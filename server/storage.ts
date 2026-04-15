@@ -1,65 +1,83 @@
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { eq, desc } from "drizzle-orm";
-import { scans, wardrobeItems, type Scan, type InsertScan, type WardrobeItem, type InsertWardrobeItem } from "@shared/schema";
+import {
+  scans,
+  wardrobeItems,
+  type Scan,
+  type InsertScan,
+  type WardrobeItem,
+  type InsertWardrobeItem,
+} from "@shared/schema";
 
-const sqlite = new Database("styleai.db");
-const db = drizzle(sqlite);
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is required");
+}
 
-// Create tables
-sqlite.exec(`
-  CREATE TABLE IF NOT EXISTS scans (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    image_data TEXT NOT NULL,
-    aesthetic TEXT NOT NULL,
-    confidence INTEGER NOT NULL,
-    style_breakdown TEXT NOT NULL,
-    occasions TEXT NOT NULL,
-    key_pieces TEXT NOT NULL,
-    color_palette TEXT NOT NULL,
-    results TEXT NOT NULL,
-    created_at INTEGER
-  );
+const client = postgres(process.env.DATABASE_URL, { ssl: "require" });
+const db = drizzle(client);
 
-  CREATE TABLE IF NOT EXISTS wardrobe_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL,
-    image_data TEXT NOT NULL,
-    brand TEXT,
-    color TEXT,
-    aesthetic TEXT,
-    source TEXT DEFAULT 'manual',
-    added_at INTEGER
-  );
-`);
+// Create tables if they don't exist
+export async function initDB() {
+  await client`
+    CREATE TABLE IF NOT EXISTS scans (
+      id SERIAL PRIMARY KEY,
+      image_data TEXT NOT NULL,
+      aesthetic TEXT NOT NULL,
+      confidence INTEGER NOT NULL,
+      style_breakdown TEXT NOT NULL,
+      occasions TEXT NOT NULL,
+      key_pieces TEXT NOT NULL,
+      color_palette TEXT NOT NULL,
+      results TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
+  await client`
+    CREATE TABLE IF NOT EXISTS wardrobe_items (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      image_data TEXT NOT NULL,
+      brand TEXT,
+      color TEXT,
+      aesthetic TEXT,
+      source TEXT DEFAULT 'manual',
+      added_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+}
 
 export interface IStorage {
-  createScan(scan: InsertScan): Scan;
-  getScans(): Scan[];
-  getScan(id: number): Scan | undefined;
-  createWardrobeItem(item: InsertWardrobeItem): WardrobeItem;
-  getWardrobeItems(): WardrobeItem[];
-  deleteWardrobeItem(id: number): void;
+  createScan(scan: InsertScan): Promise<Scan>;
+  getScans(): Promise<Scan[]>;
+  getScan(id: number): Promise<Scan | undefined>;
+  createWardrobeItem(item: InsertWardrobeItem): Promise<WardrobeItem>;
+  getWardrobeItems(): Promise<WardrobeItem[]>;
+  deleteWardrobeItem(id: number): Promise<void>;
 }
 
 export const storage: IStorage = {
-  createScan(scan) {
-    return db.insert(scans).values(scan).returning().get();
+  async createScan(scan) {
+    const [row] = await db.insert(scans).values(scan).returning();
+    return row;
   },
-  getScans() {
-    return db.select().from(scans).orderBy(desc(scans.id)).all();
+  async getScans() {
+    return db.select().from(scans).orderBy(desc(scans.id));
   },
-  getScan(id) {
-    return db.select().from(scans).where(eq(scans.id, id)).get();
+  async getScan(id) {
+    const [row] = await db.select().from(scans).where(eq(scans.id, id));
+    return row;
   },
-  createWardrobeItem(item) {
-    return db.insert(wardrobeItems).values(item).returning().get();
+  async createWardrobeItem(item) {
+    const [row] = await db.insert(wardrobeItems).values(item).returning();
+    return row;
   },
-  getWardrobeItems() {
-    return db.select().from(wardrobeItems).orderBy(desc(wardrobeItems.id)).all();
+  async getWardrobeItems() {
+    return db.select().from(wardrobeItems).orderBy(desc(wardrobeItems.id));
   },
-  deleteWardrobeItem(id) {
-    db.delete(wardrobeItems).where(eq(wardrobeItems.id, id)).run();
+  async deleteWardrobeItem(id) {
+    await db.delete(wardrobeItems).where(eq(wardrobeItems.id, id));
   },
 };

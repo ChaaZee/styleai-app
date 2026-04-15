@@ -8,8 +8,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: GEMINI_API_KEY
-        sync: false   # you fill this in on the Render dashboard
-    disk:
-      name: styleai-db
-      mountPath: /app
-      sizeGB: 1
+        sync: false   # fill in on Render dashboard
+      - key: DATABASE_URL
+        sync: false   # fill in from Supabase dashboard

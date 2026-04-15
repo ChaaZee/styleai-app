@@ -1,19 +1,19 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, serial, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Scans — each outfit analysis
-export const scans = sqliteTable("scans", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  imageData: text("image_data").notNull(), // base64 data URL
-  aesthetic: text("aesthetic").notNull(),   // e.g. "Clean Minimal"
-  confidence: integer("confidence").notNull(), // 0-100
-  styleBreakdown: text("style_breakdown").notNull(), // JSON: [{label, score}]
-  occasions: text("occasions").notNull(),   // JSON: string[]
-  keyPieces: text("key_pieces").notNull(),  // JSON: string[]
-  colorPalette: text("color_palette").notNull(), // JSON: string[]
-  results: text("results").notNull(),       // JSON: ProductResult[]
-  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+export const scans = pgTable("scans", {
+  id: serial("id").primaryKey(),
+  imageData: text("image_data").notNull(),
+  aesthetic: text("aesthetic").notNull(),
+  confidence: integer("confidence").notNull(),
+  styleBreakdown: text("style_breakdown").notNull(), // JSON string
+  occasions: text("occasions").notNull(),             // JSON string
+  keyPieces: text("key_pieces").notNull(),            // JSON string
+  colorPalette: text("color_palette").notNull(),      // JSON string
+  results: text("results").notNull(),                 // JSON string
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertScanSchema = createInsertSchema(scans).omit({
@@ -25,16 +25,16 @@ export type InsertScan = z.infer<typeof insertScanSchema>;
 export type Scan = typeof scans.$inferSelect;
 
 // Wardrobe items
-export const wardrobeItems = sqliteTable("wardrobe_items", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const wardrobeItems = pgTable("wardrobe_items", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  category: text("category").notNull(), // tops, bottoms, shoes, outerwear, accessories
+  category: text("category").notNull(),
   imageData: text("image_data").notNull(),
   brand: text("brand"),
   color: text("color"),
   aesthetic: text("aesthetic"),
-  source: text("source").default("manual"), // manual, purchase, scan
-  addedAt: integer("added_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  source: text("source").default("manual"),
+  addedAt: timestamp("added_at").defaultNow(),
 });
 
 export const insertWardrobeItemSchema = createInsertSchema(wardrobeItems).omit({
