@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Upload, Camera, Sparkles, X, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 type UploadState = "idle" | "preview" | "analyzing" | "done";
 
@@ -54,6 +54,8 @@ export default function ScanPage() {
 
       const data = await response.json();
       setUploadState("done");
+      // Invalidate history cache so new scan appears immediately
+      queryClient.invalidateQueries({ queryKey: ["/api/scans"] });
       setLocation(`/results/${data.scanId}`);
     } catch (err: any) {
       toast({ title: "Analysis failed", description: err.message, variant: "destructive" });

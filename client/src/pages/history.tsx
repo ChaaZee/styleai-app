@@ -7,6 +7,8 @@ export default function HistoryPage() {
   const [, setLocation] = useLocation();
   const { data: scans = [], isLoading } = useQuery<Scan[]>({
     queryKey: ["/api/scans"],
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   const formatDate = (ts: any) => {
