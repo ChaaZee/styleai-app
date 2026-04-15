@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: styleai-app
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.cjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false   # you fill this in on the Render dashboard
+    disk:
+      name: styleai-db
+      mountPath: /app
+      sizeGB: 1
