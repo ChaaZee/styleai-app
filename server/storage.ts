@@ -14,7 +14,10 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 
-const client = postgres(process.env.DATABASE_URL, { ssl: "require" });
+const client = postgres(process.env.DATABASE_URL, {
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  max: 10,
+});
 const db = drizzle(client);
 
 // Create tables if they don't exist
