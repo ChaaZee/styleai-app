@@ -493,6 +493,13 @@ const ANALYSIS_SCHEMA = {
         // Emerging
         "Retro-Futurism",
         "Historical Romanticism",
+        // Hybrid & Crossover
+        "Blokette",
+        "Indie Sleaze",
+        // Academia Sub-styles
+        "Light Academia",
+        // Wellness & Outdoor
+        "Granola Girl",
       ],
       description: "The dominant aesthetic category based on visual evidence.",
     },
@@ -622,9 +629,11 @@ STYLE TAXONOMY — definitions for all 35 supported aesthetics:
 
 ── NATURE & FANTASY ──
 - Cottagecore: Pastoral romance. Prairie dresses, floral blouses, linen, crochet, aprons, straw hats. Sage, cream, dusty rose, terracotta. MASC expression: linen shirts, suspenders, knit vests, wicker hats, floral prints. Slow-living, handmade-feeling.
-- Dark Academia: Scholarly and moody. Tweed blazers, turtlenecks, plaid, oxfords, trench coats. Dark brown, forest green, burgundy, camel, charcoal. MASC: tweed blazer + turtleneck + Oxford brogues + leather satchel. FEM: plaid skirts, knee socks, structured bags. Library-core layering — very wearable across all genders.
+- Dark Academia: Scholarly and moody. Tweed blazers, turtlenecks, plaid, oxfords, trench coats. PALETTE IS CRITICAL: dark brown, forest green, oxblood/burgundy, charcoal, black. NEVER cream or beige as primary colors — those are Light Academia. MASC: tweed blazer + turtleneck + Oxford brogues + leather satchel. FEM: plaid skirts, knee socks, structured bags. Inspired by gothic collegiate buildings, The Secret History, Dead Poets Society. Moody, melancholic, intellectual.
+- Light Academia: Scholarly but bright and optimistic — the warmer sibling of Dark Academia. PALETTE IS CRITICAL: cream, ivory, warm beige, oat, camel, muted pastels (dusty rose, pale sage, butter yellow). KEY ITEMS: linen dresses, cream trousers, pastel sweaters, cotton blouses, light knits, soft scarves, wire-frame glasses. DISTINGUISH from Dark Academia by palette — Light Academia is warm/light, never dark or black-dominant. Inspired by sunlit library courtyards, pastoral academia, Brideshead Revisited.
 - Fairycore: Mystical and ethereal. Chiffon, floral crowns, lace, platform boots, delicate layered jewellery. Forest green, mushroom brown, dusty purple, cream. Predominantly feminine, but seen on all genders in alt/whimsical fashion.
 - Gorpcore: Outdoor technical as everyday wear. Puffer jackets, fleece vests, cargo pants, trail shoes, beanies, fanny packs. Arc'teryx, Patagonia, The North Face. Earth tones + functional details. Very gender-neutral — classify by technical garments, not wearer.
+- Granola Girl: Casual wellness-meets-nature lifestyle aesthetic. Softer and more feminine than Gorpcore — less technical, more earthy-lifestyle. KEY SIGNALS: Patagonia or REI fleece, Birkenstocks or Chacos, hiking-inspired casual wear, flowy linen, reusable water bottle implied energy, braided hair, no-makeup. Earth tones: sage green, rust, warm brown, cream, clay. DISTINGUISH from Gorpcore: Granola Girl is more casual/lifestyle, fewer technical pieces. DISTINGUISH from Cottagecore: Granola Girl is outdoorsy/active, not pastoral/romantic.
 
 ── VINTAGE & RETRO ERAS ──
 - Y2K: Early 2000s pop-culture nostalgia. KEY SIGNALS: low-rise waistbands, rhinestone/bedazzled details, velour tracksuits, butterfly clips, tiny micro bags, baby tees, tube tops. Palette: hot pink, metallics, neon pastels, ice blue, denim-on-denim. MASC Y2K: baggy denim, Von Dutch caps, graphic jersey tees, tinted sunglasses. FEM Y2K: tube tops, low-rise mini skirts, bedazzled belts, velour co-ords. IMPORTANT: Y2K is NOT just "has platform boots" — platforms appear in 70s-80s Retro too. Y2K requires synthetic fabrics, low-rise silhouettes, or rhinestone/logo-heavy details. Earth tones + wide-leg corduroy + platform boots = 70s-80s Retro, NOT Y2K.
@@ -636,6 +645,7 @@ STYLE TAXONOMY — definitions for all 35 supported aesthetics:
 - Maximalist: More is more. Clashing prints, bold layers, statement coats, loud accessories. Animal print, jewel tones, all brights. MASC maximalism: bold printed shirts, layered jewellery, patterned suits, colourful trainers. FEM: ruffled dresses, statement coats, stacked accessories. Dopamine dressing — equally expressive across genders.
 - Glam / Party: Evening and club wear. Sequins, satin, feather trim, metallic fabrics. Gold, silver, deep red, rich jewel tones. MASC: satin shirts, embellished jackets, velvet blazers, pointed dress shoes. FEM: sequin dresses, strappy heels, metallic bags. Shine and occasion.
 - E-Girl / Alt: Internet alt culture. Striped layering tees, plaid, chunky boots, chains, alt accessories. Black, red, pastel accents. MASC expression: E-Boy — striped long-sleeve under graphic tee, chains, straight-leg jeans, skate shoes. FEM: heart clips, plaid skirts, thigh-highs. Anime meets emo.
+- Indie Sleaze: Anti-polish 2006–2012 revival, back strong in 2025–2026. Raw, messy, deliberately unkempt. KEY SIGNALS: skinny jeans, leather jacket, fishnet tights, smudged eyeliner (worn deliberately), band tees, Napoleon-style military jacket, multi-layered tops, thrifted pieces worn chaotically. Black, washed-out colours, some metallics. DISTINGUISH from 90s Grunge: Indie Sleaze is skinny/slim fit (not baggy) and rooted in 2000s indie music/MySpace era. DISTINGUISH from E-Girl: Indie Sleaze is less anime-coded, more music-scene energy. The look says "I was at a show last night."
 
 ── FORMAL & POWER DRESSING ──
 - Office Siren: Polished work dressing with a confident edge. Pencil skirts, structured blazers, silk blouses, heels. Black, white, grey, navy, red. MASC: slim-fit suit, open-collar dress shirt, oxford shoes, structured briefcase. FEM: power suits, pointed mules, corset tops. Corpcore / power dressing with intentional sex appeal.
@@ -644,6 +654,7 @@ STYLE TAXONOMY — definitions for all 35 supported aesthetics:
 ── SPORT & ACTIVE ──
 - Athleisure: Athletic pieces as everyday fashion. Performance fabrics in lifestyle context. Black, grey, white, bright accents. MASC: jogger sets, quarter-zips, track pants, running shoes, performance polos. FEM: leggings, sports bras, bombers, sneakers. Unisex aesthetic — classify by activewear silhouettes and brands (Nike, Adidas, Lululemon, Gymshark).
 - Blokecore: Football culture as fashion. Football jerseys, wide-leg jorts, trainers, bucket hats, zip hoodies. Team colours, navy, black, white. British casual meets streetwear. Predominantly masculine but increasingly worn by all genders.
+- Blokette: The sporty-feminine hybrid — Blokecore meets Coquette. KEY SIGNAL: masculine sportswear (football jersey, zip hoodie, sports socks) deliberately paired with feminine details (mini skirt, hair bows, Mary Janes, ballet flats, leg warmers, ribbons). DISTINGUISH from Blokecore: Blokette always has feminine accessories or garments. DISTINGUISH from Coquette: Blokette always has a sports/athletic piece. If you see a football jersey + mini skirt + bow = Blokette.
 
 ── COUNTERCULTURAL ──
 - Goth: Dark subculture. All black, PVC/vinyl, chokers, platform boots, dark makeup, Victorian lace details, chains. Black, deep purple, blood red. MASC goth: all-black fits, trench coats, combat boots, fishnet tops, silver jewellery, black nail polish. FEM goth: velvet dresses, corsets, platform boots, dark makeup. 40+ year subculture.
@@ -668,6 +679,11 @@ CALIBRATION RULES:
 - Choose the MOST SPECIFIC matching category. Do not default to "Vintage / Thrift" when a more specific era (Y2K, 90s Grunge, 70s-80s Retro) fits better.
 - Y2K vs 70s-80s Retro: platform boots alone do NOT confirm Y2K. Y2K requires at least one of: low-rise waistband, rhinestones/bedazzle, velour, neon pastels, baby tee, tube top, or micro bag. Corduroy + earth tones + wide-leg + platforms = 70s-80s Retro.
 - Corset/bustier tops appear across multiple aesthetics: in Y2K (paired with low-rise mini, metallics), in 70s-80s Retro (paired with wide-leg earth tones), in Coquette (paired with bows/lace/pastels), in Dark Feminine (paired with all-black). Always look at the full outfit, not just one item.
+- Dark Academia vs Light Academia: The single biggest differentiator is PALETTE. Charcoal, oxblood, forest green, espresso brown, black = Dark Academia. Cream, ivory, warm beige, soft pastels = Light Academia. Both feature blazers, trousers, loafers, satchels — palette is what separates them.
+- Gorpcore vs Granola Girl: Gorpcore = technical performance gear (Arc'teryx, shell jackets, trail runners, tactical details). Granola Girl = casual earth-tone lifestyle wear (fleece, Birkenstocks, linen, sage tones) — functional but not technical.
+- Blokecore vs Blokette: Both feature football/sports jerseys. Blokecore stays in streetwear territory (jersey + jorts + trainers). Blokette adds feminine elements (bows, mini skirt, Mary Janes, leg warmers). If a feminine item is present alongside a football jersey = Blokette.
+- Indie Sleaze vs 90s Grunge vs E-Girl: Indie Sleaze = slim/skinny fit + leather jacket + smudged liner + band tee (2000s music energy). 90s Grunge = baggy/oversized + flannel + doc martens + ripped denim (90s Seattle energy). E-Girl = striped layering + anime/emo accessories + platforms + digital-native energy.
+- Quiet Luxury vs Clean Fit vs Classic/Timeless: Quiet Luxury = expensive fabrics + heritage brands + no logos (Loro Piana, Brunello Cucinelli). Clean Fit = effortless casual basics, any brand (white tee, linen shirt, chinos, white sneakers). Classic/Timeless = structured tailoring + dress shoes + blazer (more formal than Clean Fit).
 - Minimalist outfits: distinguish carefully between the three minimalist categories:
   • Quiet Luxury = expensive fabrics, heritage brands, refined but not casual (The Row, Loro Piana energy)
   • Clean Fit = effortless casual basics, any gender — linen shirts, chinos, white sneakers, simple tees. No logos, no fuss.
