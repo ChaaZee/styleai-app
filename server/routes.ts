@@ -20,22 +20,24 @@ function generateMockResults(aesthetic: string) {
     ],
 
     "Clean Fit": [
-      { id: 1, name: "Fitted White Tank", brand: "SKIMS", price: 38, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 96, retailer: "SKIMS", url: "#" },
-      { id: 2, name: "Wide-Leg Tailored Trousers", brand: "Zara", price: 59, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 93, retailer: "Zara", url: "#" },
-      { id: 3, name: "Oversized Blazer", brand: "& Other Stories", price: 149, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 89, retailer: "& Other Stories", url: "#" },
-      { id: 4, name: "Gold Hoop Earrings", brand: "Mejuri", price: 78, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 86, retailer: "Mejuri", url: "#" },
-      { id: 5, name: "Adidas Samba", brand: "Adidas", price: 100, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80", match: 83, retailer: "Adidas", url: "#" },
-      { id: 6, name: "Satin Slip Midi Skirt", brand: "Mango", price: 49, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 80, retailer: "Mango", url: "#" },
+      { id: 1, name: "Fitted Linen Shirt", brand: "Uniqlo", price: 39, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 96, retailer: "Uniqlo", url: "#" },
+      { id: 2, name: "Slim Chino Trousers", brand: "COS", price: 89, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 93, retailer: "COS", url: "#" },
+      { id: 3, name: "White Low-Top Sneakers", brand: "Adidas", price: 90, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 90, retailer: "Adidas", url: "#" },
+      { id: 4, name: "Fitted White Tank", brand: "SKIMS", price: 38, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 87, retailer: "SKIMS", url: "#" },
+      { id: 5, name: "Wide-Leg Tailored Trousers", brand: "Zara", price: 59, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 84, retailer: "Zara", url: "#" },
+      { id: 6, name: "Minimal Watch", brand: "Skagen", price: 99, image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80", match: 81, retailer: "Skagen", url: "#" },
     ],
+
     // Legacy alias
     "Clean Girl": [
-      { id: 1, name: "Fitted White Tank", brand: "SKIMS", price: 38, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 96, retailer: "SKIMS", url: "#" },
-      { id: 2, name: "Wide-Leg Tailored Trousers", brand: "Zara", price: 59, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 93, retailer: "Zara", url: "#" },
-      { id: 3, name: "Oversized Blazer", brand: "& Other Stories", price: 149, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 89, retailer: "& Other Stories", url: "#" },
-      { id: 4, name: "Gold Hoop Earrings", brand: "Mejuri", price: 78, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 86, retailer: "Mejuri", url: "#" },
-      { id: 5, name: "Adidas Samba", brand: "Adidas", price: 100, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80", match: 83, retailer: "Adidas", url: "#" },
-      { id: 6, name: "Satin Slip Midi Skirt", brand: "Mango", price: 49, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 80, retailer: "Mango", url: "#" },
+      { id: 1, name: "Fitted Linen Shirt", brand: "Uniqlo", price: 39, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 96, retailer: "Uniqlo", url: "#" },
+      { id: 2, name: "Slim Chino Trousers", brand: "COS", price: 89, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 93, retailer: "COS", url: "#" },
+      { id: 3, name: "White Low-Top Sneakers", brand: "Adidas", price: 90, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 90, retailer: "Adidas", url: "#" },
+      { id: 4, name: "Fitted White Tank", brand: "SKIMS", price: 38, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 87, retailer: "SKIMS", url: "#" },
+      { id: 5, name: "Wide-Leg Tailored Trousers", brand: "Zara", price: 59, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 84, retailer: "Zara", url: "#" },
+      { id: 6, name: "Minimal Watch", brand: "Skagen", price: 99, image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80", match: 81, retailer: "Skagen", url: "#" },
     ],
+
 
     "Classic / Timeless": [
       { id: 1, name: "Oxford Button-Down Shirt", brand: "Brooks Brothers", price: 98, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 96, retailer: "Brooks Brothers", url: "#" },
@@ -186,38 +188,42 @@ function generateMockResults(aesthetic: string) {
     ],
 
     "Glam / Party": [
-      { id: 1, name: "Sequin Mini Dress", brand: "House of CB", price: 189, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 97, retailer: "House of CB", url: "#" },
-      { id: 2, name: "Strappy Heeled Sandals", brand: "Stuart Weitzman", price: 395, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 94, retailer: "Stuart Weitzman", url: "#" },
-      { id: 3, name: "Feather Trim Top", brand: "Zara", price: 79, image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80", match: 90, retailer: "Zara", url: "#" },
-      { id: 4, name: "Metallic Clutch Bag", brand: "ASOS", price: 45, image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80", match: 87, retailer: "ASOS", url: "#" },
-      { id: 5, name: "Crystal Drop Earrings", brand: "Completedworks", price: 145, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 84, retailer: "Completedworks", url: "#" },
-      { id: 6, name: "Satin Wide-Leg Trousers", brand: "Mango", price: 59, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 81, retailer: "Mango", url: "#" },
+      { id: 1, name: "Velvet Blazer", brand: "ASOS", price: 89, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 96, retailer: "ASOS", url: "#" },
+      { id: 2, name: "Sequin Mini Dress", brand: "House of CB", price: 149, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 93, retailer: "House of CB", url: "#" },
+      { id: 3, name: "Satin Dress Shirt", brand: "Zara", price: 69, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 90, retailer: "Zara", url: "#" },
+      { id: 4, name: "Metallic Clutch Bag", brand: "ASOS", price: 35, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 87, retailer: "ASOS", url: "#" },
+      { id: 5, name: "Crystal Drop Earrings", brand: "Completedworks", price: 95, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 84, retailer: "Completedworks", url: "#" },
+      { id: 6, name: "Pointed Dress Shoes", brand: "Aldo", price: 119, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 81, retailer: "Aldo", url: "#" },
     ],
+
     "E-Girl / Alt": [
-      { id: 1, name: "Striped Long-Sleeve Tee", brand: "Urban Outfitters", price: 38, image: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400&q=80", match: 95, retailer: "Urban Outfitters", url: "#" },
-      { id: 2, name: "Plaid Mini Skirt", brand: "UNIF", price: 89, image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80", match: 92, retailer: "UNIF", url: "#" },
-      { id: 3, name: "Platform Combat Boots", brand: "Dr. Martens", price: 180, image: "https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=400&q=80", match: 89, retailer: "Dr. Martens", url: "#" },
-      { id: 4, name: "Chain Link Choker", brand: "ASOS", price: 15, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 86, retailer: "ASOS", url: "#" },
-      { id: 5, name: "Black Fishnet Tights", brand: "Wolford", price: 35, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 83, retailer: "Wolford", url: "#" },
-      { id: 6, name: "Graphic Alt Hoodie", brand: "Killstar", price: 65, image: "https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=400&q=80", match: 80, retailer: "Killstar", url: "#" },
+      { id: 1, name: "Striped Long-Sleeve Tee", brand: "Urban Outfitters", price: 35, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 96, retailer: "Urban Outfitters", url: "#" },
+      { id: 2, name: "Chain Link Choker", brand: "ASOS", price: 12, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 93, retailer: "ASOS", url: "#" },
+      { id: 3, name: "Platform Combat Boots", brand: "Dr. Martens", price: 179, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 90, retailer: "Dr. Martens", url: "#" },
+      { id: 4, name: "Graphic Alt Hoodie", brand: "Killstar", price: 79, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 87, retailer: "Killstar", url: "#" },
+      { id: 5, name: "Straight-Leg Black Jeans", brand: "Topman", price: 55, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 84, retailer: "Topman", url: "#" },
+      { id: 6, name: "Plaid Mini Skirt", brand: "UNIF", price: 78, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 81, retailer: "UNIF", url: "#" },
     ],
+
     // ── FORMAL & POWER ──
     "Office Siren": [
-      { id: 1, name: "Power Shoulder Blazer", brand: "Zara", price: 99, image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&q=80", match: 96, retailer: "Zara", url: "#" },
-      { id: 2, name: "Pencil Midi Skirt", brand: "Banana Republic", price: 89, image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80", match: 93, retailer: "Banana Republic", url: "#" },
-      { id: 3, name: "Silk Blouse", brand: "Equipment", price: 228, image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80", match: 89, retailer: "Equipment", url: "#" },
-      { id: 4, name: "Pointed-Toe Block Heels", brand: "Steve Madden", price: 99, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 86, retailer: "Steve Madden", url: "#" },
-      { id: 5, name: "Structured Work Tote", brand: "Polene", price: 295, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 83, retailer: "Polene", url: "#" },
-      { id: 6, name: "Minimal Gold Watch", brand: "Skagen", price: 145, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 80, retailer: "Skagen", url: "#" },
+      { id: 1, name: "Power Shoulder Blazer", brand: "Zara", price: 129, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 96, retailer: "Zara", url: "#" },
+      { id: 2, name: "Slim-Fit Dress Trousers", brand: "Reiss", price: 149, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 93, retailer: "Reiss", url: "#" },
+      { id: 3, name: "Silk Blouse", brand: "Equipment", price: 198, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 90, retailer: "Equipment", url: "#" },
+      { id: 4, name: "Leather Oxford Shoes", brand: "Thursday Boot Co", price: 199, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 87, retailer: "Thursday Boot Co", url: "#" },
+      { id: 5, name: "Structured Work Tote", brand: "Polene", price: 295, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 84, retailer: "Polene", url: "#" },
+      { id: 6, name: "Minimal Gold Watch", brand: "Skagen", price: 129, image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&q=80", match: 81, retailer: "Skagen", url: "#" },
     ],
+
     "Occasion Wear": [
-      { id: 1, name: "Midi Wrap Dress", brand: "Reformation", price: 218, image: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&q=80", match: 95, retailer: "Reformation", url: "#" },
-      { id: 2, name: "Strappy Block Heels", brand: "Stuart Weitzman", price: 395, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 92, retailer: "Stuart Weitzman", url: "#" },
-      { id: 3, name: "Satin Evening Clutch", brand: "Cult Gaia", price: 195, image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80", match: 89, retailer: "Cult Gaia", url: "#" },
-      { id: 4, name: "Pearl Hoop Earrings", brand: "Completedworks", price: 195, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 86, retailer: "Completedworks", url: "#" },
-      { id: 5, name: "Structured Blazer Dress", brand: "& Other Stories", price: 179, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 83, retailer: "& Other Stories", url: "#" },
-      { id: 6, name: "Sheer Overlay Skirt", brand: "Mango", price: 69, image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80", match: 80, retailer: "Mango", url: "#" },
+      { id: 1, name: "Tailored Two-Piece Suit", brand: "Reiss", price: 595, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 96, retailer: "Reiss", url: "#" },
+      { id: 2, name: "Midi Wrap Dress", brand: "Reformation", price: 198, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 93, retailer: "Reformation", url: "#" },
+      { id: 3, name: "Oxford Dress Shoes", brand: "Thursday Boot Co", price: 199, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 90, retailer: "Thursday Boot Co", url: "#" },
+      { id: 4, name: "Pocket Square", brand: "Drake's", price: 55, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 87, retailer: "Drake's", url: "#" },
+      { id: 5, name: "Satin Evening Clutch", brand: "Cult Gaia", price: 195, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 84, retailer: "Cult Gaia", url: "#" },
+      { id: 6, name: "Pearl Hoop Earrings", brand: "Completedworks", price: 85, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 81, retailer: "Completedworks", url: "#" },
     ],
+
     // ── SPORT & ACTIVE ──
     "Blokecore": [
       { id: 1, name: "Football Jersey", brand: "Adidas", price: 85, image: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400&q=80", match: 96, retailer: "Adidas", url: "#" },
@@ -247,13 +253,14 @@ function generateMockResults(aesthetic: string) {
     ],
     // ── CULTURAL / REGIONAL ──
     "Western / Americana": [
-      { id: 1, name: "Cowboy Boots", brand: "Ariat", price: 190, image: "https://images.unsplash.com/photo-1512374382149-233c42b6a83b?w=400&q=80", match: 97, retailer: "Ariat", url: "#" },
-      { id: 2, name: "Wide-Brim Felt Hat", brand: "Lack of Color", price: 129, image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&q=80", match: 94, retailer: "Lack of Color", url: "#" },
-      { id: 3, name: "Denim Fringe Jacket", brand: "Levi's", price: 148, image: "https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?w=400&q=80", match: 91, retailer: "Levi's", url: "#" },
-      { id: 4, name: "Embroidered Western Shirt", brand: "Wrangler", price: 79, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 88, retailer: "Wrangler", url: "#" },
-      { id: 5, name: "Leather Belt with Buckle", brand: "Ariat", price: 65, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 85, retailer: "Ariat", url: "#" },
-      { id: 6, name: "Suede Fringe Bag", brand: "Free People", price: 128, image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80", match: 82, retailer: "Free People", url: "#" },
+      { id: 1, name: "Cowboy Boots", brand: "Ariat", price: 199, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 96, retailer: "Ariat", url: "#" },
+      { id: 2, name: "Wide-Brim Felt Hat", brand: "Lack of Color", price: 129, image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&q=80", match: 93, retailer: "Lack of Color", url: "#" },
+      { id: 3, name: "Embroidered Western Shirt", brand: "Wrangler", price: 79, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 90, retailer: "Wrangler", url: "#" },
+      { id: 4, name: "Bootcut Denim Jeans", brand: "Levi's", price: 99, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 87, retailer: "Levi's", url: "#" },
+      { id: 5, name: "Leather Belt with Buckle", brand: "Ariat", price: 55, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 84, retailer: "Ariat", url: "#" },
+      { id: 6, name: "Denim Fringe Jacket", brand: "Levi's", price: 149, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 81, retailer: "Levi's", url: "#" },
     ],
+
     "K-Fashion": [
       { id: 1, name: "Oversized Varsity Jacket", brand: "Ader Error", price: 289, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 96, retailer: "Ader Error", url: "#" },
       { id: 2, name: "Cropped Wide-Leg Trousers", brand: "COS", price: 109, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 93, retailer: "COS", url: "#" },
@@ -274,20 +281,22 @@ function generateMockResults(aesthetic: string) {
     ],
 
     "Historical Romanticism": [
-      { id: 1, name: "Boned Corset Top", brand: "Vivienne Westwood", price: 395, image: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=400&q=80", match: 96, retailer: "Vivienne Westwood", url: "#" },
-      { id: 2, name: "Velvet Midi Skirt", brand: "Free People", price: 148, image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80", match: 93, retailer: "Free People", url: "#" },
-      { id: 3, name: "Puffed Sleeve Blouse", brand: "& Other Stories", price: 89, image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80", match: 90, retailer: "& Other Stories", url: "#" },
-      { id: 4, name: "Victorian Lace Gloves", brand: "ASOS", price: 22, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 87, retailer: "ASOS", url: "#" },
-      { id: 5, name: "Pearl Headband", brand: "Jennifer Behr", price: 95, image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&q=80", match: 84, retailer: "Jennifer Behr", url: "#" },
-      { id: 6, name: "Mary Jane Block Heels", brand: "Reformation", price: 248, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 81, retailer: "Reformation", url: "#" },
+      { id: 1, name: "Ruffled Poet Shirt", brand: "ASOS", price: 45, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 96, retailer: "ASOS", url: "#" },
+      { id: 2, name: "Velvet Blazer", brand: "Vivienne Westwood", price: 395, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 93, retailer: "Vivienne Westwood", url: "#" },
+      { id: 3, name: "Puffed Sleeve Blouse", brand: "& Other Stories", price: 69, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 90, retailer: "& Other Stories", url: "#" },
+      { id: 4, name: "Velvet Midi Skirt", brand: "Free People", price: 128, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 87, retailer: "Free People", url: "#" },
+      { id: 5, name: "Pearl Headband", brand: "Jennifer Behr", price: 95, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 84, retailer: "Jennifer Behr", url: "#" },
+      { id: 6, name: "Buckled Dress Shoes", brand: "Dr. Martens", price: 159, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 81, retailer: "Dr. Martens", url: "#" },
     ],
+
     // ── LEGACY KEYS (map old names → closest new category) ──
     "Clean Minimal": [
-      { id: 1, name: "Relaxed Linen Blazer", brand: "& Other Stories", price: 149, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 94, retailer: "& Other Stories", url: "#" },
-      { id: 2, name: "Wide-Leg Tailored Trousers", brand: "Arket", price: 89, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 91, retailer: "Arket", url: "#" },
-      { id: 3, name: "Mango Satin Slip Dress", brand: "Mango", price: 59, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 87, retailer: "Mango", url: "#" },
-      { id: 4, name: "Structured Leather Tote", brand: "Toteme", price: 320, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 85, retailer: "Toteme", url: "#" },
+      { id: 1, name: "Relaxed Linen Blazer", brand: "& Other Stories", price: 149, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 95, retailer: "& Other Stories", url: "#" },
+      { id: 2, name: "Wide-Leg Tailored Trousers", brand: "Arket", price: 119, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 92, retailer: "Arket", url: "#" },
+      { id: 3, name: "White Low-Top Sneakers", brand: "Adidas", price: 90, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 89, retailer: "Adidas", url: "#" },
+      { id: 4, name: "Structured Leather Tote", brand: "Toteme", price: 395, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 86, retailer: "Toteme", url: "#" },
     ],
+
     "Coastal": [
       { id: 1, name: "Linen Stripe Shirt", brand: "Faherty", price: 128, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 96, retailer: "Faherty", url: "#" },
       { id: 2, name: "Relaxed Chino Shorts", brand: "J.Crew", price: 79, image: "https://images.unsplash.com/photo-1565084888279-aca607ecce0c?w=400&q=80", match: 90, retailer: "J.Crew", url: "#" },
@@ -301,11 +310,12 @@ function generateMockResults(aesthetic: string) {
       { id: 4, name: "Puffer Jacket", brand: "The North Face", price: 229, image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&q=80", match: 86, retailer: "The North Face", url: "#" },
     ],
     "Cottagecore": [
-      { id: 1, name: "Prairie Smock Dress", brand: "Anthropologie", price: 148, image: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&q=80", match: 95, retailer: "Anthropologie", url: "#" },
-      { id: 2, name: "Crochet Cardigan", brand: "Free People", price: 128, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 91, retailer: "Free People", url: "#" },
-      { id: 3, name: "Mary Jane Flats", brand: "Dr. Martens", price: 110, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 87, retailer: "Dr. Martens", url: "#" },
-      { id: 4, name: "Wicker Basket Bag", brand: "Cult Gaia", price: 188, image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80", match: 83, retailer: "Cult Gaia", url: "#" },
+      { id: 1, name: "Floral Linen Shirt", brand: "Uniqlo", price: 39, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 95, retailer: "Uniqlo", url: "#" },
+      { id: 2, name: "Crochet Cardigan", brand: "Free People", price: 148, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 92, retailer: "Free People", url: "#" },
+      { id: 3, name: "Prairie Smock Dress", brand: "Anthropologie", price: 168, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 89, retailer: "Anthropologie", url: "#" },
+      { id: 4, name: "Wicker Basket Bag", brand: "Cult Gaia", price: 195, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 86, retailer: "Cult Gaia", url: "#" },
     ],
+
     "Dark Academia": [
       { id: 1, name: "Plaid Wool Blazer", brand: "Polo Ralph Lauren", price: 349, image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&q=80", match: 96, retailer: "Polo Ralph Lauren", url: "#" },
       { id: 2, name: "High-Waist Pleated Trousers", brand: "COS", price: 119, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 92, retailer: "COS", url: "#" },
@@ -313,17 +323,19 @@ function generateMockResults(aesthetic: string) {
       { id: 4, name: "Turtleneck Knit", brand: "Uniqlo", price: 49, image: "https://images.unsplash.com/photo-1608234808654-2a8875faa7fd?w=400&q=80", match: 85, retailer: "Uniqlo", url: "#" },
     ],
     "Y2K": [
-      { id: 1, name: "Low-Rise Flare Jeans", brand: "Levi's", price: 98, image: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=400&q=80", match: 95, retailer: "Levi's", url: "#" },
-      { id: 2, name: "Crop Baby Tee", brand: "Urban Outfitters", price: 34, image: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=400&q=80", match: 92, retailer: "Urban Outfitters", url: "#" },
-      { id: 3, name: "Platform Sneakers", brand: "Buffalo London", price: 139, image: "https://images.unsplash.com/photo-1597045566677-8cf032ed6634?w=400&q=80", match: 88, retailer: "Buffalo London", url: "#" },
-      { id: 4, name: "Butterfly Hair Clips Set", brand: "ASOS", price: 12, image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&q=80", match: 84, retailer: "ASOS", url: "#" },
+      { id: 1, name: "Low-Rise Flare Jeans", brand: "Levi's", price: 99, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 95, retailer: "Levi's", url: "#" },
+      { id: 2, name: "Baggy Graphic Jersey Tee", brand: "Urban Outfitters", price: 45, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 92, retailer: "Urban Outfitters", url: "#" },
+      { id: 3, name: "Platform Sneakers", brand: "Buffalo London", price: 149, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 89, retailer: "Buffalo London", url: "#" },
+      { id: 4, name: "Von Dutch Trucker Cap", brand: "Von Dutch", price: 45, image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&q=80", match: 86, retailer: "Von Dutch", url: "#" },
     ],
+
     "Bohemian": [
-      { id: 1, name: "Tiered Maxi Skirt", brand: "Free People", price: 148, image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80", match: 94, retailer: "Free People", url: "#" },
-      { id: 2, name: "Embroidered Linen Blouse", brand: "Zara", price: 59, image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80", match: 90, retailer: "Zara", url: "#" },
-      { id: 3, name: "Suede Fringe Boots", brand: "Sam Edelman", price: 140, image: "https://images.unsplash.com/photo-1512374382149-233c42b6a83b?w=400&q=80", match: 87, retailer: "Sam Edelman", url: "#" },
-      { id: 4, name: "Layered Gold Necklace", brand: "Anthropologie", price: 48, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 83, retailer: "Anthropologie", url: "#" },
+      { id: 1, name: "Wide-Brim Straw Hat", brand: "Lack of Color", price: 119, image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&q=80", match: 95, retailer: "Lack of Color", url: "#" },
+      { id: 2, name: "Linen Button-Down Shirt", brand: "Zara", price: 49, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 92, retailer: "Zara", url: "#" },
+      { id: 3, name: "Suede Fringe Boots", brand: "Sam Edelman", price: 149, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 89, retailer: "Sam Edelman", url: "#" },
+      { id: 4, name: "Layered Gold Necklace", brand: "Anthropologie", price: 48, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 86, retailer: "Anthropologie", url: "#" },
     ],
+
     "Classic Prep": [
       { id: 1, name: "Cable-Knit Crewneck", brand: "J.Crew", price: 118, image: "https://images.unsplash.com/photo-1608256246200-53e635b5b65f?w=400&q=80", match: 95, retailer: "J.Crew", url: "#" },
       { id: 2, name: "Slim Chino Pants", brand: "Banana Republic", price: 89, image: "https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=400&q=80", match: 91, retailer: "Banana Republic", url: "#" },
@@ -340,11 +352,12 @@ function generateMockResults(aesthetic: string) {
     ],
 
     "Vintage": [
-      { id: 1, name: "Washed Denim Jacket", brand: "Levi's", price: 98, image: "https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?w=400&q=80", match: 94, retailer: "Levi's", url: "#" },
-      { id: 2, name: "Floral Wrap Midi Dress", brand: "& Other Stories", price: 119, image: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&q=80", match: 90, retailer: "& Other Stories", url: "#" },
-      { id: 3, name: "Chunky Platform Boots", brand: "Dr. Martens", price: 180, image: "https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=400&q=80", match: 87, retailer: "Dr. Martens", url: "#" },
-      { id: 4, name: "90s Logo Cap", brand: "Tommy Hilfiger", price: 38, image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&q=80", match: 83, retailer: "Tommy Hilfiger", url: "#" },
+      { id: 1, name: "Washed Denim Jacket", brand: "Levi's", price: 89, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 95, retailer: "Levi's", url: "#" },
+      { id: 2, name: "Vintage Band Graphic Tee", brand: "Urban Outfitters", price: 35, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 92, retailer: "Urban Outfitters", url: "#" },
+      { id: 3, name: "Chunky Platform Boots", brand: "Dr. Martens", price: 179, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 89, retailer: "Dr. Martens", url: "#" },
+      { id: 4, name: "90s Logo Cap", brand: "Tommy Hilfiger", price: 38, image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&q=80", match: 86, retailer: "Tommy Hilfiger", url: "#" },
     ],
+
   };
 
   return aestheticProducts[aesthetic] ?? [
