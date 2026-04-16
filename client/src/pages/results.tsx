@@ -7,6 +7,15 @@ import type { Scan } from "@shared/schema";
 interface StyleBreakdown { label: string; score: number; } // score kept for backend compat
 interface Product { id: number; name: string; brand: string; price: number; image: string; match: number; retailer: string; url: string; }
 
+// Returns true if a hex colour is light enough to need dark text
+function isLight(hex: string): boolean {
+  const c = hex.replace("#", "");
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 140;
+}
+
 export default function ResultsPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -74,12 +83,6 @@ export default function ResultsPage() {
           <div className="flex-1 min-w-0">
             <p className="text-[10px] text-muted-foreground">Scanned outfit · {scan.aesthetic}</p>
             <p className="text-sm font-semibold text-foreground">{results.length} matches found</p>
-            {/* Colour palette dots */}
-            <div className="flex gap-1 mt-1">
-              {colorPalette.map((hex, i) => (
-                <div key={i} className="w-3 h-3 rounded-full border border-border/60" style={{ backgroundColor: hex }} data-testid={`color-swatch-${i}`} />
-              ))}
-            </div>
           </div>
           <button
             onClick={() => setLocation("/")}
@@ -97,6 +100,26 @@ export default function ResultsPage() {
           ))}
           {occasions.map((o) => (
             <span key={o} className="tag">{o}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Colour palette banner */}
+      <div className="mx-5 sm:mx-8 mb-3 rounded-xl overflow-hidden border border-border">
+        <div className="flex h-12">
+          {colorPalette.map((hex, i) => (
+            <div
+              key={i}
+              className="flex-1 relative group"
+              style={{ backgroundColor: hex }}
+              data-testid={`color-swatch-${i}`}
+            >
+              <span className="absolute bottom-1.5 left-0 right-0 text-center text-[8px] font-mono opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                style={{ color: isLight(hex) ? "#00000088" : "#ffffff88" }}
+              >
+                {hex}
+              </span>
+            </div>
           ))}
         </div>
       </div>
