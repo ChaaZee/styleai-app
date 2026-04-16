@@ -173,7 +173,8 @@ export default function ResultsPage() {
           <div
             key={product.id}
             data-testid={`card-product-${product.id}`}
-            className="rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/40 transition-colors group"
+            className="rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/40 transition-colors group cursor-pointer"
+            onClick={() => window.open(product.url, '_blank', 'noopener,noreferrer')}
           >
             {/* Match score badge */}
             <div className="absolute top-2 left-2 z-10">
@@ -189,7 +190,8 @@ export default function ResultsPage() {
             {/* Info */}
             <div className="p-2">
               <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">{product.retailer}</p>
-              <p className="text-xs font-semibold text-foreground">${product.price}</p>
+              <p className="text-xs font-semibold text-foreground leading-tight mb-0.5">{product.name}</p>
+              <p className="text-xs text-primary font-semibold">${product.price}</p>
             </div>
           </div>
         ))}
