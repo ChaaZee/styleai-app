@@ -752,7 +752,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       // ── PASS 1: Garment detection (gemini-2.5-flash-lite — cheaper, simpler task) ─────
       const detectionModel = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash-lite-preview-06-17",
+        model: "gemini-2.5-flash-lite",
         systemInstruction: GARMENT_SYSTEM_INSTRUCTION,
         generationConfig: {
           responseMimeType: "application/json",
