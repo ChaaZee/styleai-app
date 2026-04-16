@@ -11,13 +11,14 @@ function generateMockResults(aesthetic: string) {
   const aestheticProducts: Record<string, any[]> = {
     // ── MINIMALIST & CLEAN ──
     "Quiet Luxury": [
-      { id: 1, name: "Cashmere Turtleneck", brand: "The Row", price: 590, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 97, retailer: "The Row", url: "#" },
-      { id: 2, name: "Tailored Camel Coat", brand: "Toteme", price: 895, image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=400&q=80", match: 94, retailer: "Toteme", url: "#" },
-      { id: 3, name: "Straight-Leg Trousers", brand: "Arket", price: 119, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 91, retailer: "Arket", url: "#" },
-      { id: 4, name: "Leather Ballet Flats", brand: "Reformation", price: 248, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 88, retailer: "Reformation", url: "#" },
-      { id: 5, name: "Structured Leather Tote", brand: "Polene", price: 320, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 85, retailer: "Polene", url: "#" },
-      { id: 6, name: "Gold Hoop Earrings", brand: "Mejuri", price: 78, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 82, retailer: "Mejuri", url: "#" },
+      { id: 1, name: "Merino Crewneck Sweater", brand: "Brunello Cucinelli", price: 695, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 97, retailer: "Brunello Cucinelli", url: "#" },
+      { id: 2, name: "Tailored Camel Overcoat", brand: "Toteme", price: 895, image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=400&q=80", match: 94, retailer: "Toteme", url: "#" },
+      { id: 3, name: "Straight-Leg Wool Trousers", brand: "Arket", price: 139, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 91, retailer: "Arket", url: "#" },
+      { id: 4, name: "Suede Penny Loafers", brand: "Grenson", price: 285, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 89, retailer: "Grenson", url: "#" },
+      { id: 5, name: "Cashmere Turtleneck", brand: "The Row", price: 590, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 86, retailer: "The Row", url: "#" },
+      { id: 6, name: "Structured Leather Tote", brand: "Polene", price: 320, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 82, retailer: "Polene", url: "#" },
     ],
+
     "Clean Girl": [
       { id: 1, name: "Fitted White Tank", brand: "SKIMS", price: 38, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 96, retailer: "SKIMS", url: "#" },
       { id: 2, name: "Wide-Leg Tailored Trousers", brand: "Zara", price: 59, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 93, retailer: "Zara", url: "#" },
@@ -27,13 +28,14 @@ function generateMockResults(aesthetic: string) {
       { id: 6, name: "Satin Slip Midi Skirt", brand: "Mango", price: 49, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 80, retailer: "Mango", url: "#" },
     ],
     "Classic / Timeless": [
-      { id: 1, name: "Relaxed Linen Blazer", brand: "& Other Stories", price: 149, image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&q=80", match: 95, retailer: "& Other Stories", url: "#" },
-      { id: 2, name: "Silk Blouse", brand: "Equipment", price: 228, image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80", match: 92, retailer: "Equipment", url: "#" },
-      { id: 3, name: "Slim Trench Coat", brand: "A.P.C.", price: 550, image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=400&q=80", match: 89, retailer: "A.P.C.", url: "#" },
-      { id: 4, name: "Pointed-Toe Pumps", brand: "Stuart Weitzman", price: 395, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 86, retailer: "Stuart Weitzman", url: "#" },
-      { id: 5, name: "Classic Oxford Shirt", brand: "Brooks Brothers", price: 89, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 83, retailer: "Brooks Brothers", url: "#" },
-      { id: 6, name: "Structured Crossbody", brand: "Mansur Gavriel", price: 395, image: "https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=400&q=80", match: 80, retailer: "Mansur Gavriel", url: "#" },
+      { id: 1, name: "Oxford Button-Down Shirt", brand: "Brooks Brothers", price: 98, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 96, retailer: "Brooks Brothers", url: "#" },
+      { id: 2, name: "Slim Trench Coat", brand: "A.P.C.", price: 595, image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=400&q=80", match: 93, retailer: "A.P.C.", url: "#" },
+      { id: 3, name: "Tailored Navy Blazer", brand: "Reiss", price: 345, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 90, retailer: "Reiss", url: "#" },
+      { id: 4, name: "Slim Chino Trousers", brand: "Banana Republic", price: 89, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 87, retailer: "Banana Republic", url: "#" },
+      { id: 5, name: "Leather Oxford Shoes", brand: "Thursday Boot Co", price: 199, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 84, retailer: "Thursday Boot Co", url: "#" },
+      { id: 6, name: "Wool Crewneck Knit", brand: "Uniqlo", price: 59, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 81, retailer: "Uniqlo", url: "#" },
     ],
+
     // ── SOFT & FEMININE ──
     "Coquette": [
       { id: 1, name: "Lace Trim Slip Dress", brand: "Reformation", price: 198, image: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&q=80", match: 97, retailer: "Reformation", url: "#" },
@@ -77,13 +79,14 @@ function generateMockResults(aesthetic: string) {
       { id: 6, name: "Plaid Wool Scarf", brand: "Burberry", price: 290, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 80, retailer: "Burberry", url: "#" },
     ],
     "Modern Preppy": [
-      { id: 1, name: "Puffer Vest", brand: "Patagonia", price: 149, image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&q=80", match: 94, retailer: "Patagonia", url: "#" },
-      { id: 2, name: "Polo Shirt", brand: "Lacoste", price: 95, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 91, retailer: "Lacoste", url: "#" },
-      { id: 3, name: "Pleated Mini Skirt", brand: "Princess Polly", price: 49, image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80", match: 88, retailer: "Princess Polly", url: "#" },
-      { id: 4, name: "Colorblock Sneakers", brand: "New Balance", price: 110, image: "https://images.unsplash.com/photo-1539185441755-769473a23570?w=400&q=80", match: 85, retailer: "New Balance", url: "#" },
-      { id: 5, name: "Grosgrain Ribbon Headband", brand: "J.Crew", price: 28, image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&q=80", match: 82, retailer: "J.Crew", url: "#" },
-      { id: 6, name: "Mini Tote Bag", brand: "L.L. Bean", price: 39, image: "https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=400&q=80", match: 79, retailer: "L.L. Bean", url: "#" },
+      { id: 1, name: "Puffer Vest", brand: "Patagonia", price: 149, image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=400&q=80", match: 95, retailer: "Patagonia", url: "#" },
+      { id: 2, name: "Classic Polo Shirt", brand: "Lacoste", price: 99, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 92, retailer: "Lacoste", url: "#" },
+      { id: 3, name: "Colourblock Sneakers", brand: "New Balance", price: 119, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 89, retailer: "New Balance", url: "#" },
+      { id: 4, name: "Chino Shorts", brand: "J.Crew", price: 69, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 86, retailer: "J.Crew", url: "#" },
+      { id: 5, name: "Pleated Mini Skirt", brand: "Princess Polly", price: 59, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 83, retailer: "Princess Polly", url: "#" },
+      { id: 6, name: "Mini Canvas Tote", brand: "L.L. Bean", price: 29, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 80, retailer: "L.L. Bean", url: "#" },
     ],
+
     // ── STREETWEAR & URBAN ──
     "Streetwear / Hypebeast": [
       { id: 1, name: "Air Max 95 OG", brand: "Nike", price: 185, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80", match: 97, retailer: "Nike", url: "#" },
@@ -136,38 +139,42 @@ function generateMockResults(aesthetic: string) {
     ],
     // ── VINTAGE & RETRO ──
     "90s Grunge": [
-      { id: 1, name: "Flannel Overshirt", brand: "Levi's", price: 79, image: "https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?w=400&q=80", match: 96, retailer: "Levi's", url: "#" },
-      { id: 2, name: "Band Graphic Tee", brand: "Urban Outfitters", price: 34, image: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400&q=80", match: 93, retailer: "Urban Outfitters", url: "#" },
-      { id: 3, name: "1460 Mono Boots", brand: "Dr. Martens", price: 180, image: "https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=400&q=80", match: 90, retailer: "Dr. Martens", url: "#" },
-      { id: 4, name: "Ripped Slim Jeans", brand: "Levi's", price: 88, image: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=400&q=80", match: 87, retailer: "Levi's", url: "#" },
-      { id: 5, name: "Satin Slip Dress", brand: "& Other Stories", price: 99, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 84, retailer: "& Other Stories", url: "#" },
-      { id: 6, name: "Oversized Plaid Cardigan", brand: "Mango", price: 69, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 81, retailer: "Mango", url: "#" },
+      { id: 1, name: "Flannel Overshirt", brand: "Levi's", price: 79, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 96, retailer: "Levi's", url: "#" },
+      { id: 2, name: "Band Graphic Tee", brand: "Urban Outfitters", price: 35, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 93, retailer: "Urban Outfitters", url: "#" },
+      { id: 3, name: "1460 Mono Boots", brand: "Dr. Martens", price: 170, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 90, retailer: "Dr. Martens", url: "#" },
+      { id: 4, name: "Ripped Slim Jeans", brand: "Levi's", price: 98, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 87, retailer: "Levi's", url: "#" },
+      { id: 5, name: "Oversized Cardigan", brand: "Mango", price: 69, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 84, retailer: "Mango", url: "#" },
+      { id: 6, name: "Leather Crossbody Bag", brand: "Urban Outfitters", price: 45, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 81, retailer: "Urban Outfitters", url: "#" },
     ],
+
     "70s-80s Retro": [
-      { id: 1, name: "High-Waist Flared Trousers", brand: "& Other Stories", price: 109, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 95, retailer: "& Other Stories", url: "#" },
-      { id: 2, name: "Wrap Midi Dress", brand: "Reformation", price: 178, image: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&q=80", match: 92, retailer: "Reformation", url: "#" },
-      { id: 3, name: "Platform Wedge Sandals", brand: "Sam Edelman", price: 110, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 89, retailer: "Sam Edelman", url: "#" },
-      { id: 4, name: "Oversized Tortoiseshell Sunglasses", brand: "Le Specs", price: 79, image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&q=80", match: 86, retailer: "Le Specs", url: "#" },
-      { id: 5, name: "Vintage Logo Tee", brand: "Urban Outfitters", price: 38, image: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400&q=80", match: 83, retailer: "Urban Outfitters", url: "#" },
-      { id: 6, name: "Gold Layered Chains", brand: "Anthropologie", price: 48, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 80, retailer: "Anthropologie", url: "#" },
+      { id: 1, name: "Flared Denim Jeans", brand: "Levi's", price: 109, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 96, retailer: "Levi's", url: "#" },
+      { id: 2, name: "Open-Collar Printed Shirt", brand: "Urban Outfitters", price: 59, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 93, retailer: "Urban Outfitters", url: "#" },
+      { id: 3, name: "Platform Chelsea Boots", brand: "Dr. Martens", price: 179, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 90, retailer: "Dr. Martens", url: "#" },
+      { id: 4, name: "Suede Jacket", brand: "ASOS", price: 149, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 87, retailer: "ASOS", url: "#" },
+      { id: 5, name: "Oversized Tortoiseshell Sunglasses", brand: "Le Specs", price: 69, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 84, retailer: "Le Specs", url: "#" },
+      { id: 6, name: "Gold Layered Chains", brand: "Anthropologie", price: 48, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 81, retailer: "Anthropologie", url: "#" },
     ],
+
     "Vintage / Thrift": [
-      { id: 1, name: "Washed Denim Jacket", brand: "Levi's", price: 98, image: "https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?w=400&q=80", match: 94, retailer: "Levi's", url: "#" },
-      { id: 2, name: "Floral Wrap Midi Dress", brand: "& Other Stories", price: 119, image: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&q=80", match: 90, retailer: "& Other Stories", url: "#" },
-      { id: 3, name: "Chunky Platform Boots", brand: "Dr. Martens", price: 180, image: "https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=400&q=80", match: 87, retailer: "Dr. Martens", url: "#" },
-      { id: 4, name: "90s Logo Cap", brand: "Tommy Hilfiger", price: 38, image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&q=80", match: 84, retailer: "Tommy Hilfiger", url: "#" },
-      { id: 5, name: "Oversized Blazer", brand: "ASOS", price: 55, image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&q=80", match: 81, retailer: "ASOS", url: "#" },
-      { id: 6, name: "Velvet Scrunchie Set", brand: "Urban Outfitters", price: 18, image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&q=80", match: 78, retailer: "Urban Outfitters", url: "#" },
+      { id: 1, name: "Washed Denim Jacket", brand: "Levi's", price: 89, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 95, retailer: "Levi's", url: "#" },
+      { id: 2, name: "Vintage Band Graphic Tee", brand: "Urban Outfitters", price: 35, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 92, retailer: "Urban Outfitters", url: "#" },
+      { id: 3, name: "Thrifted Corduroy Overshirt", brand: "ASOS", price: 55, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 89, retailer: "ASOS", url: "#" },
+      { id: 4, name: "90s Logo Cap", brand: "Tommy Hilfiger", price: 38, image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&q=80", match: 86, retailer: "Tommy Hilfiger", url: "#" },
+      { id: 5, name: "Chunky Platform Boots", brand: "Dr. Martens", price: 179, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 83, retailer: "Dr. Martens", url: "#" },
+      { id: 6, name: "Deadstock Floral Shirt", brand: "Depop", price: 28, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 80, retailer: "Depop", url: "#" },
     ],
+
     // ── BOLD & EXPRESSIVE ──
     "Maximalist": [
-      { id: 1, name: "Printed Statement Coat", brand: "Zara", price: 159, image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=400&q=80", match: 96, retailer: "Zara", url: "#" },
-      { id: 2, name: "Mixed Print Dress", brand: "Farm Rio", price: 198, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 93, retailer: "Farm Rio", url: "#" },
-      { id: 3, name: "Chunky Layered Necklace", brand: "Anthropologie", price: 68, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 90, retailer: "Anthropologie", url: "#" },
-      { id: 4, name: "Colorful Platform Heels", brand: "Steve Madden", price: 110, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 87, retailer: "Steve Madden", url: "#" },
-      { id: 5, name: "Beaded Statement Bag", brand: "Cult Gaia", price: 295, image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80", match: 84, retailer: "Cult Gaia", url: "#" },
-      { id: 6, name: "Animal Print Blazer", brand: "ASOS", price: 75, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 81, retailer: "ASOS", url: "#" },
+      { id: 1, name: "Printed Statement Shirt", brand: "Zara", price: 69, image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&q=80", match: 96, retailer: "Zara", url: "#" },
+      { id: 2, name: "Mixed Print Blazer", brand: "ASOS", price: 99, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 93, retailer: "ASOS", url: "#" },
+      { id: 3, name: "Chunky Layered Chain Necklace", brand: "Anthropologie", price: 48, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 90, retailer: "Anthropologie", url: "#" },
+      { id: 4, name: "Colourful Chunky Sneakers", brand: "New Balance", price: 139, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 87, retailer: "New Balance", url: "#" },
+      { id: 5, name: "Mixed Print Dress", brand: "Farm Rio", price: 195, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 84, retailer: "Farm Rio", url: "#" },
+      { id: 6, name: "Animal Print Coat", brand: "ASOS", price: 129, image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=400&q=80", match: 81, retailer: "ASOS", url: "#" },
     ],
+
     "Glam / Party": [
       { id: 1, name: "Sequin Mini Dress", brand: "House of CB", price: 189, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 97, retailer: "House of CB", url: "#" },
       { id: 2, name: "Strappy Heeled Sandals", brand: "Stuart Weitzman", price: 395, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 94, retailer: "Stuart Weitzman", url: "#" },
@@ -212,13 +219,14 @@ function generateMockResults(aesthetic: string) {
     ],
     // ── COUNTERCULTURAL ──
     "Goth": [
-      { id: 1, name: "Platform Chelsea Boots", brand: "Dr. Martens", price: 220, image: "https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=400&q=80", match: 97, retailer: "Dr. Martens", url: "#" },
-      { id: 2, name: "Velvet Mini Dress", brand: "Killstar", price: 89, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 94, retailer: "Killstar", url: "#" },
-      { id: 3, name: "Layered Chain Choker", brand: "ASOS", price: 20, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 90, retailer: "ASOS", url: "#" },
-      { id: 4, name: "PVC Structured Corset", brand: "Fenty", price: 120, image: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=400&q=80", match: 87, retailer: "Fenty", url: "#" },
-      { id: 5, name: "Fishnet Layering Top", brand: "Wolford", price: 55, image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80", match: 84, retailer: "Wolford", url: "#" },
-      { id: 6, name: "Skull Print Tote", brand: "Alexander McQueen", price: 495, image: "https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=400&q=80", match: 81, retailer: "Alexander McQueen", url: "#" },
+      { id: 1, name: "Platform Chelsea Boots", brand: "Dr. Martens", price: 179, image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400&q=80", match: 96, retailer: "Dr. Martens", url: "#" },
+      { id: 2, name: "Oversized Black Trench Coat", brand: "ASOS", price: 119, image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=400&q=80", match: 93, retailer: "ASOS", url: "#" },
+      { id: 3, name: "Layered Chain Choker", brand: "ASOS", price: 18, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 90, retailer: "ASOS", url: "#" },
+      { id: 4, name: "All-Black Skinny Jeans", brand: "Topman", price: 55, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 87, retailer: "Topman", url: "#" },
+      { id: 5, name: "Velvet Blazer", brand: "ASOS", price: 89, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 84, retailer: "ASOS", url: "#" },
+      { id: 6, name: "Fishnet Layering Top", brand: "Wolford", price: 45, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 81, retailer: "Wolford", url: "#" },
     ],
+
     "Grunge / Punk": [
       { id: 1, name: "Studded Leather Jacket", brand: "ASOS", price: 110, image: "https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?w=400&q=80", match: 96, retailer: "ASOS", url: "#" },
       { id: 2, name: "Band Graphic Tee", brand: "Urban Outfitters", price: 34, image: "https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=400&q=80", match: 93, retailer: "Urban Outfitters", url: "#" },
@@ -237,22 +245,24 @@ function generateMockResults(aesthetic: string) {
       { id: 6, name: "Suede Fringe Bag", brand: "Free People", price: 128, image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80", match: 82, retailer: "Free People", url: "#" },
     ],
     "K-Fashion": [
-      { id: 1, name: "Oversized Varsity Jacket", brand: "Maje", price: 349, image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&q=80", match: 95, retailer: "Maje", url: "#" },
-      { id: 2, name: "Coordinated Mini Set", brand: "Ader Error", price: 280, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 92, retailer: "Ader Error", url: "#" },
-      { id: 3, name: "Platform Dad Sneakers", brand: "New Balance", price: 110, image: "https://images.unsplash.com/photo-1539185441755-769473a23570?w=400&q=80", match: 89, retailer: "New Balance", url: "#" },
-      { id: 4, name: "Pastel Cardigan", brand: "COS", price: 89, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 86, retailer: "COS", url: "#" },
-      { id: 5, name: "Mini Shoulder Bag", brand: "Marc Jacobs", price: 295, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 83, retailer: "Marc Jacobs", url: "#" },
-      { id: 6, name: "Pleated Midi Skirt", brand: "Reformation", price: 148, image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80", match: 80, retailer: "Reformation", url: "#" },
+      { id: 1, name: "Oversized Varsity Jacket", brand: "Ader Error", price: 289, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 96, retailer: "Ader Error", url: "#" },
+      { id: 2, name: "Cropped Wide-Leg Trousers", brand: "COS", price: 109, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 93, retailer: "COS", url: "#" },
+      { id: 3, name: "Platform Dad Sneakers", brand: "New Balance", price: 139, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 90, retailer: "New Balance", url: "#" },
+      { id: 4, name: "Pastel Oversized Cardigan", brand: "COS", price: 89, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 87, retailer: "COS", url: "#" },
+      { id: 5, name: "Bucket Hat", brand: "Maje", price: 65, image: "https://images.unsplash.com/photo-1521369909029-2afed882baee?w=400&q=80", match: 84, retailer: "Maje", url: "#" },
+      { id: 6, name: "Mini Shoulder Bag", brand: "Marc Jacobs", price: 175, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 81, retailer: "Marc Jacobs", url: "#" },
     ],
+
     // ── EMERGING ──
     "Retro-Futurism": [
-      { id: 1, name: "Metallic Moto Jacket", brand: "ASOS", price: 120, image: "https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?w=400&q=80", match: 96, retailer: "ASOS", url: "#" },
-      { id: 2, name: "Vinyl Flared Trousers", brand: "Zara", price: 69, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 93, retailer: "Zara", url: "#" },
-      { id: 3, name: "Holographic Platform Boots", brand: "Steve Madden", price: 130, image: "https://images.unsplash.com/photo-1605812860427-4024433a70fd?w=400&q=80", match: 90, retailer: "Steve Madden", url: "#" },
-      { id: 4, name: "Silver Mirror Sunglasses", brand: "Le Specs", price: 69, image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&q=80", match: 87, retailer: "Le Specs", url: "#" },
-      { id: 5, name: "Chrome Mini Bag", brand: "Coperni", price: 395, image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80", match: 84, retailer: "Coperni", url: "#" },
-      { id: 6, name: "Asymmetric Top", brand: "Mango", price: 49, image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80", match: 81, retailer: "Mango", url: "#" },
+      { id: 1, name: "Metallic Bomber Jacket", brand: "ASOS", price: 129, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 96, retailer: "ASOS", url: "#" },
+      { id: 2, name: "Reflective Cargo Trousers", brand: "Zara", price: 79, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 93, retailer: "Zara", url: "#" },
+      { id: 3, name: "Futuristic Running Shoes", brand: "Salomon", price: 149, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 90, retailer: "Salomon", url: "#" },
+      { id: 4, name: "Silver Mirror Sunglasses", brand: "Le Specs", price: 69, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 87, retailer: "Le Specs", url: "#" },
+      { id: 5, name: "Chrome Crossbody Bag", brand: "Coperni", price: 395, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 84, retailer: "Coperni", url: "#" },
+      { id: 6, name: "Asymmetric Knit Top", brand: "Mango", price: 59, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 81, retailer: "Mango", url: "#" },
     ],
+
     "Historical Romanticism": [
       { id: 1, name: "Boned Corset Top", brand: "Vivienne Westwood", price: 395, image: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=400&q=80", match: 96, retailer: "Vivienne Westwood", url: "#" },
       { id: 2, name: "Velvet Midi Skirt", brand: "Free People", price: 148, image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80", match: 93, retailer: "Free People", url: "#" },
@@ -311,11 +321,14 @@ function generateMockResults(aesthetic: string) {
       { id: 4, name: "Quilted Vest", brand: "Barbour", price: 149, image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400&q=80", match: 84, retailer: "Barbour", url: "#" },
     ],
     "Athleisure": [
-      { id: 1, name: "Seamless Leggings", brand: "Lululemon", price: 98, image: "https://images.unsplash.com/photo-1506902455-a342f2b12d93?w=400&q=80", match: 96, retailer: "Lululemon", url: "#" },
-      { id: 2, name: "Oversized Hoodie", brand: "Nike", price: 75, image: "https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=400&q=80", match: 91, retailer: "Nike", url: "#" },
-      { id: 3, name: "Court Low Sneakers", brand: "New Balance", price: 85, image: "https://images.unsplash.com/photo-1539185441755-769473a23570?w=400&q=80", match: 88, retailer: "New Balance", url: "#" },
-      { id: 4, name: "Mini Crossbody Bag", brand: "Adidas", price: 45, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 83, retailer: "Adidas", url: "#" },
+      { id: 1, name: "Seamless Jogger Set", brand: "Gymshark", price: 89, image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80", match: 96, retailer: "Gymshark", url: "#" },
+      { id: 2, name: "Oversized Hoodie", brand: "Nike", price: 75, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 93, retailer: "Nike", url: "#" },
+      { id: 3, name: "Court Low Sneakers", brand: "New Balance", price: 89, image: "https://images.unsplash.com/photo-1582588678413-dbf45f4823e9?w=400&q=80", match: 90, retailer: "New Balance", url: "#" },
+      { id: 4, name: "Track Pants", brand: "Adidas", price: 65, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 87, retailer: "Adidas", url: "#" },
+      { id: 5, name: "Seamless Leggings", brand: "Lululemon", price: 98, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 84, retailer: "Lululemon", url: "#" },
+      { id: 6, name: "Quarter-Zip Pullover", brand: "Lululemon", price: 118, image: "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=400&q=80", match: 81, retailer: "Lululemon", url: "#" },
     ],
+
     "Vintage": [
       { id: 1, name: "Washed Denim Jacket", brand: "Levi's", price: 98, image: "https://images.unsplash.com/photo-1523205771623-e0faa4d2813d?w=400&q=80", match: 94, retailer: "Levi's", url: "#" },
       { id: 2, name: "Floral Wrap Midi Dress", brand: "& Other Stories", price: 119, image: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=400&q=80", match: 90, retailer: "& Other Stories", url: "#" },
@@ -477,66 +490,72 @@ const ANALYSIS_SCHEMA = {
 // ─── System instruction — 35-category style taxonomy + calibration rules ───
 const SYSTEM_INSTRUCTION = `You are StyleAI, an expert fashion stylist and aesthetic analyst specialising in visual outfit classification.
 
+GENDER-INCLUSIVE CLASSIFICATION:
+- Fashion aesthetics apply to ALL genders. Classify based on visual garments, silhouettes, and styling — never assume gender from body type alone.
+- Every aesthetic below lists both masculine and feminine expressions of that style. Identify whichever expression is visible.
+- A man wearing quiet luxury tailoring is Quiet Luxury. A man in ballet flats and pearls is Coquette. A woman in cargo pants and Jordans is Streetwear. Classify what you SEE.
+- When unsure of gender from the image, describe the clothing items neutrally and classify by aesthetic — not by assumed gender.
+
 STYLE TAXONOMY — definitions for all 35 supported aesthetics:
 
 ── MINIMALIST & CLEAN ──
-- Quiet Luxury: Understated wealth signalling. Neutral palette (camel, cream, black, ivory, navy). Cashmere, quality wool, silk. No visible logos. Tailored or relaxed but always refined. Brands: The Row, Totême, Loro Piana.
-- Clean Girl: Effortless polished minimalism. White tanks, wide-leg trousers, hoops, slicked buns, blazers. Off-white/black/beige palette. "No-makeup makeup" energy. Basics done flawlessly.
-- Classic / Timeless: Structured, heritage-quality, investment dressing. Blazers, Oxford shirts, pencil skirts, trench coats, pumps. Navy/black/white/grey/camel. Endlessly polished.
+- Quiet Luxury: Understated wealth signalling. Neutral palette (camel, cream, black, ivory, navy). Quality fabrics — cashmere, wool, silk, fine leather. No visible logos. MASC: tailored trousers, merino crewnecks, suede loafers, unstructured blazers, clean white shirts. FEM: wide-leg trousers, cashmere turtlenecks, ballet flats, structured totes. Brands: The Row, Totême, Loro Piana, Brunello Cucinelli, Auralee.
+- Clean Girl: Effortless polished minimalism. Off-white/black/beige palette. MASC: fitted white tees, straight-leg chinos, minimal white sneakers, silver chain, clean haircut. FEM: white tanks, wide-leg trousers, hoops, slicked buns, blazers. "No-effort effort" done flawlessly. Basics executed with precision.
+- Classic / Timeless: Structured, heritage-quality, investment dressing. Navy/black/white/grey/camel. MASC: Oxford shirts, slim chinos, leather Oxford shoes, tailored navy blazers, trench coats. FEM: pencil skirts, silk blouses, pointed pumps, structured handbags. Endlessly polished, never trendy.
 
 ── SOFT & FEMININE ──
-- Coquette: Hyperfeminine romanticism. Bows, lace, pearls, satin slips, corset tops, Mary Janes. Dusty pink, cream, lilac, powder blue. Lana del Rey / Bridgerton energy. Evolving into Rococo Revival.
-- Soft Girl / Kawaii: Pastel-cute, K-pop influenced. Cardigans, pleated mini skirts, heart clips, layered necklaces, cute sneakers. Baby pink, lavender, mint, peach. Gentle and playful.
-- Pink Pilates / Wellness: Aspirational wellness aesthetic. Ballet-inspired athleisure, ribbed sets, tennis skirts, satin scrunchies. Blush pink, cream, mauve, dusty rose. Fitness meets fashion.
-- Dark Feminine: Femme fatale confidence. Corsets, lace midi dresses, satin slips, black boots, statement earrings. Black, deep burgundy, forest green, dark navy. Villain-era energy.
+- Coquette: Hyperfeminine romanticism. Bows, lace, pearls, satin slips, corset tops, Mary Janes. Dusty pink, cream, lilac, powder blue. Lana del Rey / Bridgerton energy. Also seen in male fashion as Femboy / soft masc — satin blouses, lace trim, bows. Evolving into Rococo Revival.
+- Soft Girl / Kawaii: Pastel-cute, K-pop influenced. Cardigans, pleated mini skirts, heart clips, layered necklaces, cute sneakers. Baby pink, lavender, mint, peach. Also on men as pastel fits, cute prints, feminine silhouettes worn without irony. Gentle and playful.
+- Pink Pilates / Wellness: Aspirational wellness aesthetic. Ballet-inspired athleisure, ribbed sets, tennis skirts/shorts, satin scrunchies. Blush pink, cream, mauve, dusty rose. Also on men: blush-toned activewear, pastel zip-ups, clean white training shoes. Fitness meets fashion.
+- Dark Feminine: Femme fatale confidence. Corsets, lace midi dresses, satin slips, black boots, statement earrings. Black, deep burgundy, forest green, dark navy. Predominantly feminine expression — villain-era energy.
 
 ── PREPPY & COLLEGIATE ──
-- Old School Preppy: East Coast elite heritage. Oxford shirts, blazers, chinos, loafers, cable knits, pearl bracelets. Navy, white, green, red, burgundy, khaki. Country club / Ivy League.
-- Modern Preppy: Gen Z preppy reinvention. Puffer vests, polo shirts, pleated minis, colourful accessories. Brighter, more playful than classic prep. Vibrant pastels + white.
+- Old School Preppy: East Coast elite heritage. Oxford shirts, blazers, chinos, loafers, cable knits. Navy, white, green, red, burgundy, khaki. MASC: quarter-zip sweaters, boat shoes, khaki chinos, club ties, navy blazers. FEM: pearl bracelets, plaid skirts, headbands, polo dresses. Country club / Ivy League.
+- Modern Preppy: Gen Z preppy reinvention. Brighter, more playful than classic prep. Vibrant pastels + white. MASC: polo shirts, colourful shorts, clean sneakers, caps worn backwards. FEM: pleated minis, puffer vests, grosgrain headbands, mini totes.
 
 ── STREETWEAR & URBAN ──
-- Streetwear / Hypebeast: Urban culture, sneaker drops, brand-forward. Graphic hoodies, cargo pants, oversized tees, rare sneakers, crossbody bags. Supreme, Off-White, Corteiz. Bold graphics and logos.
-- Skatecore: Baggy and anti-fashion. Wide-leg jeans, graphic tees, Vans/DC shoes, caps, overshirts. Washed denim, black, white, earth tones. Skate brand logos. Relaxed and deliberate.
-- Techwear: Utilitarian futurism. Technical jackets, cargo trousers, tactical vests, trail shoes, dark palette. ACRONYM, Veilance, Stone Island. Modular, functional, all-weather.
-- Baddie: Glamorous urban confidence. Bodycon dresses, bodysuits, high heels, statement bags, fur coats. Black, nude, gold, animal print. Polished, form-fitting, bold makeup signals.
+- Streetwear / Hypebeast: Urban culture, sneaker drops, brand-forward. Graphic hoodies, cargo pants, oversized tees, rare sneakers, crossbody bags. Supreme, Off-White, Corteiz, Jordan Brand. Bold graphics and logos. Worn across all genders — key signals are the BRANDS and SILHOUETTES, not the wearer.
+- Skatecore: Baggy and anti-fashion. Wide-leg jeans, graphic tees, Vans/DC shoes, caps, overshirts. Washed denim, black, white, earth tones. Skate brand logos. MASC dominant but gender-fluid. Relaxed and deliberate.
+- Techwear: Utilitarian futurism. Technical jackets, cargo trousers, tactical vests, trail shoes, dark palette. ACRONYM, Veilance, Stone Island, Arc'teryx Veilance. Modular, functional, all-weather. Predominantly masculine expression but worn by all.
+- Baddie: Glamorous urban confidence. Bodycon silhouettes, form-fitting co-ords, high heels, statement bags, fur-trim coats. Black, nude, gold, animal print. Polished, confident, bold. Predominantly feminine expression.
 
 ── NATURE & FANTASY ──
-- Cottagecore: Pastoral romance. Prairie dresses, floral blouses, linen, crochet, aprons, straw hats. Sage, cream, dusty rose, terracotta. Slow-living, handmade-feeling.
-- Dark Academia: Scholarly and moody. Tweed blazers, turtlenecks, plaid skirts, oxfords, knee socks, trench coats. Dark brown, forest green, burgundy, camel, charcoal. Library-core layering.
-- Fairycore: Mystical and ethereal. Chiffon dresses, floral crowns, lace tights, platform boots, layered delicate jewellery. Forest green, mushroom brown, dusty purple, cream. Fantasy nature spirit.
-- Gorpcore: Outdoor technical as everyday wear. Puffer jackets, fleece vests, cargo pants, trail shoes, beanies, fanny packs. Arc'teryx, Patagonia, The North Face. Earth tones + functional details.
+- Cottagecore: Pastoral romance. Prairie dresses, floral blouses, linen, crochet, aprons, straw hats. Sage, cream, dusty rose, terracotta. MASC expression: linen shirts, suspenders, knit vests, wicker hats, floral prints. Slow-living, handmade-feeling.
+- Dark Academia: Scholarly and moody. Tweed blazers, turtlenecks, plaid, oxfords, trench coats. Dark brown, forest green, burgundy, camel, charcoal. MASC: tweed blazer + turtleneck + Oxford brogues + leather satchel. FEM: plaid skirts, knee socks, structured bags. Library-core layering — very wearable across all genders.
+- Fairycore: Mystical and ethereal. Chiffon, floral crowns, lace, platform boots, delicate layered jewellery. Forest green, mushroom brown, dusty purple, cream. Predominantly feminine, but seen on all genders in alt/whimsical fashion.
+- Gorpcore: Outdoor technical as everyday wear. Puffer jackets, fleece vests, cargo pants, trail shoes, beanies, fanny packs. Arc'teryx, Patagonia, The North Face. Earth tones + functional details. Very gender-neutral — classify by technical garments, not wearer.
 
 ── VINTAGE & RETRO ERAS ──
-- Y2K: Early 2000s nostalgia. Low-rise jeans, tube tops, rhinestone belts, platform sandals, velour tracksuits, tiny bags. Hot pink, metallics, denim, neon pastels. Bedazzled and carefree.
-- 90s Grunge: Dishevelled rebellion. Flannel shirts, band tees, ripped jeans, Doc Martens, slip dresses, cardigans. Black, plaid earth tones, faded denim, burgundy. Kurt Cobain energy.
-- 70s-80s Retro: Decade nostalgia. Flared trousers, wrap dresses, platform shoes, vintage blazers, gold jewellery. Mustard, rust, olive, navy, metallics, warm earth tones. Disco to power dressing.
-- Vintage / Thrift: Curated secondhand across any era. Heritage pieces, mixed-era layering, one-of-a-kind details. Washed/worn textures. Depop energy. Earth tones, muted brights.
+- Y2K: Early 2000s nostalgia. Low-rise cuts, rhinestone details, velour tracksuits, tiny bags, platform silhouettes. Hot pink, metallics, denim, neon pastels. MASC Y2K: baggy denim, tinted tints, Von Dutch caps, graphic jersey tees, chunky sneakers. FEM Y2K: tube tops, mini skirts, bedazzled accessories.
+- 90s Grunge: Dishevelled rebellion. Flannel shirts, band tees, ripped jeans, Doc Martens. Black, plaid earth tones, faded denim, burgundy. MASC: flannel overshirt + band tee + ripped jeans + Docs. FEM: slip dresses + flannel + chunky boots. Kurt Cobain / Courtney Love energy — equally masculine and feminine.
+- 70s-80s Retro: Decade nostalgia. MASC: flared denim, printed open shirts, suede jackets, platform boots, gold chains, aviator shades. FEM: wrap dresses, flared trousers, platform wedges, disco blouses. Mustard, rust, olive, navy, metallics, warm earth tones.
+- Vintage / Thrift: Curated secondhand across any era. Heritage pieces, mixed-era layering, one-of-a-kind details. Washed/worn textures. MASC: vintage band tees, deadstock denim, old-logo caps, thrifted blazers. FEM: floral wrap dresses, vintage blazers, 90s slip dresses. Depop energy. Earth tones, muted brights.
 
 ── BOLD & EXPRESSIVE ──
-- Maximalist: More is more. Clashing prints, bold layers, statement coats, loud accessories, eye-catching palette. Animal print, jewel tones, all brights. Dopamine dressing energy.
-- Glam / Party: Evening and club wear. Sequin dresses, satin slips, feather trim, strappy heels, metallic bags. Gold, silver, deep red, rich jewel tones. Sequins and shine.
-- E-Girl / Alt: Internet alt culture. Striped layering tees, plaid skirts, chunky boots, chains, heart makeup, alt accessories. Black, red, pastel accents. Anime meets emo.
+- Maximalist: More is more. Clashing prints, bold layers, statement coats, loud accessories. Animal print, jewel tones, all brights. MASC maximalism: bold printed shirts, layered jewellery, patterned suits, colourful trainers. FEM: ruffled dresses, statement coats, stacked accessories. Dopamine dressing — equally expressive across genders.
+- Glam / Party: Evening and club wear. Sequins, satin, feather trim, metallic fabrics. Gold, silver, deep red, rich jewel tones. MASC: satin shirts, embellished jackets, velvet blazers, pointed dress shoes. FEM: sequin dresses, strappy heels, metallic bags. Shine and occasion.
+- E-Girl / Alt: Internet alt culture. Striped layering tees, plaid, chunky boots, chains, alt accessories. Black, red, pastel accents. MASC expression: E-Boy — striped long-sleeve under graphic tee, chains, straight-leg jeans, skate shoes. FEM: heart clips, plaid skirts, thigh-highs. Anime meets emo.
 
 ── FORMAL & POWER DRESSING ──
-- Office Siren: Polished work dressing with feminine edge. Pencil skirts, structured blazers, silk blouses, heels. Black, white, grey, navy, red. Corpcore / power dressing with sex appeal.
-- Occasion Wear: Elegant event dressing. Midi dresses, structured coats, heels, clutch bags, statement earrings. Classic navy, black, ivory, rich colours. Semi-formal to formal.
+- Office Siren: Polished work dressing with a confident edge. Pencil skirts, structured blazers, silk blouses, heels. Black, white, grey, navy, red. MASC: slim-fit suit, open-collar dress shirt, oxford shoes, structured briefcase. FEM: power suits, pointed mules, corset tops. Corpcore / power dressing with intentional sex appeal.
+- Occasion Wear: Elegant event dressing. Structured pieces, elevated fabrics, sophisticated silhouettes. Classic navy, black, ivory, rich colours. MASC: suit, dress shirt, tailored trousers, Oxford shoes, pocket square. FEM: midi dresses, structured coats, heels, clutch bags. Semi-formal to formal.
 
 ── SPORT & ACTIVE ──
-- Athleisure: Athletic pieces as everyday fashion. Leggings, sports bras, bombers, sneakers, track pants, zip-ups. Black, grey, white, bright accents. Performance fabrics in lifestyle context.
-- Blokecore: Football culture as fashion. Football jerseys, wide-leg jorts, trainers, bucket hats, zip hoodies. Team colours, navy, black, white. British casual meets streetwear.
+- Athleisure: Athletic pieces as everyday fashion. Performance fabrics in lifestyle context. Black, grey, white, bright accents. MASC: jogger sets, quarter-zips, track pants, running shoes, performance polos. FEM: leggings, sports bras, bombers, sneakers. Unisex aesthetic — classify by activewear silhouettes and brands (Nike, Adidas, Lululemon, Gymshark).
+- Blokecore: Football culture as fashion. Football jerseys, wide-leg jorts, trainers, bucket hats, zip hoodies. Team colours, navy, black, white. British casual meets streetwear. Predominantly masculine but increasingly worn by all genders.
 
 ── COUNTERCULTURAL ──
-- Goth: Dark subculture. All black, PVC/vinyl, chokers, platform boots, dark makeup, Victorian lace details, chains. Black, deep purple, blood red. 40+ year subculture.
-- Grunge / Punk: Anti-fashion DIY spirit. Flannel, band tees, ripped denim, combat boots, leather jackets, safety pins, studded details. Black, plaid, faded denim. Rebellious and intentional.
-- Bohemian: Free-spirited and artisanal. Flowy maxi dresses, crochet, fringe, layered jewellery, wide-brim hats, sandals. Rust, olive, warm brown, terracotta. Festival and travel energy.
+- Goth: Dark subculture. All black, PVC/vinyl, chokers, platform boots, dark makeup, Victorian lace details, chains. Black, deep purple, blood red. MASC goth: all-black fits, trench coats, combat boots, fishnet tops, silver jewellery, black nail polish. FEM goth: velvet dresses, corsets, platform boots, dark makeup. 40+ year subculture.
+- Grunge / Punk: Anti-fashion DIY spirit. Flannel, band tees, ripped denim, combat boots, leather jackets, safety pins, studded details. Black, plaid, faded denim. MASC dominant but gender-neutral in practice — classify by the DIY, rebellious garment signals.
+- Bohemian: Free-spirited and artisanal. Flowy silhouettes, crochet, fringe, layered jewellery, wide-brim hats, sandals. Rust, olive, warm brown, terracotta. MASC boho: linen shirts, wide-brim hats, fringe vests, layered necklaces, leather sandals. FEM: maxi dresses, crochet tops, fringe bags. Festival and travel energy.
 
 ── CULTURAL / REGIONAL ──
-- Western / Americana: American West. Cowboy boots, wide-brim hats, denim jackets, fringe, plaid, leather belts. Denim blue, tan, red, brown, cream. Country music / Cowboycore.
-- K-Fashion: Korean street fashion influence. Oversized varsity jackets, mini skirts, platform shoes, coordinated sets, cardigans. Pastel coordinates, black + white, school-uniform tones. K-pop / Ulzzang.
+- Western / Americana: American West. Cowboy boots, wide-brim hats, denim jackets, fringe, plaid, leather belts. Denim blue, tan, red, brown, cream. MASC: cowboy boots + bootcut jeans + western shirt + belt buckle. FEM: fringe jackets, cowboy boots, denim mini. Country music / Cowboycore — equally worn across genders.
+- K-Fashion: Korean street fashion influence. Oversized varsity jackets, coordinated sets, platform shoes, cardigans. Pastel coordinates, black + white, school-uniform tones. MASC K-fashion: oversized blazers, cropped trousers, platform sneakers, soft-colour co-ords, bucket hats. FEM: mini skirts, platform shoes, pastel sets. K-pop / Ulzzang — very common across all genders.
 
 ── EMERGING ──
-- Retro-Futurism: Future-nostalgia. Metallic jackets, vinyl pants, bold asymmetric pieces, futuristic shoes. Silver, holographic, white, neon, chrome. Y3K energy, sci-fi inspired.
-- Historical Romanticism: Wearable historical fantasy. Corsets, lace blouses, velvet midis, puffed sleeves, pearl headbands. Dusty pink, deep blue, ivory, gold, jewel tones. Regencycore / Castlecore.
+- Retro-Futurism: Future-nostalgia. Metallic, vinyl, bold asymmetric pieces, futuristic silhouettes. Silver, holographic, white, neon, chrome. MASC: metallic bomber, utility cargo in silver/white, futuristic sneakers, chrome accessories. FEM: metallic moto jacket, vinyl flared trousers, holographic boots. Y3K energy, sci-fi inspired.
+- Historical Romanticism: Wearable historical fantasy. Corsets, lace blouses, velvet midis, puffed sleeves, pearl headbands. Dusty pink, deep blue, ivory, gold, jewel tones. MASC: ruffled poet shirts, velvet blazers, slim breeches, buckled shoes, lace cuffs. FEM: corsets, puffed sleeves, floral midis. Regencycore / Castlecore.
 
 CALIBRATION RULES:
 - Complete the reasoning field fully before any classification field.
@@ -546,7 +565,8 @@ CALIBRATION RULES:
 - If signals for two aesthetics are nearly equal, set confidence below 70 and populate secondaryAesthetic.
 - Do not default to the most common category — classify from evidence only.
 - Choose the MOST SPECIFIC matching category. Do not default to "Vintage / Thrift" when a more specific era (Y2K, 90s Grunge, 70s-80s Retro) fits better.
-- Minimalist outfits: distinguish between Quiet Luxury (quality/heritage signals), Clean Girl (polished basics), and Classic / Timeless (structured tailoring).`;
+- Minimalist outfits: distinguish between Quiet Luxury (quality/heritage signals), Clean Girl (polished basics), and Classic / Timeless (structured tailoring).
+- GENDER: Do not let perceived gender of the wearer bias classification. Classify the GARMENTS and STYLING, not the person.`;
 
 export async function registerRoutes(httpServer: Server, app: Express) {
   await initDB();
