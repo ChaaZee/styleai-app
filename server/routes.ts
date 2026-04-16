@@ -19,6 +19,15 @@ function generateMockResults(aesthetic: string) {
       { id: 6, name: "Structured Leather Tote", brand: "Polene", price: 320, image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=400&q=80", match: 82, retailer: "Polene", url: "#" },
     ],
 
+    "Clean Fit": [
+      { id: 1, name: "Fitted White Tank", brand: "SKIMS", price: 38, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 96, retailer: "SKIMS", url: "#" },
+      { id: 2, name: "Wide-Leg Tailored Trousers", brand: "Zara", price: 59, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 93, retailer: "Zara", url: "#" },
+      { id: 3, name: "Oversized Blazer", brand: "& Other Stories", price: 149, image: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=400&q=80", match: 89, retailer: "& Other Stories", url: "#" },
+      { id: 4, name: "Gold Hoop Earrings", brand: "Mejuri", price: 78, image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400&q=80", match: 86, retailer: "Mejuri", url: "#" },
+      { id: 5, name: "Adidas Samba", brand: "Adidas", price: 100, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80", match: 83, retailer: "Adidas", url: "#" },
+      { id: 6, name: "Satin Slip Midi Skirt", brand: "Mango", price: 49, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 80, retailer: "Mango", url: "#" },
+    ],
+    // Legacy alias
     "Clean Girl": [
       { id: 1, name: "Fitted White Tank", brand: "SKIMS", price: 38, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 96, retailer: "SKIMS", url: "#" },
       { id: 2, name: "Wide-Leg Tailored Trousers", brand: "Zara", price: 59, image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80", match: 93, retailer: "Zara", url: "#" },
@@ -27,6 +36,7 @@ function generateMockResults(aesthetic: string) {
       { id: 5, name: "Adidas Samba", brand: "Adidas", price: 100, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80", match: 83, retailer: "Adidas", url: "#" },
       { id: 6, name: "Satin Slip Midi Skirt", brand: "Mango", price: 49, image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80", match: 80, retailer: "Mango", url: "#" },
     ],
+
     "Classic / Timeless": [
       { id: 1, name: "Oxford Button-Down Shirt", brand: "Brooks Brothers", price: 98, image: "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80", match: 96, retailer: "Brooks Brothers", url: "#" },
       { id: 2, name: "Slim Trench Coat", brand: "A.P.C.", price: 595, image: "https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=400&q=80", match: 93, retailer: "A.P.C.", url: "#" },
@@ -380,7 +390,7 @@ const ANALYSIS_SCHEMA = {
       enum: [
         // Minimalist & Clean
         "Quiet Luxury",
-        "Clean Girl",
+        "Clean Fit",
         "Classic / Timeless",
         // Soft & Feminine
         "Coquette",
@@ -500,7 +510,7 @@ STYLE TAXONOMY — definitions for all 35 supported aesthetics:
 
 ── MINIMALIST & CLEAN ──
 - Quiet Luxury: Understated wealth signalling. Neutral palette (camel, cream, black, ivory, navy). Quality fabrics — cashmere, wool, silk, fine leather. No visible logos. MASC: tailored trousers, merino crewnecks, suede loafers, unstructured blazers, clean white shirts. FEM: wide-leg trousers, cashmere turtlenecks, ballet flats, structured totes. Brands: The Row, Totême, Loro Piana, Brunello Cucinelli, Auralee.
-- Clean Girl: Effortless polished minimalism. Off-white/black/beige palette. MASC: fitted white tees, straight-leg chinos, minimal white sneakers, silver chain, clean haircut. FEM: white tanks, wide-leg trousers, hoops, slicked buns, blazers. "No-effort effort" done flawlessly. Basics executed with precision.
+- Clean Fit: Effortless polished minimalism — basics executed with precision, zero effort visible. Off-white/black/beige/grey palette. MASC: fitted linen shirt, slim chinos or trousers, white low-top sneakers, minimal watch, clean silhouette with no logos or fuss. FEM: white tanks, wide-leg trousers, gold hoops, slicked bun, oversized blazer. KEY DISTINCTION: Clean Fit is about effortless casual minimalism. If the outfit has structured tailoring, a blazer, Oxford shirt, or leather shoes → use Classic / Timeless. If it signals wealth through fabric quality and heritage brands → use Quiet Luxury. Clean Fit = clean, casual, unfussy basics on anyone.
 - Classic / Timeless: Structured, heritage-quality, investment dressing. Navy/black/white/grey/camel. MASC: Oxford shirts, slim chinos, leather Oxford shoes, tailored navy blazers, trench coats. FEM: pencil skirts, silk blouses, pointed pumps, structured handbags. Endlessly polished, never trendy.
 
 ── SOFT & FEMININE ──
@@ -565,7 +575,11 @@ CALIBRATION RULES:
 - If signals for two aesthetics are nearly equal, set confidence below 70 and populate secondaryAesthetic.
 - Do not default to the most common category — classify from evidence only.
 - Choose the MOST SPECIFIC matching category. Do not default to "Vintage / Thrift" when a more specific era (Y2K, 90s Grunge, 70s-80s Retro) fits better.
-- Minimalist outfits: distinguish between Quiet Luxury (quality/heritage signals), Clean Girl (polished basics), and Classic / Timeless (structured tailoring).
+- Minimalist outfits: distinguish carefully between the three minimalist categories:
+  • Quiet Luxury = expensive fabrics, heritage brands, refined but not casual (The Row, Loro Piana energy)
+  • Clean Fit = effortless casual basics, any gender — linen shirts, chinos, white sneakers, simple tees. No logos, no fuss.
+  • Classic / Timeless = structured tailoring — blazers, Oxford shoes, dress trousers, trench coats. More formal than Clean Fit.
+  A man in a white linen shirt + slim trousers + white sneakers = Clean Fit. Add Oxford shoes + blazer = Classic / Timeless. Add cashmere + suede loafers + no branding = Quiet Luxury.
 - GENDER: Do not let perceived gender of the wearer bias classification. Classify the GARMENTS and STYLING, not the person.`;
 
 export async function registerRoutes(httpServer: Server, app: Express) {
