@@ -120,6 +120,10 @@
     transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  /* Hide scrollbar but keep scroll behaviour */
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
   /* Pill tag */
   .tag {
     display: inline-flex;
