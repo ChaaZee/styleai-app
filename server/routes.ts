@@ -846,11 +846,17 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const finalProducts = products.length >= 3 ? products : generateMockResults(analysis.aesthetic);
       const imageDataUrl = `data:${mimeType};base64,${imageBase64}`;
 
+      // Sync primary style score to Gemini's actual confidence so it reflects reality
+      const styleBreakdown = Array.isArray(analysis.styleBreakdown) ? analysis.styleBreakdown : [];
+      if (styleBreakdown.length > 0) {
+        styleBreakdown[0].score = analysis.confidence;
+      }
+
       const scan = await storage.createScan({
         imageData: imageDataUrl,
         aesthetic: analysis.aesthetic,
         confidence: analysis.confidence,
-        styleBreakdown: JSON.stringify(analysis.styleBreakdown),
+        styleBreakdown: JSON.stringify(styleBreakdown),
         occasions: JSON.stringify(analysis.occasions),
         keyPieces: JSON.stringify(analysis.keyPieces),
         colorPalette: JSON.stringify(analysis.colorPalette),

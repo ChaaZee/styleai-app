@@ -121,13 +121,7 @@ export default function ResultsPage() {
             </div>
           ))}
         </div>
-        {/* Confidence */}
-        <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
-          <div className="h-1 flex-1 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full" style={{ width: `${scan.confidence}%` }} />
-          </div>
-          <span className="text-[10px] text-muted-foreground">{scan.confidence}% overall confidence</span>
-        </div>
+
       </div>
 
       {/* Budget toggle */}
