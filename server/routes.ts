@@ -145,14 +145,6 @@ function generateMockResults(aesthetic: string) {
     ],
 
     // ── STREETWEAR & URBAN ──
-    "Streetwear / Hypebeast": [
-      { id: 1, name: "Air Max 95 OG", brand: "Nike", price: 185, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 97, retailer: "Nike", url: "https://www.amazon.com/s?k=Nike+Air+Max+95+OG&tag=styleaiapp-20" },
-      { id: 2, name: "Heavyweight Graphic Tee", brand: "Palace", price: 65, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 93, retailer: "Palace", url: "https://www.amazon.com/s?k=Palace+Heavyweight+Graphic+Tee&tag=styleaiapp-20" },
-      { id: 3, name: "Cargo Pants", brand: "Carhartt WIP", price: 110, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 90, retailer: "Carhartt WIP", url: "https://www.amazon.com/s?k=Carhartt+WIP+Cargo+Pants&tag=styleaiapp-20" },
-      { id: 4, name: "Puffer Jacket", brand: "The North Face", price: 229, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 87, retailer: "The North Face", url: "https://www.amazon.com/s?k=The+North+Face+Puffer+Jacket&tag=styleaiapp-20" },
-      { id: 5, name: "Crossbody Shoulder Bag", brand: "Supreme", price: 148, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 84, retailer: "Supreme", url: "https://www.amazon.com/s?k=Supreme+Crossbody+Shoulder+Bag&tag=styleaiapp-20" },
-      { id: 6, name: "Camo Cap", brand: "Palace", price: 45, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 81, retailer: "Palace", url: "https://www.amazon.com/s?k=Palace+Camo+Cap&tag=styleaiapp-20" },
-    ],
     "Skatecore": [
       { id: 1, name: "Sk8-Hi Sneakers", brand: "Vans", price: 90, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 96, retailer: "Vans", url: "https://www.amazon.com/s?k=Vans+Sk8-Hi+Sneakers&tag=styleaiapp-20" },
       { id: 2, name: "Wide-Leg Denim", brand: "Dickies", price: 49, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 93, retailer: "Dickies", url: "https://www.amazon.com/s?k=Dickies+Wide-Leg+Denim&tag=styleaiapp-20" },
@@ -349,10 +341,20 @@ function generateMockResults(aesthetic: string) {
       { id: 4, name: "Woven Straw Hat", brand: "Lack of Color", price: 99, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 84, retailer: "Lack of Color", url: "https://www.amazon.com/s?k=Lack+of+Color+Woven+Straw+Hat&tag=styleaiapp-20" },
     ],
     "Streetwear": [
+      { id: 1, name: "Carpenter Jeans", brand: "Carhartt WIP", price: 110, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 97, retailer: "Carhartt WIP", url: "https://www.amazon.com/s?k=Carhartt+WIP+Carpenter+Jeans&tag=styleaiapp-20" },
+      { id: 2, name: "Heavyweight Graphic Tee", brand: "Carhartt WIP", price: 65, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 93, retailer: "Carhartt WIP", url: "https://www.amazon.com/s?k=Carhartt+WIP+Heavyweight+Graphic+Tee&tag=styleaiapp-20" },
+      { id: 3, name: "Puffer Jacket", brand: "The North Face", price: 229, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 90, retailer: "The North Face", url: "https://www.amazon.com/s?k=The+North+Face+Puffer+Jacket&tag=styleaiapp-20" },
+      { id: 4, name: "Relaxed Fit Cargo Pants", brand: "Nike", price: 85, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 86, retailer: "Nike", url: "https://www.amazon.com/s?k=Nike+Relaxed+Fit+Cargo+Pants&tag=styleaiapp-20" },
+      { id: 5, name: "Air Force 1 Low", brand: "Nike", price: 110, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 83, retailer: "Nike", url: "https://www.amazon.com/s?k=Nike+Air+Force+1+Low&tag=styleaiapp-20" },
+      { id: 6, name: "Fleece Quarter-Zip", brand: "Stüssy", price: 120, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 80, retailer: "Stüssy", url: "https://www.amazon.com/s?k=Stussy+Fleece+Quarter+Zip&tag=styleaiapp-20" },
+    ],
+    "Hypebeast": [
       { id: 1, name: "Air Max 95 OG", brand: "Nike", price: 185, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 97, retailer: "Nike", url: "https://www.amazon.com/s?k=Nike+Air+Max+95+OG&tag=styleaiapp-20" },
-      { id: 2, name: "Heavyweight Graphic Tee", brand: "Palace", price: 65, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 93, retailer: "Palace", url: "https://www.amazon.com/s?k=Palace+Heavyweight+Graphic+Tee&tag=styleaiapp-20" },
-      { id: 3, name: "Carpenter Jeans", brand: "Carhartt WIP", price: 110, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 89, retailer: "Carhartt WIP", url: "https://www.amazon.com/s?k=Carhartt+WIP+Carpenter+Jeans&tag=styleaiapp-20" },
-      { id: 4, name: "Puffer Jacket", brand: "The North Face", price: 229, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 86, retailer: "The North Face", url: "https://www.amazon.com/s?k=The+North+Face+Puffer+Jacket&tag=styleaiapp-20" },
+      { id: 2, name: "Box Logo Hoodie", brand: "Supreme", price: 168, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 94, retailer: "Supreme", url: "https://www.amazon.com/s?k=Supreme+Box+Logo+Hoodie&tag=styleaiapp-20" },
+      { id: 3, name: "Jordan 1 Retro High OG", brand: "Jordan Brand", price: 180, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 91, retailer: "Jordan Brand", url: "https://www.amazon.com/s?k=Jordan+1+Retro+High+OG&tag=styleaiapp-20" },
+      { id: 4, name: "Crossbody Shoulder Bag", brand: "Supreme", price: 148, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 87, retailer: "Supreme", url: "https://www.amazon.com/s?k=Supreme+Crossbody+Shoulder+Bag&tag=styleaiapp-20" },
+      { id: 5, name: "Logo Tee", brand: "Off-White", price: 290, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 84, retailer: "Off-White", url: "https://www.amazon.com/s?k=Off-White+Logo+Tee&tag=styleaiapp-20" },
+      { id: 6, name: "Camo Cap", brand: "Palace", price: 45, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 80, retailer: "Palace", url: "https://www.amazon.com/s?k=Palace+Camo+Cap&tag=styleaiapp-20" },
     ],
     "Cottagecore": [
       { id: 1, name: "Floral Linen Shirt", brand: "Uniqlo", price: 39, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 95, retailer: "Uniqlo", url: "https://www.amazon.com/s?k=Uniqlo+Floral+Linen+Shirt&tag=styleaiapp-20" },
@@ -503,7 +505,8 @@ const ANALYSIS_SCHEMA = {
         "Old School Preppy",
         "Modern Preppy",
         // Streetwear & Urban
-        "Streetwear / Hypebeast",
+        "Streetwear",
+        "Hypebeast",
         "Skatecore",
         "Techwear",
         "Baddie",
@@ -644,10 +647,10 @@ const SYSTEM_INSTRUCTION = `You are StyleAI, an expert fashion stylist and aesth
 GENDER-INCLUSIVE CLASSIFICATION:
 - Fashion aesthetics apply to ALL genders. Classify based on visual garments, silhouettes, and styling — never assume gender from body type alone.
 - Every aesthetic below lists both masculine and feminine expressions of that style. Identify whichever expression is visible.
-- A man wearing quiet luxury tailoring is Quiet Luxury. A man in ballet flats and pearls is Coquette. A woman in cargo pants and Jordans is Streetwear. Classify what you SEE.
+- A man wearing quiet luxury tailoring is Quiet Luxury. A man in ballet flats and pearls is Coquette. A woman in cargo pants and clean sneakers is Streetwear. A person in a Supreme box logo hoodie with Jordan 1s is Hypebeast. Classify what you SEE.
 - When unsure of gender from the image, describe the clothing items neutrally and classify by aesthetic — not by assumed gender.
 
-STYLE TAXONOMY — definitions for all 35 supported aesthetics:
+STYLE TAXONOMY — definitions for all 40 supported aesthetics:
 
 ── MINIMALIST & CLEAN ──
 - Quiet Luxury: Understated wealth signalling. Neutral palette (camel, cream, black, ivory, navy). Quality fabrics — cashmere, wool, silk, fine leather. No visible logos. MASC: tailored trousers, merino crewnecks, suede loafers, unstructured blazers, clean white shirts. FEM: wide-leg trousers, cashmere turtlenecks, ballet flats, structured totes. Brands: The Row, Totême, Loro Piana, Brunello Cucinelli, Auralee.
@@ -665,7 +668,8 @@ STYLE TAXONOMY — definitions for all 35 supported aesthetics:
 - Modern Preppy: Gen Z preppy reinvention. Brighter, more playful than classic prep. Vibrant pastels + white. MASC: polo shirts, colourful shorts, clean sneakers, caps worn backwards. FEM: pleated minis, puffer vests, grosgrain headbands, mini totes.
 
 ── STREETWEAR & URBAN ──
-- Streetwear / Hypebeast: Urban culture, sneaker drops, brand-forward. Graphic hoodies, cargo pants, oversized tees, rare sneakers, crossbody bags. Supreme, Off-White, Corteiz, Jordan Brand. Bold graphics and logos. Worn across all genders — key signals are the BRANDS and SILHOUETTES, not the wearer.
+- Streetwear: Everyday urban culture dress. Relaxed fits, graphic tees, cargo pants, hoodies, clean sneakers. Brands: Carhartt WIP, Stüssy, Nike, New Balance, The North Face, Corteiz. No heavy logo-flex — just cool, comfortable, culturally aware. Worn across all genders.
+- Hypebeast: Drop-culture, brand-obsessed, logo-forward. Key signals: visible Supreme, Off-White, Palace, Jordan Brand, or Yeezy branding; hyped sneakers (Jordan 1, Air Max, Dunk); collector-level pieces. The fit is built around the item — often one statement piece anchors the look. DISTINGUISH from Streetwear: Hypebeast = brand signals and resale-value pieces are front and center. Streetwear = culture and silhouette without the logo flex.
 - Skatecore: Baggy and anti-fashion. Wide-leg jeans, graphic tees, Vans/DC shoes, caps, overshirts. Washed denim, black, white, earth tones. Skate brand logos. MASC dominant but gender-fluid. Relaxed and deliberate.
 - Techwear: Utilitarian futurism. Technical jackets, cargo trousers, tactical vests, trail shoes, dark palette. ACRONYM, Veilance, Stone Island, Arc'teryx Veilance. Modular, functional, all-weather. Predominantly masculine expression but worn by all.
 - Baddie: Glamorous urban confidence. Bodycon silhouettes, form-fitting co-ords, high heels, statement bags, fur-trim coats. Black, nude, gold, animal print. Polished, confident, bold. Predominantly feminine expression.
@@ -722,6 +726,7 @@ CALIBRATION RULES:
 - Dark vs Light Academia: palette decides. Charcoal/oxblood/forest green/black = Dark. Cream/ivory/warm beige/pastels = Light.
 - Gorpcore vs Granola Girl: technical gear = Gorpcore. Casual earth-tone lifestyle (fleece, Birkenstocks, linen) = Granola Girl.
 - Blokecore vs Blokette: jersey + jorts + trainers = Blokecore. Jersey + feminine item (bow, mini skirt, Mary Janes) = Blokette.
+- Streetwear vs Hypebeast: Streetwear = culture/silhouette-driven, no logo flex (Carhartt WIP, Stüssy, clean Nike). Hypebeast = visible luxury/hype branding is the centrepiece (Supreme, Off-White, Jordan 1s, Palace). If you can see the brand logo and it’s the point of the outfit → Hypebeast.
 - Indie Sleaze vs 90s Grunge: Indie = slim fit + leather jacket + smudged liner (2000s). Grunge = baggy + flannel + Docs (90s).
 - Quiet Luxury vs Clean Fit vs Classic: Quiet Luxury = expensive fabrics, no logos. Clean Fit = crisp casual basics. Classic = structured tailoring + dress shoes.
 - Clean Fit vs Vintage/Thrift: FABRIC CONDITION. Crisp/new = Clean Fit. Faded/washed/worn = Vintage/Thrift. Denim-on-denim with faded wash = Vintage/Thrift.
