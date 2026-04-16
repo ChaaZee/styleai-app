@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,50 +6,27 @@
 
 @layer base {
   :root {
-    /* StyleAI — dark fashion app: near-black surfaces, warm gold accent */
-    --background: 40 10% 8%;
-    --foreground: 40 8% 88%;
-    --card: 40 9% 11%;
-    --card-foreground: 40 8% 88%;
-    --popover: 40 9% 11%;
-    --popover-foreground: 40 8% 88%;
-    --primary: 33 45% 60%;        /* warm gold */
-    --primary-foreground: 40 10% 8%;
-    --secondary: 40 6% 18%;
-    --secondary-foreground: 40 5% 70%;
-    --muted: 40 6% 16%;
-    --muted-foreground: 40 4% 55%;
-    --accent: 33 45% 60%;
-    --accent-foreground: 40 10% 8%;
-    --destructive: 0 72% 51%;
+    /* StyleAI — Clean Minimal: warm parchment, terracotta gold, crisp type */
+    --background:    36 20% 97%;        /* #FAFAF8 warm off-white */
+    --foreground:    30 12% 12%;        /* #1E1C18 near-black */
+    --card:          36 18% 99%;        /* pure warm white cards */
+    --card-foreground: 30 12% 12%;
+    --popover:       36 18% 99%;
+    --popover-foreground: 30 12% 12%;
+    --primary:       24 42% 60%;        /* #C8956A terracotta gold */
+    --primary-foreground: 36 20% 97%;
+    --secondary:     36 14% 93%;        /* #EDEBE6 warm stone */
+    --secondary-foreground: 30 10% 35%;
+    --muted:         36 12% 94%;        /* #F0EDE8 */
+    --muted-foreground: 30 8% 52%;      /* #8A8680 */
+    --accent:        24 42% 60%;
+    --accent-foreground: 36 20% 97%;
+    --destructive:   0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 40 5% 20%;
-    --input: 40 5% 20%;
-    --ring: 33 45% 60%;
-    --radius: 0.625rem;
-  }
-
-  /* StyleAI always uses dark mode as default */
-  .dark {
-    --background: 40 10% 8%;
-    --foreground: 40 8% 88%;
-    --card: 40 9% 11%;
-    --card-foreground: 40 8% 88%;
-    --popover: 40 9% 11%;
-    --popover-foreground: 40 8% 88%;
-    --primary: 33 45% 60%;
-    --primary-foreground: 40 10% 8%;
-    --secondary: 40 6% 18%;
-    --secondary-foreground: 40 5% 70%;
-    --muted: 40 6% 16%;
-    --muted-foreground: 40 4% 55%;
-    --accent: 33 45% 60%;
-    --accent-foreground: 40 10% 8%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 40 5% 20%;
-    --input: 40 5% 20%;
-    --ring: 33 45% 60%;
+    --border:        36 10% 88%;        /* #E2DED8 subtle warm border */
+    --input:         36 10% 88%;
+    --ring:          24 42% 60%;
+    --radius:        0.5rem;
   }
 }
 
@@ -61,70 +38,99 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'DM Sans', sans-serif;
+    font-weight: 400;
     -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3 {
     font-family: 'Cormorant Garamond', Georgia, serif;
-    font-weight: 500;
-    line-height: 1.15;
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
   }
 }
 
-/* Custom StyleAI utilities */
+/* ── StyleAI utilities ── */
 @layer utilities {
   .font-display {
     font-family: 'Cormorant Garamond', Georgia, serif;
   }
 
+  /* Warm terracotta gradient text */
   .gold-gradient {
-    background: linear-gradient(135deg, #C8956A 0%, #E8B97A 50%, #C8956A 100%);
+    background: linear-gradient(135deg, #B8855A 0%, #C8956A 45%, #D4A070 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  .surface-glass {
-    background: rgba(28, 27, 25, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.06);
+  /* Thin hairline card */
+  .surface-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 12px;
   }
 
+  /* Frosted glass header */
+  .surface-glass {
+    background: rgba(250, 250, 248, 0.90);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  /* Scan line animation */
   .scan-pulse {
     animation: scan-line 2s ease-in-out infinite;
   }
 
   @keyframes scan-line {
-    0%, 100% { transform: translateY(0); opacity: 0.8; }
-    50% { transform: translateY(100%); opacity: 0.4; }
+    0%, 100% { transform: translateY(0); opacity: 0.7; }
+    50% { transform: translateY(100%); opacity: 0.3; }
   }
 
+  /* Entrance animation */
   .fade-up {
-    animation: fadeUp 0.4s ease forwards;
+    animation: fadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
+  /* Skeleton shimmer — light mode */
   .shimmer {
-    background: linear-gradient(90deg, 
-      hsl(40 6% 16%) 0%, 
-      hsl(40 6% 22%) 50%, 
-      hsl(40 6% 16%) 100%
+    background: linear-gradient(90deg,
+      hsl(36 12% 93%) 0%,
+      hsl(36 12% 97%) 50%,
+      hsl(36 12% 93%) 100%
     );
     background-size: 200% 100%;
-    animation: shimmer 1.5s ease infinite;
+    animation: shimmer 1.4s ease infinite;
   }
 
   @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
   }
 
+  /* Animated match bar */
   .match-bar {
     transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Pill tag */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    border: 1px solid hsl(var(--border));
   }
 }

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Upload, Camera, Sparkles, X, Image as ImageIcon } from "lucide-react";
+import { Upload, Sparkles, X, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -54,7 +54,6 @@ export default function ScanPage() {
 
       const data = await response.json();
       setUploadState("done");
-      // Invalidate history cache so new scan appears immediately
       queryClient.invalidateQueries({ queryKey: ["/api/scans"] });
       setLocation(`/results/${data.scanId}`);
     } catch (err: any) {
@@ -70,15 +69,20 @@ export default function ScanPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
+    <div className="max-w-2xl mx-auto px-5 py-12 fade-up">
+
       {/* Header */}
       <div className="mb-10 text-center">
-        <h1 className="font-display text-4xl mb-3 gold-gradient">Scan Your Style</h1>
-        <p className="text-muted-foreground text-sm max-w-sm mx-auto leading-relaxed">
-          Upload any outfit photo — a Pinterest find, screenshot, or your own photo — and StyleAI will identify the aesthetic and find matching pieces.
+        <p className="text-xs font-medium tracking-[0.12em] uppercase text-primary mb-3">Visual Style Recognition</p>
+        <h1 className="font-display text-5xl text-foreground mb-4 leading-[1.05]">
+          Discover your<br /><em>aesthetic</em>
+        </h1>
+        <p className="text-muted-foreground text-sm max-w-xs mx-auto leading-relaxed">
+          Upload any outfit — a Pinterest find, screenshot, or your own photo. StyleAI reads the visual language of the look.
         </p>
       </div>
 
+      {/* Drop zone */}
       {uploadState === "idle" && (
         <div
           data-testid="upload-dropzone"
@@ -86,28 +90,26 @@ export default function ScanPage() {
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onClick={() => fileInputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer transition-all duration-200 fade-up
+          className={`relative rounded-2xl p-14 text-center cursor-pointer transition-all duration-200
+            border-2 border-dashed
             ${dragOver
               ? "border-primary bg-primary/5"
-              : "border-border hover:border-primary/50 hover:bg-muted/30"
+              : "border-border hover:border-primary/40 hover:bg-muted/40"
             }`}
         >
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Upload size={24} className="text-primary" />
+          <div className="flex flex-col items-center gap-5">
+            {/* Upload icon container */}
+            <div className="w-14 h-14 rounded-full border border-border bg-background flex items-center justify-center shadow-sm">
+              <Upload size={20} className="text-muted-foreground" strokeWidth={1.5} />
             </div>
             <div>
-              <p className="font-medium text-foreground mb-1">Drop an outfit photo here</p>
-              <p className="text-sm text-muted-foreground">or click to browse · JPG, PNG, WEBP up to 10MB</p>
+              <p className="font-medium text-foreground text-sm mb-1">Drop an outfit photo here</p>
+              <p className="text-xs text-muted-foreground">or click to browse · JPG, PNG, WEBP up to 10MB</p>
             </div>
-            <div className="flex items-center gap-3 mt-2">
-              <div className="h-px w-12 bg-border" />
-              <span className="text-xs text-muted-foreground">Try with</span>
-              <div className="h-px w-12 bg-border" />
-            </div>
+            {/* Suggestion pills */}
             <div className="flex items-center gap-2 flex-wrap justify-center">
               {["Pinterest pin", "Instagram outfit", "Screenshot", "Your own photo"].map((s) => (
-                <span key={s} className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground border border-border">{s}</span>
+                <span key={s} className="tag">{s}</span>
               ))}
             </div>
           </div>
@@ -122,33 +124,36 @@ export default function ScanPage() {
         </div>
       )}
 
+      {/* Preview + analyzing */}
       {(uploadState === "preview" || uploadState === "analyzing") && previewUrl && (
         <div className="fade-up">
-          <div className="relative rounded-2xl overflow-hidden bg-card border border-border">
+          <div className="relative rounded-2xl overflow-hidden border border-border bg-muted/30">
             <img
               src={previewUrl}
               alt="Outfit preview"
-              className="w-full max-h-[480px] object-contain"
+              className="w-full max-h-[500px] object-contain"
               data-testid="img-preview"
             />
+            {/* Analyzing overlay */}
             {uploadState === "analyzing" && (
-              <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-5">
+                {/* Thin spinner */}
+                <div className="w-12 h-12 rounded-full border border-primary border-t-transparent animate-spin opacity-70" />
                 <div className="text-center">
-                  <p className="font-display text-xl mb-1">Analyzing aesthetic...</p>
-                  <p className="text-sm text-muted-foreground">Gemini Flash is reading your outfit</p>
+                  <p className="font-display text-2xl text-foreground mb-1">Reading the aesthetic…</p>
+                  <p className="text-xs text-muted-foreground tracking-wide">Gemini is analysing silhouette, fabric & palette</p>
                 </div>
-                {/* Scan line effect */}
-                <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent scan-pulse" />
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent scan-pulse" />
               </div>
             )}
+            {/* Remove button */}
             {uploadState === "preview" && (
               <button
                 onClick={handleReset}
                 data-testid="button-reset"
-                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-background/80 backdrop-blur flex items-center justify-center hover:bg-background transition-colors"
+                className="absolute top-3 right-3 w-7 h-7 rounded-full bg-background/90 border border-border flex items-center justify-center hover:bg-muted transition-colors"
               >
-                <X size={16} />
+                <X size={14} className="text-muted-foreground" />
               </button>
             )}
           </div>
@@ -158,19 +163,19 @@ export default function ScanPage() {
               <Button
                 variant="outline"
                 onClick={handleReset}
-                className="flex-1"
+                className="flex-1 h-11 border-border text-muted-foreground hover:text-foreground"
                 data-testid="button-change"
               >
-                <ImageIcon size={16} className="mr-2" />
+                <ImageIcon size={14} className="mr-2" strokeWidth={1.5} />
                 Change photo
               </Button>
               <Button
                 onClick={handleAnalyze}
-                className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                className="flex-1 h-11 bg-primary text-primary-foreground hover:bg-primary/90 font-medium tracking-wide"
                 data-testid="button-analyze"
               >
-                <Sparkles size={16} className="mr-2" />
-                Analyze outfit
+                <Sparkles size={14} className="mr-2" strokeWidth={1.5} />
+                Analyse outfit
               </Button>
             </div>
           )}
@@ -179,15 +184,14 @@ export default function ScanPage() {
 
       {/* Tips */}
       {uploadState === "idle" && (
-        <div className="mt-8 grid grid-cols-3 gap-3 fade-up">
+        <div className="mt-8 grid grid-cols-3 gap-3">
           {[
-            { icon: "🎯", title: "Full outfit", desc: "Head-to-toe shots work best" },
-            { icon: "💡", title: "Good lighting", desc: "Clear, well-lit photos" },
-            { icon: "🖼️", title: "Any source", desc: "Pinterest, Instagram, or your camera roll" },
+            { title: "Full outfit", desc: "Head-to-toe shots give the best results" },
+            { title: "Good light", desc: "Clear, evenly lit photos read better" },
+            { title: "Any source", desc: "Pinterest, Instagram, camera roll" },
           ].map((tip) => (
-            <div key={tip.title} className="rounded-xl bg-card border border-border p-4 text-center">
-              <div className="text-2xl mb-2">{tip.icon}</div>
-              <p className="text-xs font-medium text-foreground mb-0.5">{tip.title}</p>
+            <div key={tip.title} className="rounded-xl border border-border bg-card p-4 text-center">
+              <p className="text-xs font-semibold text-foreground mb-1 tracking-wide uppercase">{tip.title}</p>
               <p className="text-xs text-muted-foreground leading-snug">{tip.desc}</p>
             </div>
           ))}

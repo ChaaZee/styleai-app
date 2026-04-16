@@ -31,7 +31,8 @@ function AppContent() {
 
 export default function App() {
   useEffect(() => {
-    document.documentElement.classList.add("dark");
+    // Clean Minimal theme — light mode
+    document.documentElement.classList.remove("dark");
   }, []);
 
   return (

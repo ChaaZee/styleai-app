@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Clock, ChevronRight, Sparkles } from "lucide-react";
+import { Clock, ChevronRight } from "lucide-react";
 import type { Scan } from "@shared/schema";
 
 export default function HistoryPage() {
@@ -17,62 +17,89 @@ export default function HistoryPage() {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
-  const handleScanClick = (scan: Scan) => {
-    setLocation(`/results/${scan.id}`);
-  };
-
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="font-display text-3xl gold-gradient">Scan History</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{scans.length} outfit{scans.length !== 1 ? "s" : ""} analyzed</p>
+    <div className="max-w-2xl mx-auto px-5 py-8 fade-up">
+
+      {/* Header */}
+      <div className="mb-8">
+        <p className="text-xs font-medium tracking-[0.12em] uppercase text-primary mb-2">Archive</p>
+        <h1 className="font-display text-4xl text-foreground">Scan History</h1>
+        <p className="text-sm text-muted-foreground mt-1.5">
+          {scans.length} outfit{scans.length !== 1 ? "s" : ""} analysed
+        </p>
       </div>
 
+      {/* Loading skeletons */}
       {isLoading && (
         <div className="space-y-3">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="rounded-xl bg-card border border-border p-4 flex gap-3">
+            <div key={i} className="rounded-xl border border-border bg-card p-4 flex gap-4 items-center">
               <div className="w-14 h-14 rounded-lg shimmer flex-shrink-0" />
-              <div className="flex-1"><div className="h-4 shimmer rounded w-1/3 mb-2" /><div className="h-3 shimmer rounded w-1/2" /></div>
+              <div className="flex-1">
+                <div className="h-3.5 shimmer rounded-full w-1/3 mb-2.5" />
+                <div className="h-2.5 shimmer rounded-full w-1/2" />
+              </div>
             </div>
           ))}
         </div>
       )}
 
+      {/* Empty state */}
       {!isLoading && scans.length === 0 && (
-        <div className="text-center py-20 fade-up">
-          <Clock size={40} className="mx-auto mb-3 text-muted-foreground/40" />
-          <p className="text-muted-foreground text-sm">No scans yet. Upload your first outfit to get started.</p>
+        <div className="text-center py-24">
+          <div className="w-12 h-12 rounded-full border border-border flex items-center justify-center mx-auto mb-4">
+            <Clock size={20} className="text-muted-foreground" strokeWidth={1.5} />
+          </div>
+          <p className="text-sm text-muted-foreground">No scans yet.</p>
+          <button
+            onClick={() => setLocation("/")}
+            className="text-sm text-primary mt-2 underline underline-offset-2"
+          >
+            Scan your first outfit
+          </button>
         </div>
       )}
 
-      <div className="space-y-3">
-        {scans.map((scan) => (
-          <button
-            key={scan.id}
-            onClick={() => handleScanClick(scan)}
-            data-testid={`card-scan-${scan.id}`}
-            className="w-full rounded-xl bg-card border border-border p-4 flex items-center gap-3 hover:border-primary/30 transition-colors text-left fade-up"
-          >
-            <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-              <img src={scan.imageData} alt={scan.aesthetic} className="w-full h-full object-cover" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Sparkles size={12} className="text-primary flex-shrink-0" />
-                <span className="font-medium text-foreground text-sm truncate">{scan.aesthetic}</span>
+      {/* Scan list */}
+      <div className="space-y-2">
+        {scans.map((scan, i) => {
+          const palette: string[] = (() => {
+            try { return JSON.parse(scan.colorPalette); } catch { return []; }
+          })();
+
+          return (
+            <button
+              key={scan.id}
+              onClick={() => setLocation(`/results/${scan.id}`)}
+              data-testid={`card-scan-${scan.id}`}
+              style={{ animationDelay: `${i * 40}ms` }}
+              className="w-full rounded-xl border border-border bg-card p-4 flex items-center gap-4 hover:border-primary/30 hover:bg-muted/30 transition-all duration-150 text-left fade-up"
+            >
+              {/* Thumbnail */}
+              <div className="w-14 h-14 rounded-lg overflow-hidden border border-border flex-shrink-0 bg-muted">
+                <img src={scan.imageData} alt={scan.aesthetic} className="w-full h-full object-cover" />
               </div>
-              <div className="flex items-center gap-2">
-                <div className="h-1 w-16 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary/70 rounded-full" style={{ width: `${scan.confidence}%` }} />
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-foreground text-sm truncate mb-1">{scan.aesthetic}</p>
+                <div className="flex items-center gap-3">
+                  {/* Colour dots */}
+                  {palette.slice(0, 4).length > 0 && (
+                    <div className="flex gap-1">
+                      {palette.slice(0, 4).map((hex, j) => (
+                        <div key={j} className="w-3 h-3 rounded-full border border-border/60" style={{ backgroundColor: hex }} />
+                      ))}
+                    </div>
+                  )}
+                  <span className="text-xs text-muted-foreground">{scan.confidence}% · {formatDate(scan.createdAt)}</span>
                 </div>
-                <span className="text-xs text-primary">{scan.confidence}%</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">{formatDate(scan.createdAt)}</p>
-            </div>
-            <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
-          </button>
-        ))}
+
+              <ChevronRight size={14} className="text-muted-foreground flex-shrink-0" strokeWidth={1.5} />
+            </button>
+          );
+        })}
       </div>
     </div>
   );
