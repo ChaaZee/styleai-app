@@ -145,7 +145,7 @@ export default function ScanPage() {
           Discover your<br /><em>aesthetic</em>
         </h1>
         <p className="text-muted-foreground text-sm sm:text-base max-w-xs sm:max-w-sm mx-auto leading-relaxed">
-          Upload any outfit — a Pinterest find, screenshot, or your own photo. StyleAI reads the visual language of the look.
+          Upload any outfit — a Pinterest find, screenshot, or your own photo. Stitch reads the visual language of the look.
         </p>
       </div>
 

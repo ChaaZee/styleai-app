@@ -18,12 +18,12 @@ function TopBar() {
       <div className="max-w-4xl mx-auto px-5 sm:px-8 h-12 sm:h-14 flex items-center justify-between">
         <Link href="/">
           <div className="flex items-center gap-2 cursor-pointer">
-            <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-label="StyleAI logo">
+            <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-label="Stitch logo">
               <rect x="1" y="1" width="20" height="20" rx="5" stroke="hsl(24 42% 60%)" strokeWidth="1.2" fill="none"/>
               <path d="M6 13 C6 9.5 8.5 7.5 11 7.5 C13.5 7.5 16 9.5 16 13" stroke="hsl(24 42% 60%)" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
               <circle cx="11" cy="15.5" r="2" fill="hsl(24 42% 60%)"/>
             </svg>
-            <span className="font-display text-[16px] tracking-[0.01em] text-foreground">StyleAI</span>
+            <span className="font-display text-[16px] tracking-[0.01em] text-foreground">Stitch</span>
           </div>
         </Link>
         <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center">

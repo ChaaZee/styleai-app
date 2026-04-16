@@ -649,7 +649,7 @@ const ANALYSIS_SCHEMA = {
 };
 
 // ─── System instruction — 35-category style taxonomy + calibration rules ───
-const SYSTEM_INSTRUCTION = `You are StyleAI, an expert fashion stylist and aesthetic analyst specialising in visual outfit classification.
+const SYSTEM_INSTRUCTION = `You are Stitch, an expert fashion stylist and aesthetic analyst specialising in visual outfit classification.
 
 GENDER-INCLUSIVE CLASSIFICATION:
 - Fashion aesthetics apply to ALL genders. Classify based on visual garments, silhouettes, and styling — never assume gender from body type alone.

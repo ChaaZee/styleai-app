@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    /* StyleAI — Clean Minimal: warm parchment, terracotta gold, crisp type */
+    /* Stitch — Clean Minimal: warm parchment, terracotta gold, crisp type */
     --background:    36 20% 97%;        /* #FAFAF8 warm off-white */
     --foreground:    30 12% 12%;        /* #1E1C18 near-black */
     --card:          36 18% 99%;        /* pure warm white cards */
@@ -57,7 +57,7 @@
   }
 }
 
-/* ── StyleAI utilities ── */
+/* ── Stitch utilities ── */
 @layer utilities {
   .font-display {
     font-family: 'Cormorant Garamond', Georgia, serif;
