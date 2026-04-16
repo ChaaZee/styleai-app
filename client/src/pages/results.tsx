@@ -4,7 +4,7 @@ import { X, ShoppingBag, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import type { Scan } from "@shared/schema";
 
-interface StyleBreakdown { label: string; score: number; }
+interface StyleBreakdown { label: string; score: number; } // score kept for backend compat
 interface Product { id: number; name: string; brand: string; price: number; image: string; match: number; retailer: string; url: string; }
 
 export default function ResultsPage() {
@@ -104,24 +104,20 @@ export default function ResultsPage() {
       {/* Style breakdown */}
       <div className="mx-5 sm:mx-8 mb-3 rounded-xl border border-border bg-card p-4 sm:p-5">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Style Breakdown</p>
-        <div className="space-y-2.5">
-          {styleBreakdown.map((item, i) => (
-            <div key={item.label} className="flex items-center gap-3">
-              <span className="text-xs text-foreground w-28 flex-shrink-0 font-medium">{item.label}</span>
-              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full match-bar"
-                  style={{
-                    width: `${item.score}%`,
-                    background: i === 0 ? "hsl(24 42% 60%)" : i === 1 ? "hsl(24 42% 70%)" : "hsl(24 42% 82%)"
-                  }}
-                />
-              </div>
-              <span className="text-[10px] text-muted-foreground w-7 text-right">{item.score}%</span>
+        <div className="flex flex-col gap-2">
+          {styleBreakdown[0] && (
+            <div className="flex items-center gap-2.5">
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-primary w-20 flex-shrink-0">Primary</span>
+              <span className="text-sm font-semibold text-foreground">{styleBreakdown[0].label}</span>
             </div>
-          ))}
+          )}
+          {styleBreakdown[1] && (
+            <div className="flex items-center gap-2.5">
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground w-20 flex-shrink-0">Secondary</span>
+              <span className="text-sm text-muted-foreground">{styleBreakdown[1].label}</span>
+            </div>
+          )}
         </div>
-
       </div>
 
       {/* Budget toggle */}
