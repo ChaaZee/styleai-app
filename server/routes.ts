@@ -475,19 +475,6 @@ const ANALYSIS_SCHEMA = {
   type: SchemaType.OBJECT,
   description: "Fashion aesthetic analysis of an outfit image",
   properties: {
-    reasoning: {
-      type: SchemaType.STRING,
-      description:
-        "Step-by-step visual analysis BEFORE classification. Cover: " +
-        "(1) all visible garments and accessories by name; " +
-        "(2) silhouette — boxy, oversized, fitted, flowing, or structured; " +
-        "(3) fabric texture — matte/shiny/textured, natural/synthetic; " +
-        "(4) color palette — list dominant colors, note warm/cool/neutral tones; " +
-        "(5) fit — how garments relate to the body (cropped, relaxed, tailored); " +
-        "(6) layering — how many layers and how they interact; " +
-        "(7) footwear and accessories signals; " +
-        "(8) which aesthetic this evidence points to and why.",
-    },
     visualSignals: {
       type: SchemaType.ARRAY,
       description:
@@ -639,7 +626,6 @@ const ANALYSIS_SCHEMA = {
     },
   },
   required: [
-    "reasoning",
     "visualSignals",
     "evidenceStrength",
     "aesthetic",
@@ -727,38 +713,26 @@ STYLE TAXONOMY — definitions for all 35 supported aesthetics:
 - Historical Romanticism: Wearable historical fantasy. Corsets, lace blouses, velvet midis, puffed sleeves, pearl headbands. Dusty pink, deep blue, ivory, gold, jewel tones. MASC: ruffled poet shirts, velvet blazers, slim breeches, buckled shoes, lace cuffs. FEM: corsets, puffed sleeves, floral midis. Regencycore / Castlecore.
 
 CALIBRATION RULES:
-- Complete the reasoning field fully before any classification field.
-- Name specific visible items — not impressions or vibes.
-- Base confidence ONLY on what is observable. Do not guess at hidden garments.
-- If the image is partial, low-resolution, or ambiguous, lower confidence accordingly.
-- If signals for two aesthetics are nearly equal, set confidence below 70 and populate secondaryAesthetic.
-- Do not default to the most common category — classify from evidence only.
-- Choose the MOST SPECIFIC matching category. Do not default to "Vintage / Thrift" when a more specific era (Y2K, 90s Grunge, 70s-80s Retro) fits better.
-- Y2K vs 70s-80s Retro: platform boots alone do NOT confirm Y2K. Y2K requires at least one of: low-rise waistband, rhinestones/bedazzle, velour, neon pastels, baby tee, tube top, or micro bag. Corduroy + earth tones + wide-leg + platforms = 70s-80s Retro.
-- Corset/bustier tops appear across multiple aesthetics: in Y2K (paired with low-rise mini, metallics), in 70s-80s Retro (paired with wide-leg earth tones), in Coquette (paired with bows/lace/pastels), in Dark Feminine (paired with all-black). Always look at the full outfit, not just one item.
-- Dark Academia vs Light Academia: The single biggest differentiator is PALETTE. Charcoal, oxblood, forest green, espresso brown, black = Dark Academia. Cream, ivory, warm beige, soft pastels = Light Academia. Both feature blazers, trousers, loafers, satchels — palette is what separates them.
-- Gorpcore vs Granola Girl: Gorpcore = technical performance gear (Arc'teryx, shell jackets, trail runners, tactical details). Granola Girl = casual earth-tone lifestyle wear (fleece, Birkenstocks, linen, sage tones) — functional but not technical.
-- Blokecore vs Blokette: Both feature football/sports jerseys. Blokecore stays in streetwear territory (jersey + jorts + trainers). Blokette adds feminine elements (bows, mini skirt, Mary Janes, leg warmers). If a feminine item is present alongside a football jersey = Blokette.
-- Indie Sleaze vs 90s Grunge vs E-Girl: Indie Sleaze = slim/skinny fit + leather jacket + smudged liner + band tee (2000s music energy). 90s Grunge = baggy/oversized + flannel + doc martens + ripped denim (90s Seattle energy). E-Girl = striped layering + anime/emo accessories + platforms + digital-native energy.
-- Quiet Luxury vs Clean Fit vs Classic/Timeless: Quiet Luxury = expensive fabrics + heritage brands + no logos (Loro Piana, Brunello Cucinelli). Clean Fit = effortless casual basics, any brand (white tee, linen shirt, chinos, white sneakers). Classic/Timeless = structured tailoring + dress shoes + blazer (more formal than Clean Fit).
-- Clean Fit vs Vintage/Thrift: The single biggest differentiator is FABRIC CONDITION. Clean Fit = crisp, new-looking, unworn fabrics. Vintage/Thrift = faded, washed, worn, or thrifted-looking textures. A white tee + washed denim jacket + relaxed light-wash jeans = Vintage/Thrift. A white tee + slim chinos + clean white sneakers = Clean Fit. Denim-on-denim layering with faded wash = Vintage/Thrift.
-- Minimalist outfits: distinguish carefully between the three minimalist categories:
-  • Quiet Luxury = expensive fabrics, heritage brands, refined but not casual (The Row, Loro Piana energy)
-  • Clean Fit = effortless casual basics, any gender — linen shirts, chinos, white sneakers, simple tees. No logos, no fuss.
-  • Classic / Timeless = structured tailoring — blazers, Oxford shoes, dress trousers, trench coats. More formal than Clean Fit.
-  A man in a white linen shirt + slim trousers + white sneakers = Clean Fit. Add Oxford shoes + blazer = Classic / Timeless. Add cashmere + suede loafers + no branding = Quiet Luxury.
-- GENDER: Do not let perceived gender of the wearer bias classification. Classify the GARMENTS and STYLING, not the person.
+- Classify from specific visible items only — not vibes.
+- Confidence: 1–2 signals → 55–65; 3 → 65–75; 4 → 75–85; 5 → 85–95. Subtract 8–12 for secondary aesthetic, 10–15 for partial/blurry image. Max 95.
+- If two aesthetics nearly equal → confidence <70, populate secondaryAesthetic.
+- Choose MOST SPECIFIC category. Don't default to Vintage/Thrift when Y2K, 90s Grunge, or 70s-80s Retro fits.
+- Y2K vs 70s-80s Retro: platforms ≠ Y2K. Y2K needs low-rise, rhinestones, velour, neon pastels, baby tee, or micro bag. Corduroy + earth tones + wide-leg = 70s-80s Retro.
+- Corset/bustier: look at full outfit context — Y2K (low-rise/metallics), 70s-80s (earth tones), Coquette (bows/lace), Dark Feminine (all-black).
+- Dark vs Light Academia: palette decides. Charcoal/oxblood/forest green/black = Dark. Cream/ivory/warm beige/pastels = Light.
+- Gorpcore vs Granola Girl: technical gear = Gorpcore. Casual earth-tone lifestyle (fleece, Birkenstocks, linen) = Granola Girl.
+- Blokecore vs Blokette: jersey + jorts + trainers = Blokecore. Jersey + feminine item (bow, mini skirt, Mary Janes) = Blokette.
+- Indie Sleaze vs 90s Grunge: Indie = slim fit + leather jacket + smudged liner (2000s). Grunge = baggy + flannel + Docs (90s).
+- Quiet Luxury vs Clean Fit vs Classic: Quiet Luxury = expensive fabrics, no logos. Clean Fit = crisp casual basics. Classic = structured tailoring + dress shoes.
+- Clean Fit vs Vintage/Thrift: FABRIC CONDITION. Crisp/new = Clean Fit. Faded/washed/worn = Vintage/Thrift. Denim-on-denim with faded wash = Vintage/Thrift.
+- GENDER: Classify garments and styling, not the wearer.
 
 PRODUCT RECOMMENDATIONS:
-After classifying the outfit, generate 6 specific product recommendations in the recommendations field.
-Rules:
-- Base recommendations on what you ACTUALLY SEE. If you see a brown cardigan + tan corduroy trousers, recommend similar items in those colors and silhouettes. Do not use generic category defaults.
-- Mix get-the-look items (similar to what is worn) with complete-the-look items (pieces that elevate or complement the outfit).
-- Use REAL brands that actually sell the product type. Match brand tier to the outfit price point.
-- Be specific with product names: not just jeans but Low-Rise Straight Leg Jeans or Washed Barrel-Fit Jeans.
-- Match gender expression visible in the image. If male, recommend menswear. If female, recommend womenswear. If ambiguous, recommend gender-neutral pieces.
-- Price should be realistic: Zara = 30-100, Levis = 60-120, Dr. Martens = 140-200, The Row = 300-800.
-- The reason field should reference specific details from the outfit: not matches the aesthetic but mirrors the earth-tone palette with a similar wide-leg corduroy silhouette.`;
+Generate 6 specific product recommendations based on what you ACTUALLY SEE.
+- Mix get-the-look (similar to worn items) with complete-the-look (pieces that elevate the outfit).
+- Real brands matching the outfit's price point. Specific names: not "jeans" but "Washed Barrel-Fit Jeans".
+- Match gender expression in the image. Realistic prices: Zara = 30–100, Levi's = 60–120, Dr. Martens = 140–200, The Row = 300–800.
+- reason field: reference specific outfit details, not just the aesthetic name.`;
 
 export async function registerRoutes(httpServer: Server, app: Express) {
   await initDB();
@@ -776,9 +750,9 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const imageBase64 = file.buffer.toString("base64");
       const mimeType = file.mimetype as "image/jpeg" | "image/png" | "image/webp";
 
-      // ── PASS 1: Garment detection ──────────────────────────────────────────
+      // ── PASS 1: Garment detection (gemini-2.5-flash-lite — cheaper, simpler task) ─────
       const detectionModel = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite-preview-06-17",
         systemInstruction: GARMENT_SYSTEM_INSTRUCTION,
         generationConfig: {
           responseMimeType: "application/json",
@@ -789,7 +763,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       const detectionResult = await detectionModel.generateContent([
         { inlineData: { data: imageBase64, mimeType } },
-        "List every garment and accessory you can see in this outfit image. Be exhaustive and specific.",
+        "List every visible garment and accessory. Be specific with names and details.",
       ]);
 
       const detectionText = detectionResult.response.text();
@@ -821,7 +795,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       const result = await classificationModel.generateContent([
         { inlineData: { data: imageBase64, mimeType } },
-        `A garment detection pass has already identified the following items in this outfit image:\n\n${garmentSummary}\n\nUsing this garment inventory as your grounding context, now classify the aesthetic style of this outfit. Apply your taxonomy definitions and disambiguation rules carefully.`,
+        `Garment inventory:\n${garmentSummary}\n\nClassify the aesthetic using the taxonomy and disambiguation rules.`,
       ]);
 
       const text = result.response.text();
