@@ -577,7 +577,7 @@ const ANALYSIS_SCHEMA = {
     },
     styleBreakdown: {
       type: SchemaType.ARRAY,
-      description: "Top 3 matching aesthetics with scores, ordered highest to lowest.",
+      description: "Top 2 matching aesthetics with scores, ordered highest to lowest.",
       items: {
         type: SchemaType.OBJECT,
         properties: {
