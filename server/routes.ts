@@ -224,6 +224,15 @@ function generateMockResults(aesthetic: string) {
       { id: 6, name: "Animal Print Coat", brand: "ASOS", price: 129, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 81, retailer: "ASOS", url: "https://www.amazon.com/s?k=ASOS+Animal+Print+Coat&tag=styleaiapp-20" },
     ],
 
+    "Rave": [
+      { id: 1, name: "Holographic Mini Skirt", brand: "ASOS", price: 45, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 97, retailer: "ASOS", url: "https://www.amazon.com/s?k=Holographic+Mini+Skirt&tag=styleaiapp-20" },
+      { id: 2, name: "Fishnet Body Stocking", brand: "Leg Avenue", price: 22, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 94, retailer: "Leg Avenue", url: "https://www.amazon.com/s?k=Leg+Avenue+Fishnet+Body+Stocking&tag=styleaiapp-20" },
+      { id: 3, name: "Neon Bralette", brand: "I.AM.GIA", price: 55, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 91, retailer: "I.AM.GIA", url: "https://www.amazon.com/s?k=Neon+Bralette&tag=styleaiapp-20" },
+      { id: 4, name: "Chunky Platform Sneakers", brand: "Buffalo", price: 139, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 88, retailer: "Buffalo", url: "https://www.amazon.com/s?k=Buffalo+Chunky+Platform+Sneakers&tag=styleaiapp-20" },
+      { id: 5, name: "LED / Glow Accessories Set", brand: "ASOS", price: 18, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 85, retailer: "ASOS", url: "https://www.amazon.com/s?k=LED+Glow+Rave+Accessories&tag=styleaiapp-20" },
+      { id: 6, name: "Iridescent Cargo Pants", brand: "UNIF", price: 98, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 82, retailer: "UNIF", url: "https://www.amazon.com/s?k=UNIF+Iridescent+Cargo+Pants&tag=styleaiapp-20" },
+    ],
+
     "Glam / Party": [
       { id: 1, name: "Velvet Blazer", brand: "ASOS", price: 89, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 96, retailer: "ASOS", url: "https://www.amazon.com/s?k=ASOS+Velvet+Blazer&tag=styleaiapp-20" },
       { id: 2, name: "Sequin Mini Dress", brand: "House of CB", price: 149, image: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80", match: 93, retailer: "House of CB", url: "https://www.amazon.com/s?k=House+of+CB+Sequin+Mini+Dress&tag=styleaiapp-20" },
@@ -523,6 +532,7 @@ const ANALYSIS_SCHEMA = {
         // Bold & Expressive
         "Maximalist",
         "Glam / Party",
+        "Rave",
         "E-Girl / Alt",
         // Formal & Power
         "Office Siren",
@@ -650,7 +660,7 @@ GENDER-INCLUSIVE CLASSIFICATION:
 - A man wearing quiet luxury tailoring is Quiet Luxury. A man in ballet flats and pearls is Coquette. A woman in cargo pants and clean sneakers is Streetwear. A person in a Supreme box logo hoodie with Jordan 1s is Hypebeast. Classify what you SEE.
 - When unsure of gender from the image, describe the clothing items neutrally and classify by aesthetic — not by assumed gender.
 
-STYLE TAXONOMY — definitions for all 40 supported aesthetics:
+STYLE TAXONOMY — definitions for all 41 supported aesthetics:
 
 ── MINIMALIST & CLEAN ──
 - Quiet Luxury: Understated wealth signalling. Neutral palette (camel, cream, black, ivory, navy). Quality fabrics — cashmere, wool, silk, fine leather. No visible logos. MASC: tailored trousers, merino crewnecks, suede loafers, unstructured blazers, clean white shirts. FEM: wide-leg trousers, cashmere turtlenecks, ballet flats, structured totes. Brands: The Row, Totême, Loro Piana, Brunello Cucinelli, Auralee.
@@ -691,6 +701,7 @@ STYLE TAXONOMY — definitions for all 40 supported aesthetics:
 ── BOLD & EXPRESSIVE ──
 - Maximalist: More is more. Clashing prints, bold layers, statement coats, loud accessories. Animal print, jewel tones, all brights. MASC maximalism: bold printed shirts, layered jewellery, patterned suits, colourful trainers. FEM: ruffled dresses, statement coats, stacked accessories. Dopamine dressing — equally expressive across genders.
 - Glam / Party: Evening and club wear. Sequins, satin, feather trim, metallic fabrics. Gold, silver, deep red, rich jewel tones. MASC: satin shirts, embellished jackets, velvet blazers, pointed dress shoes. FEM: sequin dresses, strappy heels, metallic bags. Shine and occasion.
+- Rave: Festival and club culture. KEY SIGNALS: neon or UV-reactive colours, holographic/iridescent fabrics, fishnet layers, bralettes or mesh tops, tiny shorts or skirts, chunky platform sneakers or boots, kandi bracelets, LED/glow accessories, face gems or body glitter. Palette: neon green, hot pink, electric blue, UV white, holographic silver. Very skin-baring and maximally expressive. DISTINGUISH from Glam/Party: Rave is festival-practical and subculture-coded (comfort for dancing, DIY energy, glow accessories) — not cocktail-polished. DISTINGUISH from E-Girl: Rave centres neon/UV/holographic fabrics and festival accessories, not anime/emo aesthetics. DISTINGUISH from Retro-Futurism: Rave is dance-floor functional with neon energy, not sci-fi sculptural.
 - E-Girl / Alt: Internet alt culture. Striped layering tees, plaid, chunky boots, chains, alt accessories. Black, red, pastel accents. MASC expression: E-Boy — striped long-sleeve under graphic tee, chains, straight-leg jeans, skate shoes. FEM: heart clips, plaid skirts, thigh-highs. Anime meets emo.
 - Indie Sleaze: Anti-polish 2006–2012 revival, back strong in 2025–2026. Raw, messy, deliberately unkempt. KEY SIGNALS: skinny jeans, leather jacket, fishnet tights, smudged eyeliner (worn deliberately), band tees, Napoleon-style military jacket, multi-layered tops, thrifted pieces worn chaotically. Black, washed-out colours, some metallics. DISTINGUISH from 90s Grunge: Indie Sleaze is skinny/slim fit (not baggy) and rooted in 2000s indie music/MySpace era. DISTINGUISH from E-Girl: Indie Sleaze is less anime-coded, more music-scene energy. The look says "I was at a show last night."
 
@@ -726,6 +737,7 @@ CALIBRATION RULES:
 - Dark vs Light Academia: palette decides. Charcoal/oxblood/forest green/black = Dark. Cream/ivory/warm beige/pastels = Light.
 - Gorpcore vs Granola Girl: technical gear = Gorpcore. Casual earth-tone lifestyle (fleece, Birkenstocks, linen) = Granola Girl.
 - Blokecore vs Blokette: jersey + jorts + trainers = Blokecore. Jersey + feminine item (bow, mini skirt, Mary Janes) = Blokette.
+- Rave vs Glam/Party vs E-Girl: Rave = neon/UV/holographic + festival accessories (kandi, glow, fishnet) + skin-baring for dancing. Glam/Party = sequins/satin + heels + polished cocktail energy. E-Girl = striped layers + anime/emo accessories + platforms.
 - Streetwear vs Hypebeast: Streetwear = culture/silhouette-driven, no logo flex (Carhartt WIP, Stüssy, clean Nike). Hypebeast = visible luxury/hype branding is the centrepiece (Supreme, Off-White, Jordan 1s, Palace). If you can see the brand logo and it’s the point of the outfit → Hypebeast.
 - Indie Sleaze vs 90s Grunge: Indie = slim fit + leather jacket + smudged liner (2000s). Grunge = baggy + flannel + Docs (90s).
 - Quiet Luxury vs Clean Fit vs Classic: Quiet Luxury = expensive fabrics, no logos. Clean Fit = crisp casual basics. Classic = structured tailoring + dress shoes.
