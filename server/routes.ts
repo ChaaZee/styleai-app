@@ -414,6 +414,63 @@ function generateMockResults(aesthetic: string) {
 }
 
 // ─── Gemini response schema (structured output — no regex parsing needed) ───
+// ─── Pass 1: Garment detection schema ────────────────────────────────────────
+const GARMENT_SCHEMA = {
+  type: SchemaType.OBJECT,
+  description: "Structured inventory of all visible garments and accessories in the image",
+  properties: {
+    garments: {
+      type: SchemaType.ARRAY,
+      description: "Every visible clothing item and accessory. Be exhaustive — list each piece separately.",
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          item: {
+            type: SchemaType.STRING,
+            description: "Specific item name, e.g. 'Wide-leg corduroy trousers', 'Lug-sole platform boots', 'White linen shirt'",
+          },
+          color: {
+            type: SchemaType.STRING,
+            description: "Primary color(s) of this item, e.g. 'tan', 'white', 'black and white plaid'",
+          },
+          fabric: {
+            type: SchemaType.STRING,
+            description: "Fabric or material if identifiable, e.g. 'corduroy', 'linen', 'leather', 'denim', 'knit'. Use 'unknown' if unclear.",
+          },
+          fit: {
+            type: SchemaType.STRING,
+            description: "Fit or silhouette, e.g. 'oversized', 'slim', 'wide-leg', 'fitted', 'cropped', 'relaxed'",
+          },
+          details: {
+            type: SchemaType.STRING,
+            description: "Notable details: logos, hardware, embellishments, patterns, distressing, etc. Use 'none' if plain.",
+          },
+        },
+        required: ["item", "color", "fabric", "fit", "details"],
+      },
+    },
+    overallPalette: {
+      type: SchemaType.STRING,
+      description: "The dominant color story of the whole outfit, e.g. 'warm earth tones — tan, brown, white', 'all black with silver hardware'",
+    },
+    layering: {
+      type: SchemaType.STRING,
+      description: "How the outfit is layered, e.g. 'single layer', 'cardigan over tank top', 'jacket over turtleneck'",
+    },
+    perceivedGender: {
+      type: SchemaType.STRING,
+      enum: ["masculine", "feminine", "androgynous/neutral", "ambiguous"],
+      description: "Perceived gender expression of the styling, based on garments and silhouettes only",
+    },
+  },
+  required: ["garments", "overallPalette", "layering", "perceivedGender"],
+};
+
+const GARMENT_SYSTEM_INSTRUCTION = `You are a precise fashion analyst. Your job is to inventory every visible garment and accessory in an outfit image.
+Be exhaustive and specific. List every item you can see — including items that are partially visible.
+Focus on factual observation: what you literally see. No interpretation of style or aesthetic yet — that comes later.
+Be specific with names: not "pants" but "wide-leg corduroy trousers". Not "shoes" but "lug-sole platform boots".`;
+
 const ANALYSIS_SCHEMA = {
   type: SchemaType.OBJECT,
   description: "Fashion aesthetic analysis of an outfit image",
@@ -715,7 +772,43 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       if (!apiKey) return res.status(500).json({ error: "Gemini API key not configured" });
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
+      const imageBase64 = file.buffer.toString("base64");
+      const mimeType = file.mimetype as "image/jpeg" | "image/png" | "image/webp";
+
+      // ── PASS 1: Garment detection ──────────────────────────────────────────
+      const detectionModel = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction: GARMENT_SYSTEM_INSTRUCTION,
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: GARMENT_SCHEMA as any,
+          temperature: 0.0,
+        },
+      });
+
+      const detectionResult = await detectionModel.generateContent([
+        { inlineData: { data: imageBase64, mimeType } },
+        "List every garment and accessory you can see in this outfit image. Be exhaustive and specific.",
+      ]);
+
+      const detectionText = detectionResult.response.text();
+      const detectionJson = detectionText.match(/\{[\s\S]*\}/);
+      if (!detectionJson) throw new Error("Could not parse garment detection response");
+      const garmentData = JSON.parse(detectionJson[0]);
+
+      // Build a structured garment description to ground the aesthetic classification
+      const garmentSummary = [
+        `Detected garments:`,
+        ...garmentData.garments.map((g: any) =>
+          `- ${g.item}: ${g.color}, ${g.fabric} fabric, ${g.fit} fit${g.details !== "none" ? `, details: ${g.details}` : ""}`
+        ),
+        `Overall palette: ${garmentData.overallPalette}`,
+        `Layering: ${garmentData.layering}`,
+        `Gender expression: ${garmentData.perceivedGender}`,
+      ].join("\n");
+
+      // ── PASS 2: Aesthetic classification using detected garments ──────────
+      const classificationModel = genAI.getGenerativeModel({
         model: "gemini-2.5-flash",
         systemInstruction: SYSTEM_INSTRUCTION,
         generationConfig: {
@@ -725,19 +818,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         },
       });
 
-      const imageBase64 = file.buffer.toString("base64");
-      const mimeType = file.mimetype as "image/jpeg" | "image/png" | "image/webp";
-
-      const result = await model.generateContent([
+      const result = await classificationModel.generateContent([
         { inlineData: { data: imageBase64, mimeType } },
-        "Analyze this outfit image thoroughly and classify its aesthetic style. " +
-        "Follow your system instructions: examine silhouette, fabric, color, fit, layering, " +
-        "and accessories carefully before arriving at a classification.",
+        `A garment detection pass has already identified the following items in this outfit image:\n\n${garmentSummary}\n\nUsing this garment inventory as your grounding context, now classify the aesthetic style of this outfit. Apply your taxonomy definitions and disambiguation rules carefully.`,
       ]);
 
       const text = result.response.text();
-      // With responseMimeType=application/json the output is always valid JSON,
-      // but we keep a fallback regex strip for safety
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("Could not parse Gemini response");
 
