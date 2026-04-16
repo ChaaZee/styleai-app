@@ -569,34 +569,19 @@ const ANALYSIS_SCHEMA = {
     confidence: {
       type: SchemaType.INTEGER,
       description:
-        "Confidence score 0–100. This must reflect how UNIQUELY and UNAMBIGUOUSLY the outfit maps to one aesthetic. " +
-        "Most outfits should score 55–78. Scores above 85 are rare and require a near-perfect, textbook example with zero ambiguity. " +
-        "Calibration guide: " +
-        "1 clear signal → 45–55; " +
-        "2 signals → 55–65; " +
-        "3 signals → 63–72; " +
-        "4 signals with some ambiguity → 68–78; " +
-        "5+ signals, no ambiguity, textbook example → 79–88. " +
-        "Subtract 10–18 if signals could plausibly fit another aesthetic. " +
-        "Subtract 8–12 if the image is partial, blurry, or cropped. " +
-        "Do NOT output round numbers like 70, 75, 80, 85, 90 — use specific values like 67, 73, 81, 76. " +
-        "Never exceed 91.",
+        "Your raw, honest confidence (0–100) that the primary aesthetic is correct. " +
+        "No restrictions. Score exactly what you believe based on the evidence — low if ambiguous, high if certain.",
     },
     styleBreakdown: {
       type: SchemaType.ARRAY,
-      description: "Top 2 matching aesthetics with REALISTIC, VARIED scores. " +
-        "Scores must reflect actual evidence strength — do NOT default to round numbers like 90/60. " +
-        "Primary score should match the confidence value. " +
-        "Secondary score = how strongly the secondary aesthetic is also present: " +
-        "slight overlap → 25–40; moderate overlap → 41–55; strong overlap → 56–72. " +
-        "Examples of good scores: 87/43, 74/38, 91/52, 68/29. Bad: 90/60 (too round), 85/60 (secondary too high for slight overlap).",
+      description: "Top 2 matching aesthetics. Primary score matches confidence. Secondary score reflects how strongly that aesthetic is also present.",
       items: {
         type: SchemaType.OBJECT,
         properties: {
           label: { type: SchemaType.STRING },
           score: {
             type: SchemaType.INTEGER,
-            description: "Realistic score derived from evidence. Avoid round multiples of 5 or 10.",
+            description: "Raw honest score 0–100.",
           },
         },
         required: ["label", "score"],
@@ -741,7 +726,7 @@ STYLE TAXONOMY — definitions for all 41 supported aesthetics:
 
 CALIBRATION RULES:
 - Classify from specific visible items only — not vibes.
-- Confidence: most outfits score 55–78. 1 signal → 45–55; 2 → 55–65; 3 → 63–72; 4 → 68–78; 5+ textbook → 79–88. Subtract 10–18 if signals fit multiple aesthetics. Subtract 8–12 for partial/blurry image. Never output round numbers (70, 75, 80, 85, 90) — use specific values. Max 91.
+- Confidence: output your raw honest score. Low if ambiguous, high if certain. No floor or ceiling.
 - If two aesthetics nearly equal → confidence <70, populate secondaryAesthetic.
 - Choose MOST SPECIFIC category. Don't default to Vintage/Thrift when Y2K, 90s Grunge, or 70s-80s Retro fits.
 - Y2K vs 70s-80s Retro: platforms ≠ Y2K. Y2K needs low-rise, rhinestones, velour, neon pastels, baby tee, or micro bag. Corduroy + earth tones + wide-leg = 70s-80s Retro.
