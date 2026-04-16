@@ -105,20 +105,17 @@ export default function ResultsPage() {
       </div>
 
       {/* Colour palette banner */}
-      <div className="mx-5 sm:mx-8 mb-3 rounded-xl overflow-hidden border border-border">
-        <div className="flex h-12">
+      <div className="mx-5 sm:mx-8 mb-3 rounded-xl border border-border bg-card p-4 sm:p-5">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Colour Palette</p>
+        <div className="flex gap-3">
           {colorPalette.map((hex, i) => (
-            <div
-              key={i}
-              className="flex-1 relative group"
-              style={{ backgroundColor: hex }}
-              data-testid={`color-swatch-${i}`}
-            >
-              <span className="absolute bottom-1.5 left-0 right-0 text-center text-[8px] font-mono opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                style={{ color: isLight(hex) ? "#00000088" : "#ffffff88" }}
-              >
-                {hex}
-              </span>
+            <div key={i} className="flex flex-col items-center gap-1.5 group">
+              <div
+                className="w-8 h-8 rounded-full border border-border/60 shadow-sm"
+                style={{ backgroundColor: hex }}
+                data-testid={`color-swatch-${i}`}
+              />
+              <span className="text-[8px] font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">{hex}</span>
             </div>
           ))}
         </div>
