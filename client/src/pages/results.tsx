@@ -104,39 +104,45 @@ export default function ResultsPage() {
         </div>
       </div>
 
-      {/* Colour palette banner */}
-      <div className="mx-5 sm:mx-8 mb-3 rounded-xl border border-border bg-card p-4 sm:p-5">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Colour Palette</p>
-        <div className="flex gap-3">
-          {colorPalette.map((hex, i) => (
-            <div key={i} className="flex flex-col items-center gap-1.5 group">
-              <div
-                className="w-8 h-8 rounded-full border border-border/60 shadow-sm"
-                style={{ backgroundColor: hex }}
-                data-testid={`color-swatch-${i}`}
-              />
-              <span className="text-[8px] font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">{hex}</span>
-            </div>
-          ))}
+      {/* Style breakdown + Colour palette — combined panel */}
+      <div className="mx-5 sm:mx-8 mb-3 rounded-xl border border-border bg-card p-4 sm:p-5 flex gap-4">
+        {/* Left: style breakdown */}
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Style</p>
+          <div className="flex flex-col gap-2">
+            {styleBreakdown[0] && (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-primary">Primary</span>
+                <span className="text-sm font-semibold text-foreground leading-tight">{styleBreakdown[0].label}</span>
+              </div>
+            )}
+            {styleBreakdown[1] && (
+              <div className="flex flex-col gap-0.5 mt-1">
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Secondary</span>
+                <span className="text-sm text-muted-foreground leading-tight">{styleBreakdown[1].label}</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Style breakdown */}
-      <div className="mx-5 sm:mx-8 mb-3 rounded-xl border border-border bg-card p-4 sm:p-5">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Style Breakdown</p>
-        <div className="flex flex-col gap-2">
-          {styleBreakdown[0] && (
-            <div className="flex items-center gap-2.5">
-              <span className="text-[9px] font-semibold uppercase tracking-wider text-primary w-20 flex-shrink-0">Primary</span>
-              <span className="text-sm font-semibold text-foreground">{styleBreakdown[0].label}</span>
-            </div>
-          )}
-          {styleBreakdown[1] && (
-            <div className="flex items-center gap-2.5">
-              <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground w-20 flex-shrink-0">Secondary</span>
-              <span className="text-sm text-muted-foreground">{styleBreakdown[1].label}</span>
-            </div>
-          )}
+        {/* Divider */}
+        <div className="w-px bg-border flex-shrink-0" />
+
+        {/* Right: colour palette */}
+        <div className="flex-shrink-0">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Palette</p>
+          <div className="flex gap-2 flex-wrap">
+            {colorPalette.map((hex, i) => (
+              <div key={i} className="flex flex-col items-center gap-1 group">
+                <div
+                  className="w-7 h-7 rounded-full border border-border/60 shadow-sm"
+                  style={{ backgroundColor: hex }}
+                  data-testid={`color-swatch-${i}`}
+                />
+                <span className="text-[7px] font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">{hex}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
