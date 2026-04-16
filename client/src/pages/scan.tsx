@@ -62,13 +62,13 @@ export default function ScanPage() {
   // ── PREVIEW / ANALYZING STATE ──────────────────────────────────────────────
   if (uploadState === "preview" || uploadState === "analyzing") {
     return (
-      <div className="max-w-2xl mx-auto px-5 py-6 fade-up">
+      <div className="max-w-2xl mx-auto px-5 sm:px-8 py-6 sm:py-10 fade-up">
         <div className="relative rounded-2xl overflow-hidden border border-border bg-muted/30">
           {previewUrl && (
             <img
               src={previewUrl}
               alt="Outfit preview"
-              className="w-full max-h-[520px] object-contain"
+              className="w-full max-h-[520px] sm:max-h-[640px] object-contain"
               data-testid="img-preview"
             />
           )}
@@ -136,15 +136,15 @@ export default function ScanPage() {
 
   // ── IDLE STATE — clean drop zone ──────────────────────────────────────────
   return (
-    <div className="max-w-2xl mx-auto px-5 py-12 fade-up">
+    <div className="max-w-2xl mx-auto px-5 sm:px-8 py-12 sm:py-16 fade-up">
 
       {/* Header */}
       <div className="mb-10 text-center">
         <p className="text-xs font-medium tracking-[0.12em] uppercase text-primary mb-3">Visual Style Recognition</p>
-        <h1 className="font-display text-5xl text-foreground mb-4 leading-[1.05]">
+        <h1 className="font-display text-5xl sm:text-6xl text-foreground mb-4 leading-[1.05]">
           Discover your<br /><em>aesthetic</em>
         </h1>
-        <p className="text-muted-foreground text-sm max-w-xs mx-auto leading-relaxed">
+        <p className="text-muted-foreground text-sm sm:text-base max-w-xs sm:max-w-sm mx-auto leading-relaxed">
           Upload any outfit — a Pinterest find, screenshot, or your own photo. StyleAI reads the visual language of the look.
         </p>
       </div>
@@ -156,7 +156,7 @@ export default function ScanPage() {
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onClick={() => fileInputRef.current?.click()}
-        className={`relative rounded-2xl p-14 text-center cursor-pointer transition-all duration-200
+        className={`relative rounded-2xl p-10 sm:p-16 text-center cursor-pointer transition-all duration-200
           border-2 border-dashed
           ${
             dragOver
@@ -189,7 +189,7 @@ export default function ScanPage() {
       </div>
 
       {/* Tips */}
-      <div className="mt-6 grid grid-cols-3 gap-3">
+      <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
         {[
           { title: "Full outfit", desc: "Head-to-toe shots give the best results" },
           { title: "Good light", desc: "Clear, evenly lit photos read better" },

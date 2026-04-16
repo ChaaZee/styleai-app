@@ -60,10 +60,10 @@ export default function ResultsPage() {
     : budgetFiltered.filter(r => r.retailer === activeRetailer);
 
   return (
-    <div className="max-w-2xl mx-auto fade-up">
+    <div className="max-w-4xl mx-auto fade-up">
 
       {/* Results header — scanned thumb + aesthetic + close */}
-      <div className="px-5 pt-5 pb-3">
+      <div className="px-5 sm:px-8 pt-5 sm:pt-7 pb-3">
         <div className="flex items-center gap-3 mb-3">
           {/* Scanned thumb */}
           <div
@@ -102,7 +102,7 @@ export default function ResultsPage() {
       </div>
 
       {/* Style breakdown */}
-      <div className="mx-5 mb-3 rounded-xl border border-border bg-card p-4">
+      <div className="mx-5 sm:mx-8 mb-3 rounded-xl border border-border bg-card p-4 sm:p-5">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Style Breakdown</p>
         <div className="space-y-2.5">
           {styleBreakdown.map((item, i) => (
@@ -131,7 +131,7 @@ export default function ResultsPage() {
       </div>
 
       {/* Budget toggle */}
-      <div className="px-5 mb-3">
+      <div className="px-5 sm:px-8 mb-3">
         <div className="flex rounded-lg border border-border overflow-hidden bg-card">
           {["All", "Budget", "Mid", "Premium"].map((b) => (
             <button
@@ -150,7 +150,7 @@ export default function ResultsPage() {
       </div>
 
       {/* Retailer tabs */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 pb-3">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 sm:px-8 pb-3">
         {retailers.map((r) => (
           <button
             key={r}
@@ -167,8 +167,8 @@ export default function ResultsPage() {
         ))}
       </div>
 
-      {/* Product grid — 3 columns like mockup */}
-      <div className="px-5 grid grid-cols-3 gap-2.5 pb-4">
+      {/* Product grid — 3 cols mobile, 4 cols on lg+ */}
+      <div className="px-5 sm:px-8 grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 pb-4">
         {filteredProducts.map((product) => (
           <div
             key={product.id}

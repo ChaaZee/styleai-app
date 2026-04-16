@@ -15,7 +15,7 @@ import { Link } from "wouter";
 function TopBar() {
   return (
     <header className="sticky top-0 z-40 surface-glass">
-      <div className="max-w-2xl mx-auto px-5 h-12 flex items-center justify-between">
+      <div className="max-w-4xl mx-auto px-5 sm:px-8 h-12 sm:h-14 flex items-center justify-between">
         <Link href="/">
           <div className="flex items-center gap-2 cursor-pointer">
             <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-label="StyleAI logo">
@@ -38,7 +38,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <TopBar />
-      <main className="flex-1 pb-20">
+      <main className="flex-1 pb-20 sm:pb-24">
         <Switch>
           <Route path="/" component={HomePage} />
           <Route path="/scan" component={ScanPage} />

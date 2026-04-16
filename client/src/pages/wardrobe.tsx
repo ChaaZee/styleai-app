@@ -53,11 +53,11 @@ export default function WardrobePage() {
   const estValue = items.length * 80;
 
   return (
-    <div className="max-w-2xl mx-auto fade-up">
+    <div className="max-w-4xl mx-auto fade-up">
 
       {/* Header */}
-      <div className="px-5 pt-5 pb-3">
-        <h1 className="font-display text-3xl text-foreground mb-3">My Wardrobe</h1>
+      <div className="px-5 sm:px-8 pt-5 sm:pt-7 pb-3">
+        <h1 className="font-display text-3xl sm:text-4xl text-foreground mb-3">My Wardrobe</h1>
         {/* Stats row — matches mockup */}
         <div className="flex gap-6">
           <div>
@@ -76,7 +76,7 @@ export default function WardrobePage() {
       </div>
 
       {/* Category filter */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 pb-3">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 sm:px-8 pb-3">
         {CATEGORIES.map(c => (
           <button
             key={c}
@@ -95,7 +95,7 @@ export default function WardrobePage() {
 
       {/* Wardrobe gap alert — only show when items exist */}
       {items.length > 3 && (
-        <div className="mx-5 mb-4 rounded-xl bg-foreground p-4 flex gap-3">
+        <div className="mx-5 sm:mx-8 mb-4 rounded-xl bg-foreground p-4 flex gap-3">
           <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
             <Sparkles size={14} className="text-primary" strokeWidth={1.75} />
           </div>
@@ -110,7 +110,7 @@ export default function WardrobePage() {
       )}
 
       {/* Section header */}
-      <div className="px-5 flex items-center justify-between mb-3">
+      <div className="px-5 sm:px-8 flex items-center justify-between mb-3">
         <span className="text-sm font-semibold text-foreground">Recently Added</span>
         <button
           onClick={() => setAdding(true)}
@@ -123,7 +123,7 @@ export default function WardrobePage() {
 
       {/* Skeletons */}
       {isLoading && (
-        <div className="px-5 grid grid-cols-3 gap-2.5">
+        <div className="px-5 sm:px-8 grid grid-cols-3 sm:grid-cols-4 gap-2.5">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="rounded-xl overflow-hidden aspect-square shimmer" />
           ))}
@@ -149,7 +149,7 @@ export default function WardrobePage() {
 
       {/* Image-only grid with overlay — matches mockup wardrobe-grid */}
       {!isLoading && (
-        <div className="px-5 grid grid-cols-3 gap-2.5 pb-4">
+        <div className="px-5 sm:px-8 grid grid-cols-3 sm:grid-cols-4 gap-2.5 sm:gap-3 pb-4">
           {filtered.map((item) => (
             <div
               key={item.id}

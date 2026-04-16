@@ -17,10 +17,10 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto fade-up">
+    <div className="max-w-4xl mx-auto fade-up">
       {/* Header */}
-      <div className="px-5 pt-5 pb-4">
-        <h1 className="font-display text-3xl text-foreground">Scan History</h1>
+      <div className="px-5 sm:px-8 pt-5 sm:pt-7 pb-4">
+        <h1 className="font-display text-3xl sm:text-4xl text-foreground">Scan History</h1>
         <p className="text-xs text-muted-foreground mt-1">
           {scans.length} outfit{scans.length !== 1 ? "s" : ""} analysed
         </p>
@@ -28,7 +28,7 @@ export default function HistoryPage() {
 
       {/* Loading */}
       {isLoading && (
-        <div className="px-5 space-y-3">
+        <div className="px-5 sm:px-8 space-y-3">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="rounded-xl border border-border bg-card p-3 flex gap-3 items-center">
               <div className="w-16 h-16 rounded-xl shimmer flex-shrink-0" />
@@ -62,7 +62,7 @@ export default function HistoryPage() {
 
       {/* Scan list — each row matches the results-query style from mockup */}
       {!isLoading && scans.length > 0 && (
-        <div className="px-5 space-y-2 pb-4">
+        <div className="px-5 sm:px-8 space-y-2 pb-4">
           {scans.map((scan, i) => {
             const palette: string[] = (() => { try { return JSON.parse(scan.colorPalette); } catch { return []; } })();
             const breakdown: { label: string; score: number }[] = (() => {

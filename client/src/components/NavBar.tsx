@@ -11,11 +11,12 @@ export default function NavBar() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex items-end justify-around surface-glass border-t border-border"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)", height: 64 }}
+      className="fixed bottom-0 left-0 right-0 z-50 surface-glass border-t border-border"
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       role="navigation"
       aria-label="Main navigation"
     >
+      <div className="max-w-4xl mx-auto flex items-end justify-around" style={{ height: 64 }}>
       {/* Home */}
       <Link href="/">
         <button
@@ -88,6 +89,7 @@ export default function NavBar() {
         </svg>
         <span className="text-[10px] font-medium tracking-wide">Profile</span>
       </button>
+      </div>
     </nav>
   );
 }

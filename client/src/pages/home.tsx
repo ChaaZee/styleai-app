@@ -22,17 +22,17 @@ export default function HomePage() {
   const [, setLocation] = useLocation();
 
   return (
-    <div className="max-w-2xl mx-auto fade-up">
+    <div className="max-w-4xl mx-auto fade-up">
       {/* Greeting */}
-      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+      <div className="px-5 sm:px-8 pt-5 sm:pt-7 pb-3 flex items-center justify-between">
         <div>
           <p className="text-xs text-muted-foreground">Good morning</p>
-          <h1 className="font-display text-2xl text-foreground leading-tight">Your Feed</h1>
+          <h1 className="font-display text-2xl sm:text-3xl text-foreground leading-tight">Your Feed</h1>
         </div>
       </div>
 
       {/* Aesthetic chips */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 pb-3">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 sm:px-8 pb-3">
         {CHIPS.map((c, i) => (
           <button
             key={c}
@@ -48,19 +48,19 @@ export default function HomePage() {
       </div>
 
       {/* Complete Your Look */}
-      <div className="px-5 mb-5">
+      <div className="px-5 sm:px-8 mb-5">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-semibold text-foreground">Complete Your Look</span>
           <span className="text-xs text-primary underline underline-offset-2 cursor-pointer">See all</span>
         </div>
         <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1">
           {COMPLETE_LOOK.map((item) => (
-            <div key={item.name} className="flex-shrink-0 w-28 rounded-xl border border-border bg-card overflow-hidden">
+            <div key={item.name} className="flex-shrink-0 w-28 sm:w-36 rounded-xl border border-border bg-card overflow-hidden">
               <div
-                className="h-32 bg-muted bg-cover bg-center"
+                className="h-32 sm:h-40 bg-muted bg-cover bg-center"
                 style={{ backgroundImage: `url('${item.img}')` }}
               />
-              <div className="p-2">
+              <div className="p-2 sm:p-3">
                 <p className="text-xs font-semibold text-primary">${item.price}</p>
                 <p className="text-[10px] text-muted-foreground truncate">{item.name}</p>
               </div>
@@ -70,13 +70,13 @@ export default function HomePage() {
       </div>
 
       {/* For You header */}
-      <div className="px-5 flex items-center justify-between mb-3">
+      <div className="px-5 sm:px-8 flex items-center justify-between mb-3">
         <span className="text-sm font-semibold text-foreground">For You</span>
         <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">↑ 24 new</span>
       </div>
 
-      {/* Masonry grid — 2 columns */}
-      <div className="px-5 columns-2 gap-3 space-y-0">
+      {/* Masonry grid — 2 cols mobile, 3 cols on md+ */}
+      <div className="px-5 sm:px-8 columns-2 md:columns-3 gap-3 space-y-0">
         {FEED_ITEMS.map((item) => (
           <div
             key={item.id}

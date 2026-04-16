@@ -35,11 +35,18 @@
     @apply border-border;
   }
 
+  /* Fluid base font: 15px on small screens → 16px on large */
+  html {
+    font-size: clamp(0.9375rem, 0.9rem + 0.2vw, 1rem);
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'DM Sans', sans-serif;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
+    /* Prevent horizontal overflow on small screens */
+    overflow-x: hidden;
   }
 
   h1, h2, h3 {
@@ -123,6 +130,21 @@
   /* Hide scrollbar but keep scroll behaviour */
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* Safe max-width container used across all pages */
+  .page-container {
+    width: 100%;
+    max-width: 64rem; /* max-w-4xl = 1024px */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: clamp(1.25rem, 4vw, 2rem);
+    padding-right: clamp(1.25rem, 4vw, 2rem);
+  }
+
+  /* Fluid card padding */
+  .card-pad {
+    padding: clamp(0.75rem, 2vw, 1.25rem);
+  }
 
   /* Pill tag */
   .tag {
