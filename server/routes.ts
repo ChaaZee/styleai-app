@@ -577,14 +577,19 @@ const ANALYSIS_SCHEMA = {
     },
     styleBreakdown: {
       type: SchemaType.ARRAY,
-      description: "Top 2 matching aesthetics with scores, ordered highest to lowest.",
+      description: "Top 2 matching aesthetics with REALISTIC, VARIED scores. " +
+        "Scores must reflect actual evidence strength — do NOT default to round numbers like 90/60. " +
+        "Primary score should match the confidence value. " +
+        "Secondary score = how strongly the secondary aesthetic is also present: " +
+        "slight overlap → 25–40; moderate overlap → 41–55; strong overlap → 56–72. " +
+        "Examples of good scores: 87/43, 74/38, 91/52, 68/29. Bad: 90/60 (too round), 85/60 (secondary too high for slight overlap).",
       items: {
         type: SchemaType.OBJECT,
         properties: {
           label: { type: SchemaType.STRING },
           score: {
             type: SchemaType.INTEGER,
-            description: "Score 0–100. Primary aesthetic gets the highest score.",
+            description: "Realistic score derived from evidence. Avoid round multiples of 5 or 10.",
           },
         },
         required: ["label", "score"],
