@@ -570,7 +570,7 @@ const ANALYSIS_SCHEMA = {
       type: SchemaType.INTEGER,
       description:
         "Your raw, honest confidence (0–100) that the primary aesthetic is correct. " +
-        "Do NOT round to multiples of 5 or 10. Output the exact unrounded value you calculate — e.g. 73, 81, 67, not 70, 80, 65.",
+        "Output the exact unrounded value you calculate. Do not round for convenience — if your true estimate is 73, output 73, not 70 or 75.",
     },
     styleBreakdown: {
       type: SchemaType.ARRAY,
@@ -581,7 +581,7 @@ const ANALYSIS_SCHEMA = {
           label: { type: SchemaType.STRING },
           score: {
             type: SchemaType.INTEGER,
-            description: "Raw honest score 0–100. Do not round to multiples of 5 or 10.",
+            description: "Raw honest score 0–100. Do not round for convenience.",
           },
         },
         required: ["label", "score"],
