@@ -8,6 +8,44 @@ const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
 
 // Mock product results for MVP (replace with Skimlinks affiliate API)
 
+// Maps a product name to relevant Unsplash search keywords
+function buildImageKeywords(name: string): string {
+  const n = name.toLowerCase();
+  const map: [string[], string][] = [
+    [["sneaker", "trainer", "air force", "stan smith", "vans", "converse", "jordan"], "sneakers,fashion"],
+    [["boot", "chelsea", "combat", "lug-sole", "doc marten"], "boots,fashion"],
+    [["loafer", "oxford shoe", "derby", "dress shoe", "mule", "pump", "heel"], "shoes,fashion"],
+    [["sandal", "slide", "flip flop"], "sandals,fashion"],
+    [["hoodie", "sweatshirt"], "hoodie,streetwear"],
+    [["cardigan", "knitwear", "knit", "sweater", "pullover", "crewneck", "turtleneck"], "sweater,fashion"],
+    [["blazer", "suit jacket", "sport coat"], "blazer,fashion"],
+    [["jacket", "coat", "trench", "parka", "anorak", "bomber", "puffer", "windbreaker", "vest"], "jacket,fashion"],
+    [["shirt", "button-down", "oxford shirt", "flannel", "polo", "henley", "overshirt"], "shirt,fashion"],
+    [["tee", "t-shirt", "tank", "crop top", "tube top", "blouse", "camisole"], "top,fashion"],
+    [["corset", "bustier"], "corset,fashion"],
+    [["jean", "denim"], "jeans,fashion"],
+    [["trouser", "chino", "pant", "cargo", "jogger", "slack", "wide-leg", "flare"], "pants,fashion"],
+    [["skirt", "mini skirt", "midi skirt", "maxi skirt"], "skirt,fashion"],
+    [["short", "bermuda"], "shorts,fashion"],
+    [["dress", "midi", "maxi", "wrap dress", "slip dress"], "dress,fashion"],
+    [["bag", "tote", "clutch", "crossbody", "backpack", "purse", "satchel", "pouch"], "handbag,fashion"],
+    [["watch"], "watch,accessories"],
+    [["necklace", "chain", "choker", "pendant"], "necklace,jewelry"],
+    [["earring", "hoop", "stud", "drop earring"], "earrings,jewelry"],
+    [["bracelet", "bangle", "cuff"], "bracelet,jewelry"],
+    [["ring"], "ring,jewelry"],
+    [["sunglasses", "shades", "glasses"], "sunglasses,fashion"],
+    [["hat", "cap", "beanie", "bucket hat", "beret", "balaclava"], "hat,fashion"],
+    [["belt"], "belt,fashion"],
+    [["scarf"], "scarf,fashion"],
+    [["sock", "tight", "fishnet", "stocking"], "socks,fashion"],
+  ];
+  for (const [terms, keywords] of map) {
+    if (terms.some(t => n.includes(t))) return keywords;
+  }
+  return "fashion,clothing";
+}
+
 // Generates an Amazon affiliate search URL for a product
 function amazonUrl(productName: string, brand: string): string {
   const query = encodeURIComponent(`${brand} ${productName}`);
@@ -503,6 +541,38 @@ const ANALYSIS_SCHEMA = {
       description: "2–4 dominant colors as hex codes derived from what is visually present.",
       items: { type: SchemaType.STRING },
     },
+    recommendations: {
+      type: SchemaType.ARRAY,
+      description:
+        "6 specific product recommendations that match or complement this outfit. " +
+        "Base these on the actual garments, colors, and aesthetic you identified. " +
+        "Each item must be a real, shoppable product type with a specific brand. " +
+        "Mix: some items that replicate key pieces, some that complete or elevate the look. " +
+        "Include menswear or womenswear items based on what is visible in the image. " +
+        "Price should reflect realistic retail cost for that brand/product.",
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          name: {
+            type: SchemaType.STRING,
+            description: "Specific product name, e.g. 'Oversized Flannel Shirt', 'Low-Rise Straight Jeans', 'Lug-Sole Chelsea Boot'",
+          },
+          brand: {
+            type: SchemaType.STRING,
+            description: "Real brand name that sells this product, e.g. 'Levi\'s', 'Dr. Martens', 'Uniqlo', 'Zara'",
+          },
+          price: {
+            type: SchemaType.INTEGER,
+            description: "Realistic retail price in USD",
+          },
+          reason: {
+            type: SchemaType.STRING,
+            description: "One sentence: why this item matches or complements the outfit",
+          },
+        },
+        required: ["name", "brand", "price", "reason"],
+      },
+    },
   },
   required: [
     "reasoning",
@@ -514,6 +584,7 @@ const ANALYSIS_SCHEMA = {
     "occasions",
     "keyPieces",
     "colorPalette",
+    "recommendations",
   ],
 };
 
@@ -602,7 +673,18 @@ CALIBRATION RULES:
   • Clean Fit = effortless casual basics, any gender — linen shirts, chinos, white sneakers, simple tees. No logos, no fuss.
   • Classic / Timeless = structured tailoring — blazers, Oxford shoes, dress trousers, trench coats. More formal than Clean Fit.
   A man in a white linen shirt + slim trousers + white sneakers = Clean Fit. Add Oxford shoes + blazer = Classic / Timeless. Add cashmere + suede loafers + no branding = Quiet Luxury.
-- GENDER: Do not let perceived gender of the wearer bias classification. Classify the GARMENTS and STYLING, not the person.`;
+- GENDER: Do not let perceived gender of the wearer bias classification. Classify the GARMENTS and STYLING, not the person.
+
+PRODUCT RECOMMENDATIONS:
+After classifying the outfit, generate 6 specific product recommendations in the recommendations field.
+Rules:
+- Base recommendations on what you ACTUALLY SEE. If you see a brown cardigan + tan corduroy trousers, recommend similar items in those colors and silhouettes. Do not use generic category defaults.
+- Mix get-the-look items (similar to what is worn) with complete-the-look items (pieces that elevate or complement the outfit).
+- Use REAL brands that actually sell the product type. Match brand tier to the outfit price point.
+- Be specific with product names: not just jeans but Low-Rise Straight Leg Jeans or Washed Barrel-Fit Jeans.
+- Match gender expression visible in the image. If male, recommend menswear. If female, recommend womenswear. If ambiguous, recommend gender-neutral pieces.
+- Price should be realistic: Zara = 30-100, Levis = 60-120, Dr. Martens = 140-200, The Row = 300-800.
+- The reason field should reference specific details from the outfit: not matches the aesthetic but mirrors the earth-tone palette with a similar wide-leg corduroy silhouette.`;
 
 export async function registerRoutes(httpServer: Server, app: Express) {
   await initDB();
@@ -644,7 +726,25 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       if (!jsonMatch) throw new Error("Could not parse Gemini response");
 
       const analysis = JSON.parse(jsonMatch[0]);
-      const products = generateMockResults(analysis.aesthetic);
+
+      // Build products from Gemini's actual recommendations
+      const products = (analysis.recommendations || []).map((rec: any, i: number) => {
+        const keywords = buildImageKeywords(rec.name);
+        return {
+          id: i + 1,
+          name: rec.name,
+          brand: rec.brand,
+          price: rec.price,
+          image: `https://source.unsplash.com/400x500/?${keywords}`,
+          match: Math.max(75, 97 - i * 4),
+          retailer: "Amazon",
+          url: amazonUrl(rec.name, rec.brand),
+          reason: rec.reason,
+        };
+      });
+
+      // Fallback to mock results if Gemini didn't return recommendations
+      const finalProducts = products.length >= 3 ? products : generateMockResults(analysis.aesthetic);
       const imageDataUrl = `data:${mimeType};base64,${imageBase64}`;
 
       const scan = await storage.createScan({
@@ -655,7 +755,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         occasions: JSON.stringify(analysis.occasions),
         keyPieces: JSON.stringify(analysis.keyPieces),
         colorPalette: JSON.stringify(analysis.colorPalette),
-        results: JSON.stringify(products),
+        results: JSON.stringify(finalProducts),
       });
 
       res.json({ scanId: scan.id });
