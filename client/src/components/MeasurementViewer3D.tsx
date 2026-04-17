@@ -16,8 +16,17 @@ const MAT_SILHOUETTE = () => new THREE.MeshStandardMaterial({
   metalness: 0.0,
 });
 
-// Meshes to SHOW (everything else is hidden — removes clothes, hair, glasses, etc.)
-const SHOW_MESHES = new Set(["Wolf3D_Body", "Wolf3D_Head"]);
+// Meshes to SHOW with silhouette material (forms the body shape)
+// Includes outfit pieces since RPM has no separate body mesh under clothing
+const SHOW_MESHES = new Set([
+  "Wolf3D_Body",
+  "Wolf3D_Head",
+  "Wolf3D_Outfit_Top",
+  "Wolf3D_Outfit_Bottom",
+  "Wolf3D_Outfit_Footwear",
+]);
+// Always hide — these would look odd as silhouette
+const HIDE_MESHES = new Set(["Wolf3D_Hair", "Wolf3D_Glasses", "Wolf3D_Teeth", "EyeLeft", "EyeRight"]);
 
 // ─── Pose definitions ────────────────────────────────────────────────────────
 // RPM avatars use bare bone names (no mixamorig: prefix)
@@ -211,14 +220,17 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
             const mesh = child as THREE.Mesh;
             const meshName = mesh.name;
 
-            if (SHOW_MESHES.has(meshName)) {
-              // Show body/head — replace all textures with clean silhouette material
+            if (HIDE_MESHES.has(meshName)) {
+              // Always hide: hair, glasses, eyes, teeth
+              mesh.visible = false;
+            } else if (SHOW_MESHES.has(meshName)) {
+              // Show as silhouette: body, head, outfit pieces
               mesh.material = silMat;
               mesh.castShadow = true;
               mesh.receiveShadow = true;
               mesh.visible = true;
             } else {
-              // Hide everything else: clothes, hair, glasses, eyes, teeth
+              // Hide anything unknown
               mesh.visible = false;
             }
           }
