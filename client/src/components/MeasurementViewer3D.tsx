@@ -174,8 +174,12 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     key.shadow.camera.far = 16;
     Object.assign(key.shadow.camera, { left: -2, right: 2, top: 3, bottom: -0.5 });
     scene.add(key);
-    scene.add(Object.assign(new THREE.DirectionalLight(0xe4eeff, 0.5), { position: new THREE.Vector3(-3, 2, -2) }));
-    scene.add(Object.assign(new THREE.DirectionalLight(0xffffff, 0.25), { position: new THREE.Vector3(0, 3, -4) }));
+    const fill2 = new THREE.DirectionalLight(0xe4eeff, 0.5);
+    fill2.position.set(-3, 2, -2);
+    scene.add(fill2);
+    const rim2 = new THREE.DirectionalLight(0xffffff, 0.25);
+    rim2.position.set(0, 3, -4);
+    scene.add(rim2);
 
     // ── Environment ──
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), MAT_FLOOR());
@@ -188,10 +192,9 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     wall.receiveShadow = true;
     scene.add(wall);
 
-    scene.add(Object.assign(
-      new THREE.Mesh(new THREE.BoxGeometry(6, 0.018, 0.018), MAT_EDGE()),
-      { position: new THREE.Vector3(0, 0.009, -1.6) }
-    ));
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(6, 0.018, 0.018), MAT_EDGE());
+    edge.position.set(0, 0.009, -1.6);
+    scene.add(edge);
 
     const grid = new THREE.GridHelper(4, 10, 0xe0dcd4, 0xe0dcd4);
     grid.position.y = 0.001;

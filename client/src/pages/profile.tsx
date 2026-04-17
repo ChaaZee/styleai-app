@@ -1,10 +1,25 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, Component, ReactNode } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getDeviceId } from "../lib/deviceId";
 
 const MeasurementViewer3D = lazy(() => import("../components/MeasurementViewer3D"));
+
+// Error boundary to catch 3D viewer crashes gracefully
+class ViewerErrorBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
+  state = { error: false };
+  static getDerivedStateFromError() { return { error: true }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="w-full rounded-xl border border-border bg-muted flex items-center justify-center" style={{ height: 340 }}>
+          <span className="text-xs text-muted-foreground">3D viewer unavailable</span>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ── Measurement guide data ──────────────────────────────────────────────────
 const GUIDE: Record<string, { how: string; tip: string }> = {
@@ -178,13 +193,15 @@ export default function ProfilePage() {
 
       {/* 3D Viewer */}
       <div className="mb-4">
-        <Suspense fallback={
-          <div className="w-full rounded-xl border border-border bg-muted flex items-center justify-center" style={{ height: 340 }}>
-            <span className="text-xs text-muted-foreground">Loading 3D viewer…</span>
-          </div>
-        }>
-          <MeasurementViewer3D activeField={activeField} gender={profile.gender as any || "male"} />
-        </Suspense>
+        <ViewerErrorBoundary>
+          <Suspense fallback={
+            <div className="w-full rounded-xl border border-border bg-muted flex items-center justify-center" style={{ height: 340 }}>
+              <span className="text-xs text-muted-foreground">Loading 3D viewer…</span>
+            </div>
+          }>
+            <MeasurementViewer3D activeField={activeField} gender={profile.gender as any || "male"} />
+          </Suspense>
+        </ViewerErrorBoundary>
         <p className="text-[10px] text-center text-muted-foreground mt-1.5">Drag to rotate · Scroll to zoom</p>
       </div>
 
