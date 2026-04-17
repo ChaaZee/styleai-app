@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDeviceId } from "../lib/deviceId";
+
+const MeasurementViewer3D = lazy(() => import("../components/MeasurementViewer3D"));
 
 // ── Measurement guide data ──────────────────────────────────────────────────
 const GUIDE: Record<string, { how: string; tip: string }> = {
@@ -17,57 +19,6 @@ const GUIDE: Record<string, { how: string; tip: string }> = {
   thigh:     { how: "Measure around the fullest part of your upper thigh.", tip: "Keep the tape parallel to the floor and snug but not tight." },
 };
 
-// ── SVG diagram: simple body outline with measurement callout dots ──────────
-function BodyDiagram({ active }: { active: string | null }) {
-  // dot positions as % of SVG viewBox (120 wide x 280 tall)
-  const dots: Record<string, [number, number]> = {
-    height:    [60, 140],
-    chest:     [60, 90],
-    bust:      [60, 98],
-    waist:     [60, 118],
-    hips:      [60, 140],
-    shoulders: [60, 72],
-    sleeve:    [85, 100],
-    inseam:    [60, 190],
-    thigh:     [60, 165],
-  };
-
-  return (
-    <svg viewBox="0 0 120 280" className="w-full max-w-[140px] mx-auto" fill="none">
-      {/* Body outline — simple silhouette */}
-      {/* Head */}
-      <circle cx="60" cy="28" r="14" stroke="hsl(30 12% 75%)" strokeWidth="1.5" />
-      {/* Neck */}
-      <line x1="55" y1="42" x2="52" y2="55" stroke="hsl(30 12% 75%)" strokeWidth="1.5" />
-      <line x1="65" y1="42" x2="68" y2="55" stroke="hsl(30 12% 75%)" strokeWidth="1.5" />
-      {/* Torso */}
-      <path d="M52 55 Q40 70 38 90 Q36 115 40 130 Q44 145 46 160 L74 160 Q76 145 80 130 Q84 115 82 90 Q80 70 68 55 Z"
-        stroke="hsl(30 12% 75%)" strokeWidth="1.5" fill="hsl(36 20% 97%)" />
-      {/* Left arm */}
-      <path d="M38 90 Q28 100 26 120 Q24 135 28 148" stroke="hsl(30 12% 75%)" strokeWidth="1.5" fill="none" />
-      {/* Right arm */}
-      <path d="M82 90 Q92 100 94 120 Q96 135 92 148" stroke="hsl(30 12% 75%)" strokeWidth="1.5" fill="none" />
-      {/* Left leg */}
-      <path d="M46 160 Q44 185 43 210 Q42 235 44 260" stroke="hsl(30 12% 75%)" strokeWidth="1.5" fill="none" />
-      {/* Right leg */}
-      <path d="M74 160 Q76 185 77 210 Q78 235 76 260" stroke="hsl(30 12% 75%)" strokeWidth="1.5" fill="none" />
-
-      {/* Measurement dots */}
-      {Object.entries(dots).map(([key, [cx, cy]]) => {
-        const isActive = active === key;
-        return (
-          <circle
-            key={key}
-            cx={cx} cy={cy} r={isActive ? 5 : 3.5}
-            fill={isActive ? "hsl(24 42% 60%)" : "hsl(24 42% 78%)"}
-            stroke="white" strokeWidth="1"
-            style={{ transition: "all 0.2s" }}
-          />
-        );
-      })}
-    </svg>
-  );
-}
 
 // ── Measurement row ──────────────────────────────────────────────────────────
 function MeasurementRow({
@@ -225,16 +176,20 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Two-column: diagram + measurements */}
-      <div className="flex gap-4 mb-4">
-        {/* Diagram */}
-        <div className="flex-shrink-0 w-28 sticky top-20 self-start pt-2">
-          <BodyDiagram active={activeField} />
-          <p className="text-[9px] text-center text-muted-foreground mt-1">Tap ∨ for guide</p>
-        </div>
+      {/* 3D Viewer */}
+      <div className="mb-4">
+        <Suspense fallback={
+          <div className="w-full rounded-xl border border-border bg-muted flex items-center justify-center" style={{ height: 340 }}>
+            <span className="text-xs text-muted-foreground">Loading 3D viewer…</span>
+          </div>
+        }>
+          <MeasurementViewer3D activeField={activeField} gender={profile.gender as any || "male"} />
+        </Suspense>
+        <p className="text-[10px] text-center text-muted-foreground mt-1.5">Drag to rotate · Scroll to zoom</p>
+      </div>
 
-        {/* Measurements */}
-        <div className="flex-1 space-y-2">
+      {/* Measurements */}
+      <div className="space-y-2 mb-4">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Upper Body</p>
           <MeasurementRow id="height" label="Height" value={profile.height} unit={unit} onChange={set("height")} isActive={activeField === "height"} onFocus={() => setActiveField("height")} onBlur={() => setActiveField(null)} />
           <MeasurementRow id="chest" label={showBust ? "Chest / Bust" : "Chest"} value={profile.chest} unit={unit} onChange={set("chest")} isActive={activeField === "chest"} onFocus={() => setActiveField("chest")} onBlur={() => setActiveField(null)} />
@@ -254,7 +209,6 @@ export default function ProfilePage() {
 
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-4 mb-2">General</p>
           <MeasurementRow id="weight" label="Weight" value={profile.weight} unit={unit === "in" ? "lbs" : "kg"} onChange={set("weight")} isActive={activeField === "weight"} onFocus={() => setActiveField("weight")} onBlur={() => setActiveField(null)} />
-        </div>
       </div>
 
       {/* Save button */}
