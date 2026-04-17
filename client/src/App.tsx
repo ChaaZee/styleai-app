@@ -10,6 +10,7 @@ import ResultsPage from "@/pages/results";
 import WardrobePage from "@/pages/wardrobe";
 import HistoryPage from "@/pages/history";
 import ProfilePage from "@/pages/profile";
+import DiscoverPage from "@/pages/discover";
 import NavBar from "@/components/NavBar";
 import { Link } from "wouter";
 
@@ -60,6 +61,7 @@ function AppContent() {
           <Route path="/wardrobe" component={WardrobePage} />
           <Route path="/history" component={HistoryPage} />
           <Route path="/profile" component={ProfilePage} />
+          <Route path="/discover" component={DiscoverPage} />
           <Route>
             <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">Page not found</div>
           </Route>
