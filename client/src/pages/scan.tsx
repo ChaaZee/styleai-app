@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Upload, Sparkles, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { getDeviceId } from "../lib/deviceId";
 
 type UploadState = "idle" | "preview" | "analyzing" | "done";
 
@@ -38,14 +39,18 @@ export default function ScanPage() {
     try {
       const formData = new FormData();
       formData.append("image", selectedFile);
-      const response = await fetch("/api/analyze", { method: "POST", body: formData });
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "x-device-id": getDeviceId() },
+        body: formData,
+      });
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.error || "Analysis failed");
       }
       const data = await response.json();
       setUploadState("done");
-      queryClient.invalidateQueries({ queryKey: ["/api/scans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scans", getDeviceId()] });
       setLocation(`/results/${data.scanId}`);
     } catch (err: any) {
       toast({ title: "Analysis failed", description: err.message, variant: "destructive" });

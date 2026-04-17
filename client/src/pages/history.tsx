@@ -2,11 +2,18 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
 import type { Scan } from "@shared/schema";
+import { getDeviceId } from "../lib/deviceId";
 
 export default function HistoryPage() {
   const [, setLocation] = useLocation();
+  const deviceId = getDeviceId();
   const { data: scans = [], isLoading } = useQuery<Scan[]>({
-    queryKey: ["/api/scans"],
+    queryKey: ["/api/scans", deviceId],
+    queryFn: async () => {
+      const res = await fetch("/api/scans", { headers: { "x-device-id": deviceId } });
+      if (!res.ok) throw new Error("Failed to fetch scans");
+      return res.json();
+    },
     staleTime: 0,
     refetchOnMount: true,
   });

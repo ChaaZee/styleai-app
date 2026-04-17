@@ -37,6 +37,11 @@ export async function initDB() {
     )
   `;
 
+  // Add device_id column if it doesn't exist (safe migration)
+  await client`
+    ALTER TABLE scans ADD COLUMN IF NOT EXISTS device_id TEXT
+  `;
+
   await client`
     CREATE TABLE IF NOT EXISTS wardrobe_items (
       id SERIAL PRIMARY KEY,
@@ -54,7 +59,7 @@ export async function initDB() {
 
 export interface IStorage {
   createScan(scan: InsertScan): Promise<Scan>;
-  getScans(): Promise<Scan[]>;
+  getScans(deviceId?: string): Promise<Scan[]>;
   getScan(id: number): Promise<Scan | undefined>;
   createWardrobeItem(item: InsertWardrobeItem): Promise<WardrobeItem>;
   getWardrobeItems(): Promise<WardrobeItem[]>;
@@ -66,7 +71,10 @@ export const storage: IStorage = {
     const [row] = await db.insert(scans).values(scan).returning();
     return row;
   },
-  async getScans() {
+  async getScans(deviceId?: string) {
+    if (deviceId) {
+      return db.select().from(scans).where(eq(scans.deviceId, deviceId)).orderBy(desc(scans.id));
+    }
     return db.select().from(scans).orderBy(desc(scans.id));
   },
   async getScan(id) {

@@ -5,6 +5,7 @@ import { z } from "zod";
 // Scans — each outfit analysis
 export const scans = pgTable("scans", {
   id: serial("id").primaryKey(),
+  deviceId: text("device_id"),
   imageData: text("image_data").notNull(),
   aesthetic: text("aesthetic").notNull(),
   confidence: integer("confidence").notNull(),

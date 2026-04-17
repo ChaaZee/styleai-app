@@ -844,7 +844,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         styleBreakdown[0].score = analysis.confidence;
       }
 
+      const deviceId = req.headers["x-device-id"] as string | undefined;
+
       const scan = await storage.createScan({
+        deviceId: deviceId || null,
         imageData: imageDataUrl,
         aesthetic: analysis.aesthetic,
         confidence: analysis.confidence,
@@ -862,9 +865,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Get all scans
+  // Get scans — filtered by device if x-device-id header present
   app.get("/api/scans", async (req, res) => {
-    const allScans = await storage.getScans();
+    const deviceId = req.headers["x-device-id"] as string | undefined;
+    const allScans = await storage.getScans(deviceId || undefined);
     res.json(allScans);
   });
 
