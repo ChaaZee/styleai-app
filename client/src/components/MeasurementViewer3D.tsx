@@ -9,97 +9,31 @@ const MAT_FLOOR = () => new THREE.MeshStandardMaterial({ color: 0xf0ece4, roughn
 const MAT_WALL  = () => new THREE.MeshStandardMaterial({ color: 0xfafaf6, roughness: 1.0 });
 const MAT_EDGE  = () => new THREE.MeshStandardMaterial({ color: 0xd8d2c8, roughness: 1.0 });
 
+// Silhouette material — warm matte skin tone matching Stitch design system
+const MAT_SILHOUETTE = () => new THREE.MeshStandardMaterial({
+  color: new THREE.Color(0xd4c4b4),  // warm beige/stone
+  roughness: 0.85,
+  metalness: 0.0,
+});
+
+// Meshes to SHOW (everything else is hidden — removes clothes, hair, glasses, etc.)
+const SHOW_MESHES = new Set(["Wolf3D_Body", "Wolf3D_Head"]);
+
 // ─── Pose definitions ────────────────────────────────────────────────────────
-// Both Xbot (male) and Michelle (female) use the same Mixamo rig.
-// We define two poses and smoothly interpolate between them.
+// RPM avatars use bare bone names (no mixamorig: prefix)
+// A-pose: arms ~50° down  |  T-pose: arms fully horizontal
+type PoseAngles = { leftArm: number; rightArm: number };
 
-// A-pose: arms ~45° down from horizontal (natural standing pose)
-// T-pose: arms fully horizontal (good for chest / shoulder / sleeve measurements)
+const POSE_A: PoseAngles = { leftArm:  Math.PI * 0.28, rightArm: -Math.PI * 0.28 };
+const POSE_T: PoseAngles = { leftArm:  Math.PI * 0.50, rightArm: -Math.PI * 0.50 };
 
-type PoseAngles = { leftArm: number; rightArm: number };  // rotation.z on upper arm bone
-
-const POSE_A: PoseAngles = { leftArm:  Math.PI * 0.30,  rightArm: -Math.PI * 0.30 };  // ~54° down
-const POSE_T: PoseAngles = { leftArm:  Math.PI * 0.50,  rightArm: -Math.PI * 0.50 };  // fully out
-
-// Which measurements need T-pose (arms out)
+// Measurements that need T-pose (arms out for tape to fit cleanly)
 const T_POSE_FIELDS = new Set(["chest", "bust", "shoulders", "sleeve"]);
 
-// ─── Tape measure builders ────────────────────────────────────────────────────
-function buildLoopTape(cx: number, cy: number, cz: number, rx: number, rz: number): THREE.Mesh {
-  const pts: THREE.Vector3[] = [];
-  const N = 100;
-  for (let i = 0; i <= N; i++) {
-    const t = (i / N) * Math.PI * 2;
-    pts.push(new THREE.Vector3(cx + Math.cos(t) * rx, cy, cz + Math.sin(t) * rz));
-  }
-  const curve = new THREE.CatmullRomCurve3(pts, true);
-  const geo = new THREE.TubeGeometry(curve, 140, 0.007, 8, true);
-  return new THREE.Mesh(geo, MAT_TAPE());
-}
-
-function buildVertTape(x: number, y0: number, y1: number, z: number): THREE.Mesh {
-  const pts = [
-    new THREE.Vector3(x, y0, z),
-    new THREE.Vector3(x + 0.02, (y0 + y1) / 2, z),
-    new THREE.Vector3(x, y1, z),
-  ];
-  const curve = new THREE.CatmullRomCurve3(pts);
-  const geo = new THREE.TubeGeometry(curve, 40, 0.007, 8, false);
-  return new THREE.Mesh(geo, MAT_TAPE());
-}
-
-function buildTickMarks(cx: number, cy: number, cz: number, rx: number, rz: number): THREE.Group {
-  const g = new THREE.Group();
-  const tickMat = new THREE.MeshStandardMaterial({ color: 0x8a6020 });
-  for (let i = 0; i < 24; i++) {
-    const t = (i / 24) * Math.PI * 2;
-    const x = cx + Math.cos(t) * rx;
-    const z = cz + Math.sin(t) * rz;
-    const isMain = i % 6 === 0;
-    const m = new THREE.Mesh(
-      new THREE.BoxGeometry(0.003, isMain ? 0.022 : 0.013, 0.003),
-      tickMat
-    );
-    m.position.set(x, cy, z);
-    m.rotation.y = -t;
-    g.add(m);
-  }
-  return g;
-}
-
-// ─── Measurement configs ──────────────────────────────────────────────────────
-// Xbot Y range: 0–1.806  |  Michelle Y range: 0–1.662
-// Tape coords are calibrated for Xbot (male); female model is same relative scale.
-// T-POSE configs: arms out for chest/bust/shoulders/sleeve
-// A-POSE configs: arms down for everything else
-
-type LoopCfg = { type: "loop"; cx: number; cy: number; cz: number; rx: number; rz: number; camPos: [number,number,number]; camTarget: [number,number,number]; };
-type VertCfg = { type: "vert"; x: number; y0: number; y1: number; z: number; camPos: [number,number,number]; camTarget: [number,number,number]; };
-type TapeCfg = LoopCfg | VertCfg;
-
-const TAPE: Record<string, TapeCfg> = {
-  // T-pose measurements (arms out)
-  height:    { type:"vert", x: 0.50,  y0:0.01, y1:1.80, z:0,          camPos:[2.8, 1.0, 2.0],  camTarget:[0.4,  0.9,  0] },
-  chest:     { type:"loop", cx:0, cy:1.32, cz:0, rx:0.23, rz:0.15,     camPos:[1.8, 1.35, 1.6], camTarget:[0,    1.32, 0] },
-  bust:      { type:"loop", cx:0, cy:1.26, cz:0, rx:0.23, rz:0.16,     camPos:[1.8, 1.3,  1.6], camTarget:[0,    1.26, 0] },
-  shoulders: { type:"loop", cx:0, cy:1.44, cz:0, rx:0.28, rz:0.15,     camPos:[0,   2.2,  2.2], camTarget:[0,    1.44, 0] },
-  sleeve:    { type:"vert", x:-0.50,  y0:0.90, y1:1.44, z:0,           camPos:[-2.4,1.35, 1.8], camTarget:[-0.2, 1.2,  0] },
-  // A-pose measurements (arms down)
-  waist:     { type:"loop", cx:0, cy:1.06, cz:0, rx:0.17, rz:0.13,     camPos:[1.8, 1.1,  1.6], camTarget:[0,    1.06, 0] },
-  hips:      { type:"loop", cx:0, cy:0.90, cz:0, rx:0.22, rz:0.17,     camPos:[1.8, 0.9,  1.6], camTarget:[0,    0.90, 0] },
-  inseam:    { type:"vert", x:-0.18, y0:0.01, y1:0.80, z:0,            camPos:[2.0, 0.5,  2.2], camTarget:[0,    0.4,  0] },
-  thigh:     { type:"loop", cx:-0.11, cy:0.73, cz:0, rx:0.10, rz:0.09, camPos:[1.8, 0.75, 1.8], camTarget:[-0.1, 0.73, 0] },
-  weight:    { type:"loop", cx:0, cy:0.95, cz:0, rx:0.22, rz:0.17,     camPos:[1.8, 1.0,  2.0], camTarget:[0,    0.95, 0] },
-};
-
 // ─── Smooth pose animation ────────────────────────────────────────────────────
-function animatePose(
-  scene: THREE.Scene,
-  targetPose: PoseAngles,
-  duration = 400
-): void {
-  const leftArm  = scene.getObjectByName("mixamorig:LeftArm");
-  const rightArm = scene.getObjectByName("mixamorig:RightArm");
+function animatePose(scene: THREE.Scene, target: PoseAngles, duration = 400): void {
+  const leftArm  = scene.getObjectByName("LeftArm");
+  const rightArm = scene.getObjectByName("RightArm");
   if (!leftArm || !rightArm) return;
 
   const startL = leftArm.rotation.z;
@@ -108,16 +42,78 @@ function animatePose(
 
   const step = (now: number) => {
     const t = Math.min((now - t0) / duration, 1);
-    const e = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease in-out
-    leftArm.rotation.z  = startL + (targetPose.leftArm  - startL) * e;
-    rightArm.rotation.z = startR + (targetPose.rightArm - startR) * e;
+    const e = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    leftArm.rotation.z  = startL + (target.leftArm  - startL) * e;
+    rightArm.rotation.z = startR + (target.rightArm - startR) * e;
     if (t < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 }
 
+// ─── Tape measure builders ────────────────────────────────────────────────────
+function buildLoopTape(cx: number, cy: number, cz: number, rx: number, rz: number): THREE.Mesh {
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 100; i++) {
+    const t = (i / 100) * Math.PI * 2;
+    pts.push(new THREE.Vector3(cx + Math.cos(t) * rx, cy, cz + Math.sin(t) * rz));
+  }
+  return new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 140, 0.007, 8, true),
+    MAT_TAPE()
+  );
+}
+
+function buildVertTape(x: number, y0: number, y1: number, z: number): THREE.Mesh {
+  const pts = [
+    new THREE.Vector3(x, y0, z),
+    new THREE.Vector3(x + 0.02, (y0 + y1) / 2, z),
+    new THREE.Vector3(x, y1, z),
+  ];
+  return new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.007, 8, false),
+    MAT_TAPE()
+  );
+}
+
+function buildTickMarks(cx: number, cy: number, cz: number, rx: number, rz: number): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x8a6020 });
+  for (let i = 0; i < 24; i++) {
+    const t = (i / 24) * Math.PI * 2;
+    const m = new THREE.Mesh(
+      new THREE.BoxGeometry(0.003, i % 6 === 0 ? 0.022 : 0.013, 0.003),
+      mat
+    );
+    m.position.set(cx + Math.cos(t) * rx, cy, cz + Math.sin(t) * rz);
+    m.rotation.y = -t;
+    g.add(m);
+  }
+  return g;
+}
+
+// ─── Measurement configs ──────────────────────────────────────────────────────
+// Calibrated to RPM avatar Y range: male 0→1.856, female 0→1.765
+type LoopCfg = { type: "loop"; cx: number; cy: number; cz: number; rx: number; rz: number; camPos: [number,number,number]; camTarget: [number,number,number] };
+type VertCfg = { type: "vert"; x: number; y0: number; y1: number; z: number; camPos: [number,number,number]; camTarget: [number,number,number] };
+type TapeCfg = LoopCfg | VertCfg;
+
+const TAPE: Record<string, TapeCfg> = {
+  // T-pose (arms out)
+  height:    { type:"vert", x: 0.50,  y0:0.01, y1:1.82, z:0,           camPos:[2.8, 1.0, 2.0],  camTarget:[0.4,  0.9,  0] },
+  chest:     { type:"loop", cx:0, cy:1.32, cz:0, rx:0.22, rz:0.14,      camPos:[1.8, 1.35, 1.6], camTarget:[0,    1.32, 0] },
+  bust:      { type:"loop", cx:0, cy:1.25, cz:0, rx:0.22, rz:0.15,      camPos:[1.8, 1.3,  1.6], camTarget:[0,    1.25, 0] },
+  shoulders: { type:"loop", cx:0, cy:1.45, cz:0, rx:0.27, rz:0.14,      camPos:[0,   2.2,  2.2], camTarget:[0,    1.45, 0] },
+  sleeve:    { type:"vert", x:-0.48, y0:0.90, y1:1.45, z:0,             camPos:[-2.4,1.35, 1.8], camTarget:[-0.2, 1.2,  0] },
+  // A-pose (arms down)
+  waist:     { type:"loop", cx:0, cy:1.05, cz:0, rx:0.16, rz:0.12,      camPos:[1.8, 1.1,  1.6], camTarget:[0,    1.05, 0] },
+  hips:      { type:"loop", cx:0, cy:0.88, cz:0, rx:0.20, rz:0.16,      camPos:[1.8, 0.9,  1.6], camTarget:[0,    0.88, 0] },
+  inseam:    { type:"vert", x:-0.17, y0:0.01, y1:0.80, z:0,             camPos:[2.0, 0.5,  2.2], camTarget:[0,    0.4,  0] },
+  thigh:     { type:"loop", cx:-0.10, cy:0.72, cz:0, rx:0.09, rz:0.08,  camPos:[1.8, 0.75, 1.8], camTarget:[-0.1, 0.72, 0] },
+  weight:    { type:"loop", cx:0, cy:0.94, cz:0, rx:0.21, rz:0.16,      camPos:[1.8, 1.0,  2.0], camTarget:[0,    0.94, 0] },
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
-interface Props { activeField: string | null; gender: "male" | "female" | "both"; }
+interface Props { activeField: string | null; gender: "male" | "female" | "both" }
 
 export default function MeasurementViewer3D({ activeField, gender }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -129,16 +125,15 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     controls: OrbitControls;
     tapeGroup: THREE.Group;
     raf: number;
-    modelLoaded: boolean;
   } | null>(null);
 
-  // ── Scene init (re-runs when gender changes) ──────────────────────────────
+  // ── Init scene (re-runs on gender change) ─────────────────────────────────
   useEffect(() => {
     const el = mountRef.current;
     if (!el) return;
     const W = el.clientWidth, H = el.clientHeight || 360;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
     renderer.shadowMap.enabled = true;
@@ -164,9 +159,9 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     controls.update();
 
     // ── Lighting ──
-    scene.add(new THREE.AmbientLight(0xfff8f2, 1.1));
+    scene.add(new THREE.AmbientLight(0xfff8f2, 1.2));
 
-    const key = new THREE.DirectionalLight(0xfff4e8, 1.6);
+    const key = new THREE.DirectionalLight(0xfff4e8, 1.4);
     key.position.set(3, 6, 4);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
@@ -174,12 +169,14 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     key.shadow.camera.far = 16;
     Object.assign(key.shadow.camera, { left: -2, right: 2, top: 3, bottom: -0.5 });
     scene.add(key);
-    const fill2 = new THREE.DirectionalLight(0xe4eeff, 0.5);
-    fill2.position.set(-3, 2, -2);
-    scene.add(fill2);
-    const rim2 = new THREE.DirectionalLight(0xffffff, 0.25);
-    rim2.position.set(0, 3, -4);
-    scene.add(rim2);
+
+    const fill = new THREE.DirectionalLight(0xe8eeff, 0.6);
+    fill.position.set(-3, 2, -2);
+    scene.add(fill);
+
+    const rim = new THREE.DirectionalLight(0xffffff, 0.3);
+    rim.position.set(0, 4, -4);
+    scene.add(rim);
 
     // ── Environment ──
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), MAT_FLOOR());
@@ -189,7 +186,6 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
 
     const wall = new THREE.Mesh(new THREE.PlaneGeometry(6, 5), MAT_WALL());
     wall.position.set(0, 2.5, -1.6);
-    wall.receiveShadow = true;
     scene.add(wall);
 
     const edge = new THREE.Mesh(new THREE.BoxGeometry(6, 0.018, 0.018), MAT_EDGE());
@@ -200,51 +196,46 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     grid.position.y = 0.001;
     scene.add(grid);
 
-    // ── Load GLB body ──
+    // ── Load GLB ──
     const modelPath = gender === "female" ? "/models/body_female.glb" : "/models/body_male.glb";
     const loader = new GLTFLoader();
-
-    // Warm skin tone matching Stitch design system
-    const skinColor  = new THREE.Color(0xe8ddd4);  // warm beige
-    const accentColor = new THREE.Color(0xc8956a); // terracotta — for joints/secondary parts
+    const silMat = MAT_SILHOUETTE();
 
     loader.load(
       modelPath,
       (gltf) => {
         const model = gltf.scene;
-        model.scale.set(1, 1, 1);
-        model.position.set(0, 0, 0);
 
-        // Re-skin with Stitch palette
         model.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
             const mesh = child as THREE.Mesh;
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            const matName = ((mesh.material as THREE.Material)?.name || "").toLowerCase();
-            const useAccent = matName.includes("joint") || matName.includes("beta_joint");
-            mesh.material = new THREE.MeshStandardMaterial({
-              color: useAccent ? accentColor : skinColor,
-              roughness: 0.65,
-              metalness: 0.0,
-            });
+            const meshName = mesh.name;
+
+            if (SHOW_MESHES.has(meshName)) {
+              // Show body/head — replace all textures with clean silhouette material
+              mesh.material = silMat;
+              mesh.castShadow = true;
+              mesh.receiveShadow = true;
+              mesh.visible = true;
+            } else {
+              // Hide everything else: clothes, hair, glasses, eyes, teeth
+              mesh.visible = false;
+            }
           }
         });
 
-        // Start in A-pose (arms slightly down)
-        const leftArm  = model.getObjectByName("mixamorig:LeftArm");
-        const rightArm = model.getObjectByName("mixamorig:RightArm");
-        if (leftArm)  leftArm.rotation.z  = POSE_A.leftArm;
-        if (rightArm) rightArm.rotation.z = POSE_A.rightArm;
+        // Start in A-pose
+        const la = model.getObjectByName("LeftArm");
+        const ra = model.getObjectByName("RightArm");
+        if (la) la.rotation.z = POSE_A.leftArm;
+        if (ra) ra.rotation.z = POSE_A.rightArm;
 
         scene.add(model);
-        if (refs.current) refs.current.modelLoaded = true;
       },
       undefined,
       () => {
-        // Fallback if GLB can't load
-        scene.add(buildFallbackBody());
-        if (refs.current) refs.current.modelLoaded = true;
+        // Fallback silhouette body if GLB fails
+        scene.add(buildFallback());
       }
     );
 
@@ -272,7 +263,7 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     };
     window.addEventListener("resize", onResize);
 
-    refs.current = { renderer, scene, camera, controls, tapeGroup, raf, modelLoaded: false };
+    refs.current = { renderer, scene, camera, controls, tapeGroup, raf };
 
     return () => {
       cancelAnimationFrame(raf);
@@ -287,17 +278,14 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     const r = refs.current;
     if (!r) return;
 
-    // Clear old tape
     r.tapeGroup.clear();
 
-    // Switch pose based on field
-    const wantTPose = activeField ? T_POSE_FIELDS.has(activeField) : false;
-    animatePose(r.scene, wantTPose ? POSE_T : POSE_A);
+    // Switch pose
+    animatePose(r.scene, activeField && T_POSE_FIELDS.has(activeField) ? POSE_T : POSE_A);
 
     if (!activeField || !TAPE[activeField]) return;
     const cfg = TAPE[activeField];
 
-    // Build tape geometry
     let tapeMesh: THREE.Mesh;
     if (cfg.type === "loop") {
       tapeMesh = buildLoopTape(cfg.cx, cfg.cy, cfg.cz, cfg.rx, cfg.rz);
@@ -307,7 +295,7 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     }
     r.tapeGroup.add(tapeMesh);
 
-    // Animate camera to measurement
+    // Camera animation
     const startPos    = r.camera.position.clone();
     const startTarget = r.controls.target.clone();
     const endPos      = new THREE.Vector3(...cfg.camPos);
@@ -356,18 +344,18 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
   );
 }
 
-// ─── Fallback body (if GLB fails to load) ────────────────────────────────────
-function buildFallbackBody(): THREE.Group {
+// ─── Fallback silhouette (if GLB fails to load) ───────────────────────────────
+function buildFallback(): THREE.Group {
   const g = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: 0xe8ddd4, roughness: 0.6 });
+  const mat = MAT_SILHOUETTE();
   const add = (geo: THREE.BufferGeometry, x: number, y: number, z: number) => {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
     m.castShadow = true;
     g.add(m);
   };
-  add(new THREE.SphereGeometry(0.12, 16, 12), 0, 1.72, 0);
-  add(new THREE.CapsuleGeometry(0.18, 0.55, 8, 16), 0, 1.2, 0);
+  add(new THREE.SphereGeometry(0.12, 20, 16), 0, 1.72, 0);
+  add(new THREE.CapsuleGeometry(0.19, 0.55, 8, 16), 0, 1.20, 0);
   add(new THREE.CapsuleGeometry(0.07, 0.35, 6, 12), -0.28, 1.18, 0);
   add(new THREE.CapsuleGeometry(0.07, 0.35, 6, 12),  0.28, 1.18, 0);
   add(new THREE.CapsuleGeometry(0.05, 0.28, 6, 10), -0.30, 0.82, 0);
