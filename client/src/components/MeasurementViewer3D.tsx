@@ -1,171 +1,15 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-// ─── Material palette ─────────────────────────────────────────────────────────
-const MAT_BODY   = () => new THREE.MeshStandardMaterial({ color: 0xe8ddd4, roughness: 0.55, metalness: 0.02 });
-const MAT_TAPE   = () => new THREE.MeshStandardMaterial({ color: 0xf0c060, roughness: 0.4,  metalness: 0.15, emissive: new THREE.Color(0x201000) });
-const MAT_FLOOR  = () => new THREE.MeshStandardMaterial({ color: 0xf0ece4, roughness: 1.0 });
-const MAT_WALL   = () => new THREE.MeshStandardMaterial({ color: 0xfafaf6, roughness: 1.0 });
-const MAT_EDGE   = () => new THREE.MeshStandardMaterial({ color: 0xd8d2c8, roughness: 1.0 });
+// ─── Materials ────────────────────────────────────────────────────────────────
+const MAT_TAPE  = () => new THREE.MeshStandardMaterial({ color: 0xf0c060, roughness: 0.4,  metalness: 0.15, emissive: new THREE.Color(0x201000) });
+const MAT_FLOOR = () => new THREE.MeshStandardMaterial({ color: 0xf0ece4, roughness: 1.0 });
+const MAT_WALL  = () => new THREE.MeshStandardMaterial({ color: 0xfafaf6, roughness: 1.0 });
+const MAT_EDGE  = () => new THREE.MeshStandardMaterial({ color: 0xd8d2c8, roughness: 1.0 });
 
-// ─── Build smooth organic body ────────────────────────────────────────────────
-// Uses LatheGeometry for the torso (revolution of a profile curve) +
-// SphereGeometry for head + CapsuleGeometry for limbs
-
-function capsule(
-  radiusTop: number, radiusBottom: number, height: number,
-  radSeg = 12, capSeg = 8
-): THREE.BufferGeometry {
-  // Build a smooth capsule-like shape via CylinderGeometry with half-sphere caps merged
-  const geo = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radSeg, 1, false);
-  return geo;
-}
-
-function buildBody(gender: "male" | "female" | "both"): THREE.Group {
-  const isFem = gender === "female";
-  const g = new THREE.Group();
-  const mat = MAT_BODY();
-
-  const mesh = (geo: THREE.BufferGeometry, x=0, y=0, z=0, rx=0, ry=0, rz=0, sx=1, sy=1, sz=1) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
-    m.rotation.set(rx, ry, rz);
-    m.scale.set(sx, sy, sz);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    g.add(m);
-    return m;
-  };
-
-  // ── HEAD ─────────────────────────────────────────────────────────────────────
-  // Main cranium
-  const head = new THREE.SphereGeometry(0.115, 24, 20);
-  mesh(head, 0, 1.73, 0);
-  // Jaw/chin — slightly flattened sphere offset down
-  const jaw = new THREE.SphereGeometry(0.088, 20, 16);
-  mesh(jaw, 0, 1.618, 0.01, 0, 0, 0, 1, 0.78, 0.92);
-  // Nose bump
-  mesh(new THREE.SphereGeometry(0.025, 10, 8), 0, 1.66, 0.115);
-
-  // ── NECK ─────────────────────────────────────────────────────────────────────
-  mesh(new THREE.CylinderGeometry(0.052, 0.062, 0.14, 14), 0, 1.535, 0);
-
-  // ── TORSO via LatheGeometry ────────────────────────────────────────────────
-  // Profile points [radius, y] from hip to top of torso
-  // Male: broader shoulders, slimmer hips
-  // Female: narrower shoulders, wider hips, defined waist
-  const tPoints = isFem
-    ? [
-        new THREE.Vector2(0.215, 0.00),   // hip bottom
-        new THREE.Vector2(0.225, 0.08),   // hip fullest
-        new THREE.Vector2(0.21,  0.16),   // hip upper
-        new THREE.Vector2(0.175, 0.26),   // waist
-        new THREE.Vector2(0.185, 0.34),   // underbust
-        new THREE.Vector2(0.205, 0.42),   // chest mid
-        new THREE.Vector2(0.215, 0.50),   // chest fullest
-        new THREE.Vector2(0.205, 0.57),   // chest upper
-        new THREE.Vector2(0.195, 0.63),   // clavicle
-        new THREE.Vector2(0.165, 0.70),   // neck base
-      ]
-    : [
-        new THREE.Vector2(0.195, 0.00),   // hip bottom
-        new THREE.Vector2(0.200, 0.08),   // hip
-        new THREE.Vector2(0.195, 0.18),   // waist
-        new THREE.Vector2(0.205, 0.28),   // mid torso
-        new THREE.Vector2(0.225, 0.40),   // chest
-        new THREE.Vector2(0.235, 0.50),   // chest fullest
-        new THREE.Vector2(0.225, 0.58),   // chest upper
-        new THREE.Vector2(0.215, 0.64),   // clavicle
-        new THREE.Vector2(0.175, 0.70),   // neck base
-      ];
-
-  const torsoGeo = new THREE.LatheGeometry(tPoints, 28);
-  mesh(torsoGeo, 0, 0.79, 0);
-
-  // ── SHOULDER CAPS ─────────────────────────────────────────────────────────
-  const shW = isFem ? 0.215 : 0.245;
-  mesh(new THREE.SphereGeometry(0.072, 14, 12), -shW,  1.44, 0);
-  mesh(new THREE.SphereGeometry(0.072, 14, 12),  shW, 1.44, 0);
-
-  // ── BUST (female) ─────────────────────────────────────────────────────────
-  if (isFem) {
-    mesh(new THREE.SphereGeometry(0.068, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
-      -0.083, 1.25, 0.145);
-    mesh(new THREE.SphereGeometry(0.068, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
-       0.083, 1.25, 0.145);
-  }
-
-  // ── UPPER ARMS ────────────────────────────────────────────────────────────
-  const uaLen = isFem ? 0.25 : 0.27;
-  const uaR   = isFem ? 0.048 : 0.056;
-  const uaX   = isFem ? 0.285 : 0.315;
-
-  const uaGeo = new THREE.CapsuleGeometry(uaR, uaLen, 6, 12);
-  const la = mesh(uaGeo, -uaX, 1.31, 0, 0, 0, 0.14);
-  const ra = mesh(uaGeo,  uaX, 1.31, 0, 0, 0, -0.14);
-
-  // ── FOREARMS ──────────────────────────────────────────────────────────────
-  const faLen = isFem ? 0.21 : 0.23;
-  const faR   = isFem ? 0.034 : 0.040;
-  const faX   = isFem ? 0.315 : 0.345;
-  const faY   = 1.04;
-
-  const faGeo = new THREE.CapsuleGeometry(faR, faLen, 5, 10);
-  mesh(faGeo, -faX, faY, 0, 0, 0, 0.10);
-  mesh(faGeo,  faX, faY, 0, 0, 0, -0.10);
-
-  // ── HANDS ─────────────────────────────────────────────────────────────────
-  const hX = isFem ? 0.33 : 0.36;
-  mesh(new THREE.SphereGeometry(0.038, 10, 8), -hX, 0.86, 0, 0, 0, 0, 1, 0.75, 0.65);
-  mesh(new THREE.SphereGeometry(0.038, 10, 8),  hX, 0.86, 0, 0, 0, 0, 1, 0.75, 0.65);
-
-  // ── PELVIS ────────────────────────────────────────────────────────────────
-  const pelW = isFem ? 0.195 : 0.175;
-  mesh(new THREE.SphereGeometry(pelW, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.55),
-    0, 0.78, 0, 0, 0, 0, 1, 0.7, 0.9);
-
-  // ── THIGHS ────────────────────────────────────────────────────────────────
-  const thR = isFem ? 0.092 : 0.096;
-  const thLen = 0.36;
-  const thX = isFem ? 0.105 : 0.095;
-  const thGeo = new THREE.CapsuleGeometry(thR, thLen, 6, 14);
-  mesh(thGeo, -thX, 0.565, 0, 0, 0,  0.04);
-  mesh(thGeo,  thX, 0.565, 0, 0, 0, -0.04);
-
-  // ── CALVES ────────────────────────────────────────────────────────────────
-  const caLen = 0.30;
-  const caGeo = new THREE.CapsuleGeometry(0.055, caLen, 6, 12);
-  mesh(caGeo, -0.115, 0.195, 0, 0, 0,  0.025);
-  mesh(caGeo,  0.115, 0.195, 0, 0, 0, -0.025);
-
-  // ── FEET ──────────────────────────────────────────────────────────────────
-  mesh(new THREE.CapsuleGeometry(0.038, 0.14, 4, 10), -0.118, 0.025, 0.04, 0, 0, Math.PI/2);
-  mesh(new THREE.CapsuleGeometry(0.038, 0.14, 4, 10),  0.118, 0.025, 0.04, 0, 0, Math.PI/2);
-
-  // ── HAIR ──────────────────────────────────────────────────────────────────
-  const hairMat = new THREE.MeshStandardMaterial({ color: isFem ? 0xc8a060 : 0x503820, roughness: 0.9 });
-  const hairTop = new THREE.SphereGeometry(0.118, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52);
-  const hm = new THREE.Mesh(hairTop, hairMat);
-  hm.position.set(0, 1.755, -0.012);
-  hm.castShadow = true;
-  g.add(hm);
-
-  if (isFem) {
-    // Longer side/back hair
-    const sideHair = new THREE.CapsuleGeometry(0.07, 0.2, 4, 10);
-    const sh = new THREE.Mesh(sideHair, hairMat);
-    sh.position.set(0, 1.60, -0.065);
-    sh.scale.set(1.3, 1, 0.7);
-    sh.castShadow = true;
-    g.add(sh);
-  }
-
-  return g;
-}
-
-// ─── Tape measure builder ─────────────────────────────────────────────────────
-
+// ─── Tape measure builders ────────────────────────────────────────────────────
 function buildLoopTape(cx: number, cy: number, cz: number, rx: number, rz: number): THREE.Mesh {
   const pts: THREE.Vector3[] = [];
   const N = 100;
@@ -189,19 +33,7 @@ function buildVertTape(x: number, y0: number, y1: number, z: number): THREE.Mesh
   return new THREE.Mesh(geo, MAT_TAPE());
 }
 
-function buildEndCaps(mesh: THREE.Mesh): THREE.Group {
-  const g = new THREE.Group();
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x888060, roughness: 0.5 });
-  const cap = new THREE.CylinderGeometry(0.018, 0.018, 0.012, 12);
-  const c1 = new THREE.Mesh(cap, capMat);
-  const c2 = new THREE.Mesh(cap, capMat);
-  // approximate cap placement at start/end of tube
-  c1.position.copy((mesh.geometry as THREE.TubeGeometry).parameters?.path?.getPointAt(0) || new THREE.Vector3());
-  g.add(c1); g.add(c2);
-  return g;
-}
-
-// ─── Tick marks on tape ───────────────────────────────────────────────────────
+// ─── Tick marks on loop tape ──────────────────────────────────────────────────
 function buildTickMarks(cx: number, cy: number, cz: number, rx: number, rz: number): THREE.Group {
   const g = new THREE.Group();
   const tickMat = new THREE.MeshStandardMaterial({ color: 0x8a6020 });
@@ -220,21 +52,23 @@ function buildTickMarks(cx: number, cy: number, cz: number, rx: number, rz: numb
 }
 
 // ─── Measurement configs ──────────────────────────────────────────────────────
+// Xbot model Y range: 0 (feet) → 1.806 (top of head)
+// Tape positions calibrated to Xbot proportions
 type LoopCfg = { type: "loop"; cx: number; cy: number; cz: number; rx: number; rz: number; camPos: [number,number,number]; camTarget: [number,number,number]; };
 type VertCfg = { type: "vert"; x: number; y0: number; y1: number; z: number;   camPos: [number,number,number]; camTarget: [number,number,number]; };
 type TapeCfg = LoopCfg | VertCfg;
 
 const TAPE: Record<string, TapeCfg> = {
-  height:    { type:"vert", x:0.50, y0:0.01, y1:1.85, z:0,       camPos:[2.8,1.0,2.0],  camTarget:[0.4, 0.9,0] },
-  chest:     { type:"loop", cx:0, cy:1.32, cz:0, rx:0.225, rz:0.195, camPos:[1.8,1.35,1.6], camTarget:[0,1.32,0] },
-  bust:      { type:"loop", cx:0, cy:1.26, cz:0, rx:0.235, rz:0.205, camPos:[1.8,1.3, 1.6], camTarget:[0,1.26,0] },
-  waist:     { type:"loop", cx:0, cy:1.06, cz:0, rx:0.185, rz:0.165, camPos:[1.8,1.1, 1.6], camTarget:[0,1.06,0] },
-  hips:      { type:"loop", cx:0, cy:0.85, cz:0, rx:0.23,  rz:0.20,  camPos:[1.8,0.9, 1.6], camTarget:[0,0.85,0] },
-  shoulders: { type:"loop", cx:0, cy:1.44, cz:0, rx:0.265, rz:0.14,  camPos:[0,  2.2, 2.2], camTarget:[0,1.44,0] },
-  sleeve:    { type:"vert", x:-0.38, y0:0.86, y1:1.44, z:0,         camPos:[-2.2,1.3,1.6], camTarget:[-0.2,1.2,0] },
-  inseam:    { type:"vert", x:-0.2,  y0:0.01, y1:0.76, z:0,         camPos:[2.0, 0.5,2.2], camTarget:[0,  0.4,0] },
-  thigh:     { type:"loop", cx:-0.11, cy:0.63, cz:0, rx:0.105, rz:0.1, camPos:[1.8,0.7,1.8], camTarget:[-0.1,0.63,0] },
-  weight:    { type:"loop", cx:0, cy:0.92, cz:0, rx:0.22, rz:0.19,  camPos:[1.8,1.0, 2.0], camTarget:[0,0.92,0] },
+  height:    { type:"vert", x:0.50,  y0:0.01, y1:1.80, z:0,         camPos:[2.8, 1.0, 2.0],  camTarget:[0.4, 0.9,  0] },
+  chest:     { type:"loop", cx:0, cy:1.32, cz:0, rx:0.22, rz:0.14,  camPos:[1.8, 1.35, 1.6], camTarget:[0,   1.32, 0] },
+  bust:      { type:"loop", cx:0, cy:1.26, cz:0, rx:0.22, rz:0.15,  camPos:[1.8, 1.3,  1.6], camTarget:[0,   1.26, 0] },
+  waist:     { type:"loop", cx:0, cy:1.06, cz:0, rx:0.16, rz:0.12,  camPos:[1.8, 1.1,  1.6], camTarget:[0,   1.06, 0] },
+  hips:      { type:"loop", cx:0, cy:0.90, cz:0, rx:0.21, rz:0.16,  camPos:[1.8, 0.9,  1.6], camTarget:[0,   0.90, 0] },
+  shoulders: { type:"loop", cx:0, cy:1.44, cz:0, rx:0.27, rz:0.14,  camPos:[0,   2.2,  2.2], camTarget:[0,   1.44, 0] },
+  sleeve:    { type:"vert", x:-0.38, y0:0.86, y1:1.44, z:0,         camPos:[-2.2,1.3,  1.6], camTarget:[-0.2,1.2,  0] },
+  inseam:    { type:"vert", x:-0.18, y0:0.01, y1:0.80, z:0,         camPos:[2.0, 0.5,  2.2], camTarget:[0,   0.4,  0] },
+  thigh:     { type:"loop", cx:-0.11, cy:0.73, cz:0, rx:0.10, rz:0.09, camPos:[1.8, 0.75, 1.8], camTarget:[-0.1, 0.73, 0] },
+  weight:    { type:"loop", cx:0, cy:0.95, cz:0, rx:0.22, rz:0.16,  camPos:[1.8, 1.0,  2.0], camTarget:[0,   0.95, 0] },
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -256,9 +90,9 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
   useEffect(() => {
     const el = mountRef.current;
     if (!el) return;
-    const W = el.clientWidth, H = el.clientHeight || 340;
+    const W = el.clientWidth, H = el.clientHeight || 360;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
     renderer.shadowMap.enabled = true;
@@ -270,12 +104,12 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     scene.fog = new THREE.Fog(0xfafaf8, 6, 14);
 
     const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 30);
-    camera.position.set(2.2, 1.5, 2.5);
+    camera.position.set(2.2, 1.4, 2.5);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0.9, 0);
     controls.enablePan = false;
-    controls.minDistance = 1.4;
+    controls.minDistance = 1.2;
     controls.maxDistance = 5;
     controls.minPolarAngle = 0.15;
     controls.maxPolarAngle = Math.PI * 0.86;
@@ -284,22 +118,22 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     controls.update();
 
     // ── Lighting ──
-    scene.add(new THREE.AmbientLight(0xfff8f2, 0.9));
+    scene.add(new THREE.AmbientLight(0xfff8f2, 1.1));
 
-    const key = new THREE.DirectionalLight(0xfff4e8, 1.8);
+    const key = new THREE.DirectionalLight(0xfff4e8, 1.6);
     key.position.set(3, 6, 4);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.near = 0.5;
     key.shadow.camera.far = 16;
-    Object.assign(key.shadow.camera, { left:-2, right:2, top:3, bottom:-0.5 });
+    Object.assign(key.shadow.camera, { left: -2, right: 2, top: 3, bottom: -0.5 });
     scene.add(key);
 
-    const fill = new THREE.DirectionalLight(0xe4eeff, 0.55);
+    const fill = new THREE.DirectionalLight(0xe4eeff, 0.5);
     fill.position.set(-3, 2, -2);
     scene.add(fill);
 
-    const rim = new THREE.DirectionalLight(0xffffff, 0.3);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.25);
     rim.position.set(0, 3, -4);
     scene.add(rim);
 
@@ -315,19 +149,63 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     wall.receiveShadow = true;
     scene.add(wall);
 
-    // Wall/floor baseboard
+    // Baseboard
     const edge = new THREE.Mesh(new THREE.BoxGeometry(6, 0.018, 0.018), MAT_EDGE());
     edge.position.set(0, 0.009, -1.6);
     scene.add(edge);
 
-    // Subtle floor grid lines (thin)
+    // Subtle grid
     const gridHelper = new THREE.GridHelper(4, 10, 0xe0dcd4, 0xe0dcd4);
     gridHelper.position.y = 0.001;
     scene.add(gridHelper);
 
-    // ── Body ──
-    const body = buildBody(gender === "both" ? "male" : gender);
-    scene.add(body);
+    // ── Load GLB body ──
+    const loader = new GLTFLoader();
+    // Use body.glb for both genders — it's a neutral human figure
+    // The scale/material treatment gives enough gender hint from the proportions
+    const modelPath = "/models/body.glb";
+
+    loader.load(
+      modelPath,
+      (gltf) => {
+        const model = gltf.scene;
+
+        // Scale to ~1.8m standing height (Xbot is already ~1.8 in model units)
+        model.scale.set(1, 1, 1);
+        model.position.set(0, 0, 0);
+
+        // Apply warm skin-tone material that matches the Stitch design system
+        const skinColor = new THREE.Color(0xe8ddd4);    // warm off-white beige
+        const jointColor = new THREE.Color(0xc8a882);   // slightly darker for joints
+
+        model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            // Re-skin the model with the Stitch palette
+            const matName = (mesh.material as THREE.Material)?.name || "";
+            const isJoint = matName.toLowerCase().includes("joint");
+
+            mesh.material = new THREE.MeshStandardMaterial({
+              color: isJoint ? jointColor : skinColor,
+              roughness: 0.65,
+              metalness: 0.0,
+            });
+          }
+        });
+
+        scene.add(model);
+      },
+      undefined,
+      (err) => {
+        console.warn("GLB load failed, falling back to simple body", err);
+        // Fallback: simple capsule silhouette
+        const fallback = buildFallbackBody();
+        scene.add(fallback);
+      }
+    );
 
     // ── Tape group ──
     const tapeGroup = new THREE.Group();
@@ -346,7 +224,7 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     const onResize = () => {
       if (!mountRef.current) return;
       const w = mountRef.current.clientWidth;
-      const h = mountRef.current.clientHeight || 340;
+      const h = mountRef.current.clientHeight || 360;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
@@ -368,13 +246,10 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     const r = refs.current;
     if (!r) return;
 
-    // Clear old tape
     r.tapeGroup.clear();
-
     if (!activeField || !TAPE[activeField]) return;
     const cfg = TAPE[activeField];
 
-    // Build tape + tick marks
     let tapeMesh: THREE.Mesh;
     if (cfg.type === "loop") {
       tapeMesh = buildLoopTape(cfg.cx, cfg.cy, cfg.cz, cfg.rx, cfg.rz);
@@ -385,7 +260,7 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     }
     r.tapeGroup.add(tapeMesh);
 
-    // Animate camera + tape fade-in
+    // Animate camera to measurement
     const startPos = r.camera.position.clone();
     const startTarget = r.controls.target.clone();
     const endPos = new THREE.Vector3(...cfg.camPos);
@@ -400,7 +275,7 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     let animId = 0;
     const anim = (now: number) => {
       const t = Math.min((now - t0) / DURATION, 1);
-      const e = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+      const e = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
       r.camera.position.lerpVectors(startPos, endPos, e);
       r.controls.target.lerpVectors(startTarget, endTarget, e);
       r.controls.update();
@@ -410,7 +285,7 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
     };
     animId = requestAnimationFrame(anim);
 
-    // Pulse glow after arrival
+    // Pulse glow
     let pulseId = 0;
     const pulse = (now: number) => {
       const p = (Math.sin(now * 0.0025) + 1) * 0.5;
@@ -433,4 +308,27 @@ export default function MeasurementViewer3D({ activeField, gender }: Props) {
       style={{ height: 360, touchAction: "none", background: "#fafaf8" }}
     />
   );
+}
+
+// ─── Fallback body (if GLB fails to load) ────────────────────────────────────
+function buildFallbackBody(): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0xe8ddd4, roughness: 0.6 });
+  const add = (geo: THREE.BufferGeometry, x: number, y: number, z: number) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    g.add(m);
+  };
+  add(new THREE.SphereGeometry(0.12, 16, 12), 0, 1.72, 0);           // head
+  add(new THREE.CapsuleGeometry(0.18, 0.55, 8, 16), 0, 1.2, 0);      // torso
+  add(new THREE.CapsuleGeometry(0.07, 0.35, 6, 12), -0.28, 1.18, 0); // L upper arm
+  add(new THREE.CapsuleGeometry(0.07, 0.35, 6, 12),  0.28, 1.18, 0); // R upper arm
+  add(new THREE.CapsuleGeometry(0.05, 0.28, 6, 10), -0.30, 0.82, 0); // L forearm
+  add(new THREE.CapsuleGeometry(0.05, 0.28, 6, 10),  0.30, 0.82, 0); // R forearm
+  add(new THREE.CapsuleGeometry(0.09, 0.38, 6, 14), -0.10, 0.62, 0); // L thigh
+  add(new THREE.CapsuleGeometry(0.09, 0.38, 6, 14),  0.10, 0.62, 0); // R thigh
+  add(new THREE.CapsuleGeometry(0.065, 0.32, 6, 12), -0.12, 0.20, 0); // L calf
+  add(new THREE.CapsuleGeometry(0.065, 0.32, 6, 12),  0.12, 0.20, 0); // R calf
+  return g;
 }
