@@ -2,383 +2,435 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-// ─── Body geometry helpers ───────────────────────────────────────────────────
+// ─── Material palette ─────────────────────────────────────────────────────────
+const MAT_BODY   = () => new THREE.MeshStandardMaterial({ color: 0xe8ddd4, roughness: 0.55, metalness: 0.02 });
+const MAT_TAPE   = () => new THREE.MeshStandardMaterial({ color: 0xf0c060, roughness: 0.4,  metalness: 0.15, emissive: new THREE.Color(0x201000) });
+const MAT_FLOOR  = () => new THREE.MeshStandardMaterial({ color: 0xf0ece4, roughness: 1.0 });
+const MAT_WALL   = () => new THREE.MeshStandardMaterial({ color: 0xfafaf6, roughness: 1.0 });
+const MAT_EDGE   = () => new THREE.MeshStandardMaterial({ color: 0xd8d2c8, roughness: 1.0 });
+
+// ─── Build smooth organic body ────────────────────────────────────────────────
+// Uses LatheGeometry for the torso (revolution of a profile curve) +
+// SphereGeometry for head + CapsuleGeometry for limbs
+
+function capsule(
+  radiusTop: number, radiusBottom: number, height: number,
+  radSeg = 12, capSeg = 8
+): THREE.BufferGeometry {
+  // Build a smooth capsule-like shape via CylinderGeometry with half-sphere caps merged
+  const geo = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radSeg, 1, false);
+  return geo;
+}
 
 function buildBody(gender: "male" | "female" | "both"): THREE.Group {
   const isFem = gender === "female";
-  const group = new THREE.Group();
-  const skin = new THREE.MeshStandardMaterial({ color: 0xc8956a, roughness: 0.8, metalness: 0 });
-  const cloth = new THREE.MeshStandardMaterial({ color: isFem ? 0xd4a0b0 : 0x7a8fa6, roughness: 0.9 });
-  const clothLower = new THREE.MeshStandardMaterial({ color: isFem ? 0x8b7090 : 0x3a4a5a, roughness: 0.9 });
+  const g = new THREE.Group();
+  const mat = MAT_BODY();
 
-  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x=0, y=0, z=0, sx=1, sy=1, sz=1) => {
+  const mesh = (geo: THREE.BufferGeometry, x=0, y=0, z=0, rx=0, ry=0, rz=0, sx=1, sy=1, sz=1) => {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
+    m.rotation.set(rx, ry, rz);
     m.scale.set(sx, sy, sz);
     m.castShadow = true;
-    group.add(m);
+    m.receiveShadow = true;
+    g.add(m);
     return m;
   };
 
-  // ── Head ──
-  add(new THREE.SphereGeometry(0.13, 16, 16), skin, 0, 1.72, 0);
+  // ── HEAD ─────────────────────────────────────────────────────────────────────
+  // Main cranium
+  const head = new THREE.SphereGeometry(0.115, 24, 20);
+  mesh(head, 0, 1.73, 0);
+  // Jaw/chin — slightly flattened sphere offset down
+  const jaw = new THREE.SphereGeometry(0.088, 20, 16);
+  mesh(jaw, 0, 1.618, 0.01, 0, 0, 0, 1, 0.78, 0.92);
+  // Nose bump
+  mesh(new THREE.SphereGeometry(0.025, 10, 8), 0, 1.66, 0.115);
 
-  // ── Neck ──
-  add(new THREE.CylinderGeometry(0.055, 0.06, 0.12, 12), skin, 0, 1.57, 0);
+  // ── NECK ─────────────────────────────────────────────────────────────────────
+  mesh(new THREE.CylinderGeometry(0.052, 0.062, 0.14, 14), 0, 1.535, 0);
 
-  // ── Torso ──
-  const torsoW = isFem ? 0.21 : 0.24;
-  const hipW   = isFem ? 0.235 : 0.21;
-  const waistW = isFem ? 0.175 : 0.195;
+  // ── TORSO via LatheGeometry ────────────────────────────────────────────────
+  // Profile points [radius, y] from hip to top of torso
+  // Male: broader shoulders, slimmer hips
+  // Female: narrower shoulders, wider hips, defined waist
+  const tPoints = isFem
+    ? [
+        new THREE.Vector2(0.215, 0.00),   // hip bottom
+        new THREE.Vector2(0.225, 0.08),   // hip fullest
+        new THREE.Vector2(0.21,  0.16),   // hip upper
+        new THREE.Vector2(0.175, 0.26),   // waist
+        new THREE.Vector2(0.185, 0.34),   // underbust
+        new THREE.Vector2(0.205, 0.42),   // chest mid
+        new THREE.Vector2(0.215, 0.50),   // chest fullest
+        new THREE.Vector2(0.205, 0.57),   // chest upper
+        new THREE.Vector2(0.195, 0.63),   // clavicle
+        new THREE.Vector2(0.165, 0.70),   // neck base
+      ]
+    : [
+        new THREE.Vector2(0.195, 0.00),   // hip bottom
+        new THREE.Vector2(0.200, 0.08),   // hip
+        new THREE.Vector2(0.195, 0.18),   // waist
+        new THREE.Vector2(0.205, 0.28),   // mid torso
+        new THREE.Vector2(0.225, 0.40),   // chest
+        new THREE.Vector2(0.235, 0.50),   // chest fullest
+        new THREE.Vector2(0.225, 0.58),   // chest upper
+        new THREE.Vector2(0.215, 0.64),   // clavicle
+        new THREE.Vector2(0.175, 0.70),   // neck base
+      ];
 
-  // Chest
-  add(new THREE.CylinderGeometry(torsoW, waistW, 0.32, 16), cloth, 0, 1.3, 0);
-  // Waist
-  add(new THREE.CylinderGeometry(waistW, hipW, 0.18, 16), cloth, 0, 1.07, 0);
-  // Hips
-  add(new THREE.CylinderGeometry(hipW, hipW * 0.92, 0.22, 16), clothLower, 0, 0.89, 0);
+  const torsoGeo = new THREE.LatheGeometry(tPoints, 28);
+  mesh(torsoGeo, 0, 0.79, 0);
 
-  // ── Bust (female only) ──
+  // ── SHOULDER CAPS ─────────────────────────────────────────────────────────
+  const shW = isFem ? 0.215 : 0.245;
+  mesh(new THREE.SphereGeometry(0.072, 14, 12), -shW,  1.44, 0);
+  mesh(new THREE.SphereGeometry(0.072, 14, 12),  shW, 1.44, 0);
+
+  // ── BUST (female) ─────────────────────────────────────────────────────────
   if (isFem) {
-    const bustGeo = new THREE.SphereGeometry(0.065, 12, 12);
-    add(bustGeo, cloth, -0.085, 1.38, 0.13);
-    add(bustGeo, cloth,  0.085, 1.38, 0.13);
+    mesh(new THREE.SphereGeometry(0.068, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+      -0.083, 1.25, 0.145);
+    mesh(new THREE.SphereGeometry(0.068, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.62),
+       0.083, 1.25, 0.145);
   }
 
-  // ── Shoulders ──
-  const shoulderW = isFem ? 0.19 : 0.225;
-  add(new THREE.SphereGeometry(0.07, 12, 12), cloth, -shoulderW,  1.48, 0);
-  add(new THREE.SphereGeometry(0.07, 12, 12), cloth,  shoulderW, 1.48, 0);
+  // ── UPPER ARMS ────────────────────────────────────────────────────────────
+  const uaLen = isFem ? 0.25 : 0.27;
+  const uaR   = isFem ? 0.048 : 0.056;
+  const uaX   = isFem ? 0.285 : 0.315;
 
-  // ── Arms ──
-  const armLen  = isFem ? 0.26 : 0.28;
-  const armRad  = isFem ? 0.04 : 0.048;
-  const foreLen = isFem ? 0.22 : 0.24;
-  const foreRad = isFem ? 0.033 : 0.038;
+  const uaGeo = new THREE.CapsuleGeometry(uaR, uaLen, 6, 12);
+  const la = mesh(uaGeo, -uaX, 1.31, 0, 0, 0, 0.14);
+  const ra = mesh(uaGeo,  uaX, 1.31, 0, 0, 0, -0.14);
 
-  // Upper arms — slight outward angle
-  const uaGeo = new THREE.CylinderGeometry(armRad, armRad * 0.9, armLen, 10);
-  [-1, 1].forEach(side => {
-    const ua = add(uaGeo, cloth, side * (shoulderW + 0.07), 1.34, 0);
-    ua.rotation.z = side * 0.18;
-    // Forearm
-    const fa = add(new THREE.CylinderGeometry(foreRad, foreRad * 0.85, foreLen, 10), skin,
-      side * (shoulderW + 0.125), 1.06, 0);
-    fa.rotation.z = side * 0.12;
-    // Hand
-    add(new THREE.SphereGeometry(0.038, 10, 10), skin, side * (shoulderW + 0.155), 0.88, 0);
-  });
+  // ── FOREARMS ──────────────────────────────────────────────────────────────
+  const faLen = isFem ? 0.21 : 0.23;
+  const faR   = isFem ? 0.034 : 0.040;
+  const faX   = isFem ? 0.315 : 0.345;
+  const faY   = 1.04;
 
-  // ── Legs ──
-  const thighW = isFem ? 0.085 : 0.09;
-  const calfW  = isFem ? 0.055 : 0.06;
-  const thighLen = 0.38;
-  const calfLen  = 0.34;
+  const faGeo = new THREE.CapsuleGeometry(faR, faLen, 5, 10);
+  mesh(faGeo, -faX, faY, 0, 0, 0, 0.10);
+  mesh(faGeo,  faX, faY, 0, 0, 0, -0.10);
 
-  [-1, 1].forEach(side => {
-    // Thigh
-    const th = add(new THREE.CylinderGeometry(thighW, thighW * 0.85, thighLen, 12), clothLower,
-      side * 0.1, 0.59, 0);
-    th.rotation.z = side * 0.04;
-    // Calf
-    const ca = add(new THREE.CylinderGeometry(calfW, calfW * 0.75, calfLen, 12), skin,
-      side * 0.11, 0.21, 0);
-    ca.rotation.z = side * 0.02;
-    // Foot
-    const foot = add(new THREE.BoxGeometry(0.09, 0.055, 0.19), skin, side * 0.115, 0.03, 0.04);
-    foot.rotation.z = side * 0.02;
-  });
+  // ── HANDS ─────────────────────────────────────────────────────────────────
+  const hX = isFem ? 0.33 : 0.36;
+  mesh(new THREE.SphereGeometry(0.038, 10, 8), -hX, 0.86, 0, 0, 0, 0, 1, 0.75, 0.65);
+  mesh(new THREE.SphereGeometry(0.038, 10, 8),  hX, 0.86, 0, 0, 0, 0, 1, 0.75, 0.65);
 
-  // ── Hair ──
-  const hairColor = isFem ? 0x3a2010 : 0x2a1a08;
-  const hair = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 1 });
-  add(new THREE.SphereGeometry(0.135, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.5), hair, 0, 1.77, -0.01);
+  // ── PELVIS ────────────────────────────────────────────────────────────────
+  const pelW = isFem ? 0.195 : 0.175;
+  mesh(new THREE.SphereGeometry(pelW, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.55),
+    0, 0.78, 0, 0, 0, 0, 1, 0.7, 0.9);
+
+  // ── THIGHS ────────────────────────────────────────────────────────────────
+  const thR = isFem ? 0.092 : 0.096;
+  const thLen = 0.36;
+  const thX = isFem ? 0.105 : 0.095;
+  const thGeo = new THREE.CapsuleGeometry(thR, thLen, 6, 14);
+  mesh(thGeo, -thX, 0.565, 0, 0, 0,  0.04);
+  mesh(thGeo,  thX, 0.565, 0, 0, 0, -0.04);
+
+  // ── CALVES ────────────────────────────────────────────────────────────────
+  const caLen = 0.30;
+  const caGeo = new THREE.CapsuleGeometry(0.055, caLen, 6, 12);
+  mesh(caGeo, -0.115, 0.195, 0, 0, 0,  0.025);
+  mesh(caGeo,  0.115, 0.195, 0, 0, 0, -0.025);
+
+  // ── FEET ──────────────────────────────────────────────────────────────────
+  mesh(new THREE.CapsuleGeometry(0.038, 0.14, 4, 10), -0.118, 0.025, 0.04, 0, 0, Math.PI/2);
+  mesh(new THREE.CapsuleGeometry(0.038, 0.14, 4, 10),  0.118, 0.025, 0.04, 0, 0, Math.PI/2);
+
+  // ── HAIR ──────────────────────────────────────────────────────────────────
+  const hairMat = new THREE.MeshStandardMaterial({ color: isFem ? 0xc8a060 : 0x503820, roughness: 0.9 });
+  const hairTop = new THREE.SphereGeometry(0.118, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52);
+  const hm = new THREE.Mesh(hairTop, hairMat);
+  hm.position.set(0, 1.755, -0.012);
+  hm.castShadow = true;
+  g.add(hm);
+
   if (isFem) {
-    // Longer hair
-    add(new THREE.CylinderGeometry(0.09, 0.06, 0.22, 12), hair, 0, 1.63, -0.06);
+    // Longer side/back hair
+    const sideHair = new THREE.CapsuleGeometry(0.07, 0.2, 4, 10);
+    const sh = new THREE.Mesh(sideHair, hairMat);
+    sh.position.set(0, 1.60, -0.065);
+    sh.scale.set(1.3, 1, 0.7);
+    sh.castShadow = true;
+    g.add(sh);
   }
 
-  return group;
+  return g;
 }
 
-// ─── Tape measure geometry ────────────────────────────────────────────────────
+// ─── Tape measure builder ─────────────────────────────────────────────────────
 
-// Returns a tube that forms an arc/loop at a given body height and radius
-function buildTapeMesh(cx: number, cy: number, cz: number, radius: number, axis: "y" | "x" | "z"): THREE.Mesh {
-  const segments = 80;
-  const points: THREE.Vector3[] = [];
-  for (let i = 0; i <= segments; i++) {
-    const t = (i / segments) * Math.PI * 2;
-    if (axis === "y") {
-      points.push(new THREE.Vector3(cx + Math.cos(t) * radius, cy, cz + Math.sin(t) * radius));
-    } else if (axis === "x") {
-      points.push(new THREE.Vector3(cx, cy + Math.cos(t) * radius, cz + Math.sin(t) * radius));
-    } else {
-      points.push(new THREE.Vector3(cx + Math.cos(t) * radius, cy + Math.sin(t) * radius, cz));
-    }
+function buildLoopTape(cx: number, cy: number, cz: number, rx: number, rz: number): THREE.Mesh {
+  const pts: THREE.Vector3[] = [];
+  const N = 100;
+  for (let i = 0; i <= N; i++) {
+    const t = (i / N) * Math.PI * 2;
+    pts.push(new THREE.Vector3(cx + Math.cos(t) * rx, cy, cz + Math.sin(t) * rz));
   }
-  const curve = new THREE.CatmullRomCurve3(points, true);
-  const geo = new THREE.TubeGeometry(curve, 120, 0.008, 8, true);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xf5e6c0, roughness: 0.5, metalness: 0.1 });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.castShadow = true;
-  return mesh;
+  const curve = new THREE.CatmullRomCurve3(pts, true);
+  const geo = new THREE.TubeGeometry(curve, 140, 0.007, 8, true);
+  return new THREE.Mesh(geo, MAT_TAPE());
 }
 
-// Vertical line for height
-function buildVerticalTape(x: number, y0: number, y1: number, z: number): THREE.Mesh {
-  const points = [new THREE.Vector3(x, y0, z), new THREE.Vector3(x, y1, z)];
-  const curve = new THREE.CatmullRomCurve3(points);
-  const geo = new THREE.TubeGeometry(curve, 20, 0.008, 8, false);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xf5e6c0, roughness: 0.5, metalness: 0.1 });
-  return new THREE.Mesh(geo, mat);
+function buildVertTape(x: number, y0: number, y1: number, z: number): THREE.Mesh {
+  const pts = [
+    new THREE.Vector3(x, y0, z),
+    new THREE.Vector3(x + 0.02, (y0 + y1) / 2, z),
+    new THREE.Vector3(x, y1, z),
+  ];
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.TubeGeometry(curve, 40, 0.007, 8, false);
+  return new THREE.Mesh(geo, MAT_TAPE());
+}
+
+function buildEndCaps(mesh: THREE.Mesh): THREE.Group {
+  const g = new THREE.Group();
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x888060, roughness: 0.5 });
+  const cap = new THREE.CylinderGeometry(0.018, 0.018, 0.012, 12);
+  const c1 = new THREE.Mesh(cap, capMat);
+  const c2 = new THREE.Mesh(cap, capMat);
+  // approximate cap placement at start/end of tube
+  c1.position.copy((mesh.geometry as THREE.TubeGeometry).parameters?.path?.getPointAt(0) || new THREE.Vector3());
+  g.add(c1); g.add(c2);
+  return g;
+}
+
+// ─── Tick marks on tape ───────────────────────────────────────────────────────
+function buildTickMarks(cx: number, cy: number, cz: number, rx: number, rz: number): THREE.Group {
+  const g = new THREE.Group();
+  const tickMat = new THREE.MeshStandardMaterial({ color: 0x8a6020 });
+  for (let i = 0; i < 24; i++) {
+    const t = (i / 24) * Math.PI * 2;
+    const x = cx + Math.cos(t) * rx;
+    const z = cz + Math.sin(t) * rz;
+    const isMain = i % 6 === 0;
+    const tick = new THREE.BoxGeometry(0.003, isMain ? 0.022 : 0.013, 0.003);
+    const m = new THREE.Mesh(tick, tickMat);
+    m.position.set(x, cy, z);
+    m.rotation.y = -t;
+    g.add(m);
+  }
+  return g;
 }
 
 // ─── Measurement configs ──────────────────────────────────────────────────────
-// Each entry: what tape to show and where camera should look
-type TapeConfig = {
-  type: "loop";
-  cx: number; cy: number; cz: number; radius: number; axis: "y" | "x" | "z";
-  camPos: [number, number, number]; camTarget: [number, number, number];
-} | {
-  type: "vertical";
-  x: number; y0: number; y1: number; z: number;
-  camPos: [number, number, number]; camTarget: [number, number, number];
-};
+type LoopCfg = { type: "loop"; cx: number; cy: number; cz: number; rx: number; rz: number; camPos: [number,number,number]; camTarget: [number,number,number]; };
+type VertCfg = { type: "vert"; x: number; y0: number; y1: number; z: number;   camPos: [number,number,number]; camTarget: [number,number,number]; };
+type TapeCfg = LoopCfg | VertCfg;
 
-const TAPE_CONFIGS: Record<string, TapeConfig> = {
-  height:    { type: "vertical", x: 0.45, y0: 0, y1: 1.85, z: 0,      camPos: [2.5, 1.0, 2.0], camTarget: [0.3, 0.9, 0] },
-  chest:     { type: "loop",     cx: 0, cy: 1.36, cz: 0, radius: 0.26, axis: "y", camPos: [2.0, 1.4, 1.5], camTarget: [0, 1.36, 0] },
-  bust:      { type: "loop",     cx: 0, cy: 1.38, cz: 0, radius: 0.27, axis: "y", camPos: [2.0, 1.4, 1.5], camTarget: [0, 1.38, 0] },
-  waist:     { type: "loop",     cx: 0, cy: 1.07, cz: 0, radius: 0.20, axis: "y", camPos: [2.0, 1.1, 1.5], camTarget: [0, 1.07, 0] },
-  hips:      { type: "loop",     cx: 0, cy: 0.87, cz: 0, radius: 0.245, axis: "y", camPos: [2.0, 0.9, 1.5], camTarget: [0, 0.87, 0] },
-  shoulders: { type: "loop",     cx: 0, cy: 1.48, cz: 0, radius: 0.30, axis: "y", camPos: [0, 2.0, 2.5], camTarget: [0, 1.48, 0] },
-  sleeve:    { type: "vertical", x: -0.42, y0: 0.88, y1: 1.48, z: 0,   camPos: [-2.0, 1.3, 1.5], camTarget: [-0.3, 1.2, 0] },
-  inseam:    { type: "vertical", x: -0.28, y0: 0.0,  y1: 0.78, z: 0,   camPos: [2.0, 0.5, 2.0], camTarget: [0, 0.4, 0] },
-  thigh:     { type: "loop",     cx: -0.1, cy: 0.62, cz: 0, radius: 0.1, axis: "y", camPos: [2.0, 0.7, 1.8], camTarget: [-0.1, 0.62, 0] },
-  weight:    { type: "loop",     cx: 0, cy: 0.9, cz: 0, radius: 0.23, axis: "y", camPos: [2.0, 1.0, 2.0], camTarget: [0, 0.9, 0] },
+const TAPE: Record<string, TapeCfg> = {
+  height:    { type:"vert", x:0.50, y0:0.01, y1:1.85, z:0,       camPos:[2.8,1.0,2.0],  camTarget:[0.4, 0.9,0] },
+  chest:     { type:"loop", cx:0, cy:1.32, cz:0, rx:0.225, rz:0.195, camPos:[1.8,1.35,1.6], camTarget:[0,1.32,0] },
+  bust:      { type:"loop", cx:0, cy:1.26, cz:0, rx:0.235, rz:0.205, camPos:[1.8,1.3, 1.6], camTarget:[0,1.26,0] },
+  waist:     { type:"loop", cx:0, cy:1.06, cz:0, rx:0.185, rz:0.165, camPos:[1.8,1.1, 1.6], camTarget:[0,1.06,0] },
+  hips:      { type:"loop", cx:0, cy:0.85, cz:0, rx:0.23,  rz:0.20,  camPos:[1.8,0.9, 1.6], camTarget:[0,0.85,0] },
+  shoulders: { type:"loop", cx:0, cy:1.44, cz:0, rx:0.265, rz:0.14,  camPos:[0,  2.2, 2.2], camTarget:[0,1.44,0] },
+  sleeve:    { type:"vert", x:-0.38, y0:0.86, y1:1.44, z:0,         camPos:[-2.2,1.3,1.6], camTarget:[-0.2,1.2,0] },
+  inseam:    { type:"vert", x:-0.2,  y0:0.01, y1:0.76, z:0,         camPos:[2.0, 0.5,2.2], camTarget:[0,  0.4,0] },
+  thigh:     { type:"loop", cx:-0.11, cy:0.63, cz:0, rx:0.105, rz:0.1, camPos:[1.8,0.7,1.8], camTarget:[-0.1,0.63,0] },
+  weight:    { type:"loop", cx:0, cy:0.92, cz:0, rx:0.22, rz:0.19,  camPos:[1.8,1.0, 2.0], camTarget:[0,0.92,0] },
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-
-interface Props {
-  activeField: string | null;
-  gender: "male" | "female" | "both";
-}
+interface Props { activeField: string | null; gender: "male" | "female" | "both"; }
 
 export default function MeasurementViewer3D({ activeField, gender }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<{
+
+  const refs = useRef<{
     renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
     controls: OrbitControls;
-    body: THREE.Group;
-    tapeMesh: THREE.Mesh | null;
-    animFrame: number;
-    tapeProgress: number;
-    tapeTarget: number;
+    tapeGroup: THREE.Group;
+    raf: number;
   } | null>(null);
 
-  // ── Init scene once ──
+  // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!mountRef.current) return;
     const el = mountRef.current;
-    const W = el.clientWidth;
-    const H = el.clientHeight;
+    if (!el) return;
+    const W = el.clientWidth, H = el.clientHeight || 340;
 
-    // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.setClearColor(0x00000000, 0);
+    renderer.setClearColor(0xfafaf8, 1);
     el.appendChild(renderer.domElement);
 
-    // Scene
     const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0xfafaf8, 6, 14);
 
-    // Camera
-    const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 50);
-    camera.position.set(2.2, 1.4, 2.2);
-    camera.lookAt(0, 0.9, 0);
+    const camera = new THREE.PerspectiveCamera(38, W / H, 0.1, 30);
+    camera.position.set(2.2, 1.5, 2.5);
 
-    // Controls — orbit only, no pan, limited range
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0.9, 0);
     controls.enablePan = false;
-    controls.minDistance = 1.2;
-    controls.maxDistance = 4.5;
-    controls.minPolarAngle = Math.PI * 0.1;
-    controls.maxPolarAngle = Math.PI * 0.88;
+    controls.minDistance = 1.4;
+    controls.maxDistance = 5;
+    controls.minPolarAngle = 0.15;
+    controls.maxPolarAngle = Math.PI * 0.86;
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
+    controls.dampingFactor = 0.07;
+    controls.update();
 
     // ── Lighting ──
-    const ambient = new THREE.AmbientLight(0xfff8f0, 0.7);
-    scene.add(ambient);
+    scene.add(new THREE.AmbientLight(0xfff8f2, 0.9));
 
-    const key = new THREE.DirectionalLight(0xfff5e8, 1.4);
-    key.position.set(3, 5, 3);
+    const key = new THREE.DirectionalLight(0xfff4e8, 1.8);
+    key.position.set(3, 6, 4);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.near = 0.5;
-    key.shadow.camera.far = 15;
-    key.shadow.camera.left = -2;
-    key.shadow.camera.right = 2;
-    key.shadow.camera.top = 3;
-    key.shadow.camera.bottom = -1;
+    key.shadow.camera.far = 16;
+    Object.assign(key.shadow.camera, { left:-2, right:2, top:3, bottom:-0.5 });
     scene.add(key);
 
-    const fill = new THREE.DirectionalLight(0xe8f0ff, 0.4);
-    fill.position.set(-2, 3, -1);
+    const fill = new THREE.DirectionalLight(0xe4eeff, 0.55);
+    fill.position.set(-3, 2, -2);
     scene.add(fill);
 
+    const rim = new THREE.DirectionalLight(0xffffff, 0.3);
+    rim.position.set(0, 3, -4);
+    scene.add(rim);
+
     // ── Floor ──
-    const floorGeo = new THREE.PlaneGeometry(5, 5);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0xf0ece4, roughness: 1 });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), MAT_FLOOR());
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // ── Back wall ──
-    const wallGeo = new THREE.PlaneGeometry(5, 4);
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0xfafaf8, roughness: 1 });
-    const wall = new THREE.Mesh(wallGeo, wallMat);
-    wall.position.set(0, 2, -1.5);
+    // ── Wall ──
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(6, 5), MAT_WALL());
+    wall.position.set(0, 2.5, -1.6);
     wall.receiveShadow = true;
     scene.add(wall);
 
-    // Subtle wall/floor edge line
-    const edgeGeo = new THREE.BoxGeometry(5, 0.015, 0.015);
-    const edgeMat = new THREE.MeshStandardMaterial({ color: 0xd8d0c4 });
-    const edge = new THREE.Mesh(edgeGeo, edgeMat);
-    edge.position.set(0, 0.007, -1.5);
+    // Wall/floor baseboard
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(6, 0.018, 0.018), MAT_EDGE());
+    edge.position.set(0, 0.009, -1.6);
     scene.add(edge);
+
+    // Subtle floor grid lines (thin)
+    const gridHelper = new THREE.GridHelper(4, 10, 0xe0dcd4, 0xe0dcd4);
+    gridHelper.position.y = 0.001;
+    scene.add(gridHelper);
 
     // ── Body ──
     const body = buildBody(gender === "both" ? "male" : gender);
     scene.add(body);
 
-    // Render loop
-    let animFrame = 0;
+    // ── Tape group ──
+    const tapeGroup = new THREE.Group();
+    scene.add(tapeGroup);
+
+    // ── Render loop ──
+    let raf = 0;
     const render = () => {
-      animFrame = requestAnimationFrame(render);
+      raf = requestAnimationFrame(render);
       controls.update();
       renderer.render(scene, camera);
     };
     render();
 
-    // Resize
+    // ── Resize ──
     const onResize = () => {
       if (!mountRef.current) return;
-      const W2 = mountRef.current.clientWidth;
-      const H2 = mountRef.current.clientHeight;
-      camera.aspect = W2 / H2;
+      const w = mountRef.current.clientWidth;
+      const h = mountRef.current.clientHeight || 340;
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(W2, H2);
+      renderer.setSize(w, h);
     };
     window.addEventListener("resize", onResize);
 
-    sceneRef.current = { renderer, scene, camera, controls, body, tapeMesh: null, animFrame, tapeProgress: 0, tapeTarget: 0 };
+    refs.current = { renderer, scene, camera, controls, tapeGroup, raf };
 
     return () => {
-      cancelAnimationFrame(animFrame);
+      cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       renderer.dispose();
-      el.removeChild(renderer.domElement);
+      if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement);
     };
-  }, [gender]); // reinit if gender changes
+  }, [gender]);
 
-  // ── React to active field: animate tape measure ──
+  // ── Active field → tape measure ───────────────────────────────────────────
   useEffect(() => {
-    const s = sceneRef.current;
-    if (!s) return;
+    const r = refs.current;
+    if (!r) return;
 
-    // Remove existing tape
-    if (s.tapeMesh) {
-      s.scene.remove(s.tapeMesh);
-      s.tapeMesh.geometry.dispose();
-      s.tapeMesh = null;
-    }
+    // Clear old tape
+    r.tapeGroup.clear();
 
-    if (!activeField || !TAPE_CONFIGS[activeField]) return;
+    if (!activeField || !TAPE[activeField]) return;
+    const cfg = TAPE[activeField];
 
-    const cfg = TAPE_CONFIGS[activeField];
-
-    // Build the final tape mesh
-    let finalMesh: THREE.Mesh;
+    // Build tape + tick marks
+    let tapeMesh: THREE.Mesh;
     if (cfg.type === "loop") {
-      finalMesh = buildTapeMesh(cfg.cx, cfg.cy, cfg.cz, cfg.radius, cfg.axis);
+      tapeMesh = buildLoopTape(cfg.cx, cfg.cy, cfg.cz, cfg.rx, cfg.rz);
+      const ticks = buildTickMarks(cfg.cx, cfg.cy, cfg.cz, cfg.rx + 0.012, cfg.rz + 0.012);
+      r.tapeGroup.add(ticks);
     } else {
-      finalMesh = buildVerticalTape(cfg.x, cfg.y0, cfg.y1, cfg.z);
+      tapeMesh = buildVertTape(cfg.x, cfg.y0, cfg.y1, cfg.z);
     }
+    r.tapeGroup.add(tapeMesh);
 
-    // Animate camera to measurement position
-    const startPos = s.camera.position.clone();
-    const startTarget = s.controls.target.clone();
+    // Animate camera + tape fade-in
+    const startPos = r.camera.position.clone();
+    const startTarget = r.controls.target.clone();
     const endPos = new THREE.Vector3(...cfg.camPos);
     const endTarget = new THREE.Vector3(...cfg.camTarget);
-    const DURATION = 600; // ms
-    const startTime = performance.now();
+    const t0 = performance.now();
+    const DURATION = 550;
 
-    // Tape draw-on animation using a clipping plane approach:
-    // we'll scale the tape's opacity from 0→1 and add tick marks
-    finalMesh.material = new THREE.MeshStandardMaterial({
-      color: 0xf5e6c0, roughness: 0.5, metalness: 0.1,
-      transparent: true, opacity: 0,
-    });
-    s.scene.add(finalMesh);
-    s.tapeMesh = finalMesh;
+    const mat = tapeMesh.material as THREE.MeshStandardMaterial;
+    mat.transparent = true;
+    mat.opacity = 0;
 
-    let done = false;
-    const animateTape = (now: number) => {
-      if (done) return;
-      const t = Math.min((now - startTime) / DURATION, 1);
-      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease in-out quad
-
-      // Camera lerp
-      s.camera.position.lerpVectors(startPos, endPos, ease);
-      s.controls.target.lerpVectors(startTarget, endTarget, ease);
-      s.controls.update();
-
-      // Tape fade in
-      (finalMesh.material as THREE.MeshStandardMaterial).opacity = ease;
-
-      if (t < 1) {
-        requestAnimationFrame(animateTape);
-      } else {
-        done = true;
-        (finalMesh.material as THREE.MeshStandardMaterial).opacity = 1;
-        (finalMesh.material as THREE.MeshStandardMaterial).transparent = false;
-      }
+    let animId = 0;
+    const anim = (now: number) => {
+      const t = Math.min((now - t0) / DURATION, 1);
+      const e = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+      r.camera.position.lerpVectors(startPos, endPos, e);
+      r.controls.target.lerpVectors(startTarget, endTarget, e);
+      r.controls.update();
+      mat.opacity = e;
+      if (t < 1) { animId = requestAnimationFrame(anim); }
+      else { mat.transparent = false; mat.opacity = 1; }
     };
-    requestAnimationFrame(animateTape);
+    animId = requestAnimationFrame(anim);
 
-    // Gentle tape pulse after arrival
-    let pulseFrame = 0;
+    // Pulse glow after arrival
+    let pulseId = 0;
     const pulse = (now: number) => {
-      if (s.tapeMesh !== finalMesh) return; // replaced
-      const mat = finalMesh.material as THREE.MeshStandardMaterial;
-      if (!mat.transparent) {
-        // Add subtle emissive pulse
-        const p = (Math.sin(now * 0.003) + 1) * 0.5;
-        mat.emissive.setRGB(p * 0.15, p * 0.1, 0);
-      }
-      pulseFrame = requestAnimationFrame(pulse);
+      const p = (Math.sin(now * 0.0025) + 1) * 0.5;
+      mat.emissive.setRGB(p * 0.18, p * 0.10, 0);
+      pulseId = requestAnimationFrame(pulse);
     };
-    setTimeout(() => { pulseFrame = requestAnimationFrame(pulse); }, DURATION);
+    const pulseTimeout = setTimeout(() => { pulseId = requestAnimationFrame(pulse); }, DURATION + 50);
 
-    return () => { cancelAnimationFrame(pulseFrame); };
+    return () => {
+      cancelAnimationFrame(animId);
+      cancelAnimationFrame(pulseId);
+      clearTimeout(pulseTimeout);
+    };
   }, [activeField]);
 
   return (
     <div
       ref={mountRef}
-      className="w-full rounded-xl overflow-hidden border border-border bg-card"
-      style={{ height: 340, touchAction: "none" }}
+      className="w-full rounded-xl overflow-hidden border border-border"
+      style={{ height: 360, touchAction: "none", background: "#fafaf8" }}
     />
   );
 }
