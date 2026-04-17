@@ -9,8 +9,20 @@ import ScanPage from "@/pages/scan";
 import ResultsPage from "@/pages/results";
 import WardrobePage from "@/pages/wardrobe";
 import HistoryPage from "@/pages/history";
+import ProfilePage from "@/pages/profile";
 import NavBar from "@/components/NavBar";
 import { Link } from "wouter";
+
+function ProfileInitial() {
+  try {
+    const raw = localStorage.getItem("stitch_profile");
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p.name) return <span className="text-xs font-semibold text-primary">{p.name[0].toUpperCase()}</span>;
+    }
+  } catch {}
+  return <span className="text-xs font-medium text-muted-foreground">A</span>;
+}
 
 function TopBar() {
   return (
@@ -26,9 +38,11 @@ function TopBar() {
             <span className="font-display text-[16px] tracking-[0.01em] text-foreground">Stitch</span>
           </div>
         </Link>
-        <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center">
-          <span className="text-xs font-medium text-muted-foreground">A</span>
-        </div>
+        <Link href="/profile">
+          <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+            <ProfileInitial />
+          </div>
+        </Link>
       </div>
     </header>
   );
@@ -45,6 +59,7 @@ function AppContent() {
           <Route path="/results/:id" component={ResultsPage} />
           <Route path="/wardrobe" component={WardrobePage} />
           <Route path="/history" component={HistoryPage} />
+          <Route path="/profile" component={ProfilePage} />
           <Route>
             <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">Page not found</div>
           </Route>
