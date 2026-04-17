@@ -1,11 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface OutfitCard {
   id: string;
   imageUrl: string;
   aesthetic: string;
+  secondaryAesthetic?: string;
   description: string;
+  palette: string[];
+  tags: string[];
 }
 
 interface LikedItem {
@@ -15,146 +18,189 @@ interface LikedItem {
 }
 
 // ── Outfit inspiration data ──────────────────────────────────────────────────
-// Unsplash photos organised by aesthetic — free, no API key needed
 const OUTFITS: OutfitCard[] = [
-  // Clean Girl / Minimal
   {
     id: "cg1",
     imageUrl: "https://images.unsplash.com/photo-1594938298603-c8148c4b4057?w=800&q=80",
     aesthetic: "Clean Girl",
-    description: "Effortless minimalism — neutral tones, sleek lines",
+    secondaryAesthetic: "Minimalist",
+    description: "Effortless neutrals, sleek silhouettes",
+    palette: ["#F5EFE6", "#D4C5B0", "#8C7B6B", "#4A3F35"],
+    tags: ["Neutral tones", "Everyday", "Casual"],
   },
   {
     id: "cg2",
     imageUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&q=80",
     aesthetic: "Clean Girl",
+    secondaryAesthetic: "Old Money",
     description: "Tonal dressing — monochrome done right",
+    palette: ["#E8E0D8", "#B8A898", "#786858", "#2C2420"],
+    tags: ["Monochrome", "Polished", "Chic"],
   },
-  // Streetwear
   {
     id: "sw1",
     imageUrl: "https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=800&q=80",
     aesthetic: "Streetwear",
+    secondaryAesthetic: "Hypebeast",
     description: "Urban edge — hoodies, cargos, kicks",
+    palette: ["#1A1A1A", "#3D3D3D", "#C8956A", "#F0F0F0"],
+    tags: ["Urban", "Oversized", "Sneakers"],
   },
   {
     id: "sw2",
     imageUrl: "https://images.unsplash.com/photo-1556906781-9a412961a28c?w=800&q=80",
     aesthetic: "Streetwear",
+    secondaryAesthetic: "Indie",
     description: "Street-ready layering with graphic energy",
+    palette: ["#2B2B2B", "#5C4033", "#D4A574", "#E8E0D0"],
+    tags: ["Graphic tee", "Layered", "Bold"],
   },
-  // Dark Academia
   {
     id: "da1",
     imageUrl: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=800&q=80",
     aesthetic: "Dark Academia",
+    secondaryAesthetic: "Preppy",
     description: "Tweed, plaid, and brooding intellectual energy",
+    palette: ["#2C2416", "#5C4A2A", "#8B7355", "#C4A882"],
+    tags: ["Tweed", "Vintage", "Academic"],
   },
-  // Cottagecore
   {
     id: "cc1",
     imageUrl: "https://images.unsplash.com/photo-1600950207944-0d63e8edbc3f?w=800&q=80",
     aesthetic: "Cottagecore",
+    secondaryAesthetic: "Romantic",
     description: "Floral prints, prairie silhouettes, golden hour",
+    palette: ["#F2E8D9", "#D4A96A", "#8B6E4E", "#4A7C59"],
+    tags: ["Floral", "Prairie", "Feminine"],
   },
-  // Athleisure
   {
     id: "at1",
     imageUrl: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800&q=80",
     aesthetic: "Athleisure",
+    secondaryAesthetic: "Minimalist",
     description: "Performance meets polish — sleek and active",
+    palette: ["#1C1C1E", "#3A3A3C", "#8E8E93", "#F2F2F7"],
+    tags: ["Active", "Sleek", "Functional"],
   },
   {
     id: "at2",
     imageUrl: "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=800&q=80",
     aesthetic: "Athleisure",
+    secondaryAesthetic: "Clean Girl",
     description: "Matching sets that move with you",
+    palette: ["#E8F4F8", "#B0CDD8", "#6B9EAE", "#2C5F6F"],
+    tags: ["Matching set", "Sporty", "Casual"],
   },
-  // Boho
   {
     id: "bh1",
     imageUrl: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800&q=80",
     aesthetic: "Boho",
-    description: "Free-spirited layers, earthy textures, fringe details",
+    secondaryAesthetic: "Cottagecore",
+    description: "Free-spirited layers, earthy textures, fringe",
+    palette: ["#C4956A", "#8B6347", "#5C3D2E", "#E8D5C0"],
+    tags: ["Earthy", "Layered", "Free-spirited"],
   },
-  // Hypebeast
   {
     id: "hb1",
     imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80",
     aesthetic: "Hypebeast",
+    secondaryAesthetic: "Streetwear",
     description: "Limited drops, bold logos, sneaker culture",
+    palette: ["#FF4500", "#1A1A1A", "#F5F5F5", "#FFD700"],
+    tags: ["Logo", "Sneakers", "Bold"],
   },
-  // Old Money
   {
     id: "om1",
     imageUrl: "https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=800&q=80",
     aesthetic: "Old Money",
-    description: "Quiet luxury — cashmere, blazers, understated wealth",
+    secondaryAesthetic: "Business Casual",
+    description: "Quiet luxury — cashmere, blazers, understated",
+    palette: ["#F5F0E8", "#C8B89A", "#8B7355", "#3C2F1E"],
+    tags: ["Cashmere", "Tailored", "Luxury"],
   },
   {
     id: "om2",
     imageUrl: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800&q=80",
     aesthetic: "Old Money",
+    secondaryAesthetic: "Minimalist",
     description: "Heritage tailoring, neutral palette, effortless class",
+    palette: ["#EAE4DC", "#B8A898", "#7A6A5A", "#2E2418"],
+    tags: ["Heritage", "Neutral", "Refined"],
   },
-  // Y2K
   {
     id: "y2k1",
     imageUrl: "https://images.unsplash.com/photo-1571513722275-4b41940f54b8?w=800&q=80",
     aesthetic: "Y2K",
+    secondaryAesthetic: "Indie Sleaze",
     description: "Low-rise, metallics, and early-2000s nostalgia",
+    palette: ["#E8C8E8", "#C878C8", "#784878", "#F8F8E8"],
+    tags: ["Nostalgic", "Metallic", "Bold"],
   },
-  // Preppy
   {
     id: "pp1",
     imageUrl: "https://images.unsplash.com/photo-1617127365659-c47fa864d8bc?w=800&q=80",
     aesthetic: "Preppy",
+    secondaryAesthetic: "Old Money",
     description: "Polo shirts, chinos, varsity energy",
+    palette: ["#1B4F72", "#2E86C1", "#D4E6F1", "#F8F9FA"],
+    tags: ["Polo", "Varsity", "Classic"],
   },
-  // Minimalist
   {
     id: "mn1",
     imageUrl: "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=800&q=80",
     aesthetic: "Minimalist",
+    secondaryAesthetic: "Clean Girl",
     description: "Less is more — clean silhouettes, zero noise",
+    palette: ["#FFFFFF", "#E8E8E8", "#B0B0B0", "#404040"],
+    tags: ["Structural", "Clean", "Modern"],
+  },
+  {
+    id: "ro1",
+    imageUrl: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800&q=80",
+    aesthetic: "Romantic",
+    secondaryAesthetic: "Cottagecore",
+    description: "Soft florals, lace, and feminine grace",
+    palette: ["#F8E8E8", "#E8A8A8", "#C87878", "#8B4858"],
+    tags: ["Floral", "Lace", "Soft"],
+  },
+  {
+    id: "bc1",
+    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80",
+    aesthetic: "Business Casual",
+    secondaryAesthetic: "Old Money",
+    description: "Smart-casual balance — polished but approachable",
+    palette: ["#2C3E50", "#5D6D7E", "#AEB6BF", "#F0F3F4"],
+    tags: ["Blazer", "Smart", "Professional"],
+  },
+  {
+    id: "in1",
+    imageUrl: "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=800&q=80",
+    aesthetic: "Indie",
+    secondaryAesthetic: "Dark Academia",
+    description: "Thrifted layers, band tees, creative expression",
+    palette: ["#3D2B1F", "#7B5E45", "#B8956A", "#E8D5C0"],
+    tags: ["Thrifted", "Layered", "Creative"],
+  },
+  {
+    id: "cs1",
+    imageUrl: "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800&q=80",
+    aesthetic: "Coastal",
+    secondaryAesthetic: "Boho",
+    description: "Breezy linens, nautical accents, sun-kissed ease",
+    palette: ["#F0F8FF", "#87CEEB", "#4682B4", "#F5DEB3"],
+    tags: ["Linen", "Nautical", "Breezy"],
   },
   {
     id: "mn2",
     imageUrl: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&q=80",
     aesthetic: "Minimalist",
+    secondaryAesthetic: "Business Casual",
     description: "Structural simplicity in warm neutral tones",
-  },
-  // Romantic
-  {
-    id: "ro1",
-    imageUrl: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800&q=80",
-    aesthetic: "Romantic",
-    description: "Soft florals, lace, and feminine grace",
-  },
-  // Business Casual
-  {
-    id: "bc1",
-    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80",
-    aesthetic: "Business Casual",
-    description: "Smart-casual balance — polished but approachable",
-  },
-  // Indie / Alt
-  {
-    id: "in1",
-    imageUrl: "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=800&q=80",
-    aesthetic: "Indie",
-    description: "Thrifted layers, band tees, creative expression",
-  },
-  // Coastal / Resort
-  {
-    id: "cs1",
-    imageUrl: "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800&q=80",
-    aesthetic: "Coastal",
-    description: "Breezy linens, nautical accents, sun-kissed ease",
+    palette: ["#EDE8E3", "#C4B8A8", "#8C7D6D", "#3C332C"],
+    tags: ["Structured", "Neutral", "Warm"],
   },
 ];
 
-// Shuffle for variety on each session
 function shuffled(arr: OutfitCard[]): OutfitCard[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -180,30 +226,27 @@ function HeartButton({ liked, onToggle }: { liked: boolean; onToggle: () => void
     <button
       onClick={handleClick}
       aria-label={liked ? "Unlike" : "Like"}
-      className="relative flex items-center justify-center w-14 h-14 rounded-full transition-transform active:scale-90"
+      className="relative flex items-center justify-center w-10 h-10 rounded-full transition-transform active:scale-90"
       style={{ WebkitTapHighlightColor: "transparent" }}
     >
-      {/* Burst rings */}
       {burst && (
-        <>
-          <span className="absolute inset-0 rounded-full animate-ping"
-            style={{ backgroundColor: "rgba(200,149,106,0.3)", animationDuration: "0.5s" }} />
-          <span className="absolute inset-2 rounded-full animate-ping"
-            style={{ backgroundColor: "rgba(200,149,106,0.2)", animationDuration: "0.4s", animationDelay: "0.05s" }} />
-        </>
+        <span
+          className="absolute inset-0 rounded-full animate-ping"
+          style={{ backgroundColor: "rgba(200,149,106,0.3)", animationDuration: "0.5s" }}
+        />
       )}
       <svg
-        width="32"
-        height="32"
+        width="24"
+        height="24"
         viewBox="0 0 24 24"
         fill={liked ? "#C8956A" : "none"}
-        stroke={liked ? "#C8956A" : "rgba(255,255,255,0.9)"}
-        strokeWidth="2"
+        stroke={liked ? "#C8956A" : "currentColor"}
+        strokeWidth="1.75"
         strokeLinecap="round"
         style={{
-          transition: "fill 0.2s ease, transform 0.2s ease",
+          transition: "fill 0.2s ease, transform 0.15s ease",
           transform: burst ? "scale(1.3)" : "scale(1)",
-          filter: liked ? "drop-shadow(0 0 6px rgba(200,149,106,0.6))" : "drop-shadow(0 1px 3px rgba(0,0,0,0.5))",
+          color: "hsl(var(--muted-foreground))",
         }}
       >
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -226,76 +269,87 @@ function DiscoverCard({
   const [imgError, setImgError] = useState(false);
 
   return (
-    <div
-      className="relative w-full flex-shrink-0 overflow-hidden bg-black"
-      style={{ height: "100svh" }}
-    >
-      {/* Skeleton */}
-      {!imgLoaded && !imgError && (
-        <div className="absolute inset-0 bg-muted animate-pulse" />
-      )}
+    <div className="w-full flex-shrink-0 bg-background" style={{ scrollSnapAlign: "start", scrollSnapStop: "always" }}>
+      <div className="max-w-lg mx-auto px-4 pt-4 pb-6 flex flex-col gap-3">
 
-      {/* Image */}
-      {!imgError ? (
-        <img
-          src={card.imageUrl}
-          alt={card.aesthetic}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ opacity: imgLoaded ? 1 : 0, transition: "opacity 0.3s ease" }}
-          onLoad={() => setImgLoaded(true)}
-          onError={() => { setImgError(true); setImgLoaded(true); }}
-          draggable={false}
-        />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted">
-          <span className="text-muted-foreground text-sm">Image unavailable</span>
+        {/* Image — contained, rounded */}
+        <div className="relative w-full rounded-2xl overflow-hidden bg-muted border border-border" style={{ aspectRatio: "3/4" }}>
+          {!imgLoaded && !imgError && (
+            <div className="absolute inset-0 bg-muted animate-pulse" />
+          )}
+          {!imgError ? (
+            <img
+              src={card.imageUrl}
+              alt={card.aesthetic}
+              className="w-full h-full object-cover"
+              style={{ opacity: imgLoaded ? 1 : 0, transition: "opacity 0.3s ease" }}
+              onLoad={() => setImgLoaded(true)}
+              onError={() => { setImgError(true); setImgLoaded(true); }}
+              draggable={false}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-muted-foreground text-sm">Image unavailable</span>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Gradient overlay — bottom */}
-      <div
-        className="absolute inset-x-0 bottom-0 pointer-events-none"
-        style={{
-          height: "55%",
-          background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)",
-        }}
-      />
+        {/* Style + Palette panel — mirrors results.tsx exactly */}
+        <div className="rounded-xl border border-border bg-card p-4 flex gap-4">
+          {/* Left: style breakdown */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Style</p>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-primary">Primary</span>
+                <span className="text-sm font-semibold text-foreground leading-tight">{card.aesthetic}</span>
+              </div>
+              {card.secondaryAesthetic && (
+                <div className="flex flex-col gap-0.5 mt-1">
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Secondary</span>
+                  <span className="text-sm text-muted-foreground leading-tight">{card.secondaryAesthetic}</span>
+                </div>
+              )}
+            </div>
+          </div>
 
-      {/* Gradient overlay — top (for safe-area) */}
-      <div
-        className="absolute inset-x-0 top-0 pointer-events-none"
-        style={{
-          height: "80px",
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, transparent 100%)",
-        }}
-      />
+          {/* Divider */}
+          <div className="w-px bg-border flex-shrink-0" />
 
-      {/* Content — bottom left */}
-      <div className="absolute bottom-0 left-0 right-16 p-5 pb-8" style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))" }}>
-        {/* Aesthetic tag */}
-        <span
-          className="inline-block text-xs font-semibold tracking-wider uppercase px-2.5 py-1 rounded-full mb-2"
-          style={{ backgroundColor: "rgba(200,149,106,0.85)", color: "#fff" }}
-        >
-          {card.aesthetic}
-        </span>
-        {/* Description */}
-        <p className="text-white text-sm font-medium leading-snug" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>
-          {card.description}
-        </p>
-      </div>
+          {/* Right: colour palette dots */}
+          <div className="flex-shrink-0">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Palette</p>
+            <div className="flex gap-2 flex-wrap">
+              {card.palette.map((hex, i) => (
+                <div key={i} className="flex flex-col items-center gap-1 group">
+                  <div
+                    className="w-7 h-7 rounded-full border border-border/60 shadow-sm"
+                    style={{ backgroundColor: hex }}
+                  />
+                  <span className="text-[7px] font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    {hex}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
-      {/* Heart — bottom right */}
-      <div
-        className="absolute bottom-0 right-2 flex flex-col items-center gap-1 pb-6"
-        style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
-      >
-        <HeartButton liked={liked} onToggle={() => onToggleLike(card)} />
-        {liked && (
-          <span className="text-xs font-semibold" style={{ color: "#C8956A", textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}>
-            Liked
-          </span>
-        )}
+        {/* Bottom row — tags + heart */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex gap-1.5 flex-wrap">
+            {card.tags.map((t) => (
+              <span key={t} className="tag">{t}</span>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {liked && (
+              <span className="text-xs font-semibold text-primary">Liked</span>
+            )}
+            <HeartButton liked={liked} onToggle={() => onToggleLike(card)} />
+          </div>
+        </div>
+
       </div>
     </div>
   );
@@ -315,83 +369,57 @@ export default function DiscoverPage() {
     }
   });
 
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Persist likes
   const toggleLike = useCallback((card: OutfitCard) => {
     setLikes((prev) => {
       const next = { ...prev, [card.id]: !prev[card.id] };
-
       try {
         const raw = localStorage.getItem("stitch_likes");
         const arr: LikedItem[] = raw ? JSON.parse(raw) : [];
         if (next[card.id]) {
-          // Add
           if (!arr.find((l) => l.id === card.id)) {
             arr.push({ id: card.id, aesthetic: card.aesthetic, likedAt: Date.now() });
           }
         } else {
-          // Remove
           const idx = arr.findIndex((l) => l.id === card.id);
           if (idx !== -1) arr.splice(idx, 1);
         }
         localStorage.setItem("stitch_likes", JSON.stringify(arr));
       } catch {}
-
       return next;
     });
   }, []);
 
-  // Snap scroll via CSS — smooth feel
+  const likedCount = Object.values(likes).filter(Boolean).length;
+
   return (
     <div
-      ref={containerRef}
-      className="fixed inset-0 overflow-y-scroll"
+      className="overflow-y-scroll"
       style={{
         scrollSnapType: "y mandatory",
         WebkitOverflowScrolling: "touch",
-        // Account for top bar (48px) + bottom nav (64px)
-        top: 0,
-        bottom: 0,
+        height: "calc(100svh - 48px - 64px)", // subtract TopBar + NavBar
       }}
     >
-      {/* Header overlay — "Discover" title on top of first card */}
-      <div
-        className="fixed top-0 left-0 right-0 z-30 flex items-center px-5 pointer-events-none"
-        style={{ height: 48 }}
-      >
-        <span
-          className="font-display text-base text-white"
-          style={{ textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}
-        >
-          Discover
-        </span>
-      </div>
-
       {cards.map((card) => (
-        <div
+        <DiscoverCard
           key={card.id}
-          style={{ scrollSnapAlign: "start", scrollSnapStop: "always" }}
-        >
-          <DiscoverCard
-            card={card}
-            liked={!!likes[card.id]}
-            onToggleLike={toggleLike}
-          />
-        </div>
+          card={card}
+          liked={!!likes[card.id]}
+          onToggleLike={toggleLike}
+        />
       ))}
 
       {/* End card */}
       <div
-        className="relative w-full flex-shrink-0 flex flex-col items-center justify-center gap-4 bg-background"
-        style={{ height: "100svh", scrollSnapAlign: "start" }}
+        className="w-full flex-shrink-0 flex flex-col items-center justify-center gap-3 bg-background"
+        style={{ scrollSnapAlign: "start", minHeight: "calc(100svh - 48px - 64px)" }}
       >
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="hsl(24 42% 60%)" strokeWidth="1.5" strokeLinecap="round">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="hsl(24 42% 60%)" strokeWidth="1.5" strokeLinecap="round">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>
         <p className="font-display text-xl text-foreground">You're all caught up</p>
         <p className="text-sm text-muted-foreground">
-          {Object.values(likes).filter(Boolean).length} outfit{Object.values(likes).filter(Boolean).length !== 1 ? "s" : ""} liked
+          {likedCount} outfit{likedCount !== 1 ? "s" : ""} liked
         </p>
       </div>
     </div>
