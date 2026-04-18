@@ -32,11 +32,11 @@ function TopBar() {
         <Link href="/">
           <div className="flex items-center cursor-pointer" aria-label="Stitch home">
             {/* Stitch logo — Bebas Neue, diagonal slash as the I, ST up / TCH down */}
-            {/* Canonical Stitch logo — viewBox="0 -2 67 35", font-size 30, tight equal gaps */}
-            <svg viewBox="0 -2 67 35" width="100" height="52" xmlns="http://www.w3.org/2000/svg" aria-label="Stitch">
+            {/* Canonical Stitch logo — flat square ends, equal 4-unit extension past ST top and TCH bottom */}
+            <svg viewBox="0 -14 67 55" width="100" height="77" xmlns="http://www.w3.org/2000/svg" aria-label="Stitch">
               <text x="0"  y="19" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="#5088B8">S</text>
               <text x="12" y="19" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="#5088B8">T</text>
-              <line x1="25" y1="-1" x2="28" y2="33" stroke="#5088B8" strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="25" y1="-12" x2="30" y2="39" stroke="#5088B8" strokeWidth="2.5" strokeLinecap="square"/>
               <text x="30" y="26" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="#5088B8">T</text>
               <text x="42" y="26" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="#5088B8">C</text>
               <text x="54" y="26" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="#5088B8">H</text>
