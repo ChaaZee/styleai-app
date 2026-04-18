@@ -5,6 +5,30 @@ import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 import { useState } from "react";
 import type { Scan } from "@shared/schema";
 
+function ProductCard({ product }: { product: any }) {
+  return (
+    <div
+      className="rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/40 transition-colors group cursor-pointer"
+      onClick={() => window.open(product.url, '_blank', 'noopener,noreferrer')}
+    >
+      <div className="absolute top-2 left-2 z-10">
+        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-background/90 border border-border text-foreground font-semibold">
+          {product.match}%
+        </span>
+      </div>
+      <div
+        className="aspect-[3/4] bg-cover bg-top bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+        style={{ backgroundImage: `url('${product.image}')` }}
+      />
+      <div className="p-2">
+        <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">{product.retailer}</p>
+        <p className="text-xs font-semibold text-foreground leading-tight mb-0.5">{product.name}</p>
+        <p className="text-xs text-primary font-semibold">${product.price}</p>
+      </div>
+    </div>
+  );
+}
+
 interface StyleBreakdown { label: string; score: number; } // score kept for backend compat
 interface Product { id: number; name: string; brand: string; price: number; image: string; match: number; retailer: string; url: string; }
 
@@ -66,11 +90,17 @@ export default function ResultsPage() {
         : results;
 
   const retailers = ["All", ...Array.from(new Set(results.map(r => r.retailer)))];
-  const filteredProducts = depopMode
+  const budgetAndRetailerFiltered = depopMode
     ? budgetFiltered
     : activeRetailer === "All"
       ? budgetFiltered
       : budgetFiltered.filter(r => r.retailer === activeRetailer);
+
+  const outfitProducts = budgetAndRetailerFiltered.filter((p: any) => p.type === "outfit" || !p.type);
+  const similarProducts = budgetAndRetailerFiltered.filter((p: any) => p.type === "similar");
+  // If no split (legacy data), show all under outfit section
+  const hasSplit = outfitProducts.length > 0 && similarProducts.length > 0;
+  const filteredProducts = budgetAndRetailerFiltered;
 
   return (
     <div className="max-w-4xl mx-auto fade-up">
@@ -225,8 +255,9 @@ export default function ResultsPage() {
         ))}
       </div>
 
-      {/* Product grid — image cards (default) or text list (Depop mode) */}
+      {/* Product sections */}
       {depopMode ? (
+        // Depop mode — text list, no images
         <div className="px-5 sm:px-8 flex flex-col gap-2 pb-4">
           {filteredProducts.map((product) => (
             <a
@@ -248,33 +279,33 @@ export default function ResultsPage() {
             </a>
           ))}
         </div>
+      ) : hasSplit ? (
+        // Split mode — Get the Look + Complete the Look
+        <div className="pb-4">
+          {/* Get the Look */}
+          <div className="px-5 sm:px-8 mb-4">
+            <p className="text-xs font-semibold text-foreground uppercase tracking-[0.08em] mb-2.5">Get the Look</p>
+            <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
+              {outfitProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          </div>
+          {/* Complete the Look */}
+          <div className="px-5 sm:px-8">
+            <p className="text-xs font-semibold text-foreground uppercase tracking-[0.08em] mb-2.5">Complete the Look</p>
+            <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
+              {similarProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          </div>
+        </div>
       ) : (
+        // Legacy / fallback — single flat grid
         <div className="px-5 sm:px-8 grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 pb-4">
           {filteredProducts.map((product) => (
-            <div
-              key={product.id}
-              data-testid={`card-product-${product.id}`}
-              className="rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/40 transition-colors group cursor-pointer"
-              onClick={() => window.open(product.url, '_blank', 'noopener,noreferrer')}
-            >
-              {/* Match score badge */}
-              <div className="absolute top-2 left-2 z-10">
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-background/90 border border-border text-foreground font-semibold">
-                  {product.match}%
-                </span>
-              </div>
-              {/* Product image */}
-              <div
-                className="aspect-[3/4] bg-cover bg-top bg-muted group-hover:scale-[1.02] transition-transform duration-500"
-                style={{ backgroundImage: `url('${product.image}')` }}
-              />
-              {/* Info */}
-              <div className="p-2">
-                <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">{product.retailer}</p>
-                <p className="text-xs font-semibold text-foreground leading-tight mb-0.5">{product.name}</p>
-                <p className="text-xs text-primary font-semibold">${product.price}</p>
-              </div>
-            </div>
+            <ProductCard key={product.id} product={product} />
           ))}
         </div>
       )}

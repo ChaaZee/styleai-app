@@ -602,34 +602,37 @@ const ANALYSIS_SCHEMA = {
       description: "2–4 dominant colors as hex codes derived from what is visually present.",
       items: { type: SchemaType.STRING },
     },
-    recommendations: {
+    outfitRecs: {
       type: SchemaType.ARRAY,
       description:
-        "6 specific product recommendations that match or complement this outfit. " +
-        "Base these on the actual garments, colors, and aesthetic you identified. " +
-        "Each item must be a real, shoppable product type with a specific brand. " +
-        "Mix: some items that replicate key pieces, some that complete or elevate the look. " +
-        "Include menswear or womenswear items based on what is visible in the image. " +
-        "Price should reflect realistic retail cost for that brand/product.",
+        "4 get-the-look recommendations — items that directly replicate specific pieces VISIBLE in the outfit. " +
+        "Each must correspond to an actual garment, shoe, or accessory you can see in the image. " +
+        "e.g. if the outfit has a brown leather jacket, recommend a specific brown leather jacket. " +
+        "Real brands, specific names, realistic prices.",
       items: {
         type: SchemaType.OBJECT,
         properties: {
-          name: {
-            type: SchemaType.STRING,
-            description: "Specific product name, e.g. 'Oversized Flannel Shirt', 'Low-Rise Straight Jeans', 'Lug-Sole Chelsea Boot'",
-          },
-          brand: {
-            type: SchemaType.STRING,
-            description: "Real brand name that sells this product, e.g. 'Levi\'s', 'Dr. Martens', 'Uniqlo', 'Zara'",
-          },
-          price: {
-            type: SchemaType.INTEGER,
-            description: "Realistic retail price in USD",
-          },
-          reason: {
-            type: SchemaType.STRING,
-            description: "One sentence: why this item matches or complements the outfit",
-          },
+          name: { type: SchemaType.STRING, description: "Specific product name matching what is worn" },
+          brand: { type: SchemaType.STRING, description: "Real brand that sells this exact product type" },
+          price: { type: SchemaType.INTEGER, description: "Realistic retail price in USD" },
+          reason: { type: SchemaType.STRING, description: "One sentence referencing exactly which piece in the outfit this replicates" },
+        },
+        required: ["name", "brand", "price", "reason"],
+      },
+    },
+    similarRecs: {
+      type: SchemaType.ARRAY,
+      description:
+        "4 style-adjacent recommendations — items NOT in the outfit but that complement or elevate it. " +
+        "Think: what would a stylist add to complete this look? Missing accessory, layering piece, shoe alternative, or bag. " +
+        "Real brands, specific names, realistic prices.",
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          name: { type: SchemaType.STRING, description: "Specific product name" },
+          brand: { type: SchemaType.STRING, description: "Real brand that sells this product" },
+          price: { type: SchemaType.INTEGER, description: "Realistic retail price in USD" },
+          reason: { type: SchemaType.STRING, description: "One sentence: why this complements or elevates the outfit" },
         },
         required: ["name", "brand", "price", "reason"],
       },
@@ -742,11 +745,19 @@ CALIBRATION RULES:
 - GENDER: Classify garments and styling, not the wearer.
 
 PRODUCT RECOMMENDATIONS:
-Generate 6 specific product recommendations based on what you ACTUALLY SEE.
-- Mix get-the-look (similar to worn items) with complete-the-look (pieces that elevate the outfit).
-- Real brands matching the outfit's price point. Specific names: not "jeans" but "Washed Barrel-Fit Jeans".
-- Match gender expression in the image. Realistic prices: Zara = 30–100, Levi's = 60–120, Dr. Martens = 140–200, The Row = 300–800.
-- reason field: reference specific outfit details, not just the aesthetic name.`;
+Generate two separate sets of 4 recommendations based on what you ACTUALLY SEE.
+
+outfitRecs — GET THE LOOK (4 items):
+- Each item must replicate a specific piece VISIBLE in the outfit.
+- If you see a brown leather jacket → recommend a specific brown leather jacket. White sneakers → those exact white sneakers.
+- reason field: reference the exact piece (e.g. "Replicates the oversized denim jacket worn in the outfit").
+
+similarRecs — COMPLETE THE LOOK (4 items):
+- Items NOT visible in the outfit that would complement or elevate it.
+- Think like a stylist: missing accessory, bag, shoe alternative, layering piece, or jewellery.
+- reason field: explain why it pairs with what's already in the outfit.
+
+Both sets: real brands, specific names (not "jeans" but "Washed Barrel-Fit Jeans"), match gender expression, realistic prices: Zara = 30–100, Levi's = 60–120, Dr. Martens = 140–200, The Row = 300–800.`;
 
 export async function registerRoutes(httpServer: Server, app: Express) {
   await initDB();
@@ -818,11 +829,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       const analysis = JSON.parse(jsonMatch[0]);
 
-      // Build products from Gemini's actual recommendations
-      const products = (analysis.recommendations || []).map((rec: any, i: number) => {
-        const keywords = buildImageKeywords(rec.name);
-        return {
-          id: i + 1,
+      // Build products from Gemini's split recommendations
+      const mapRecs = (recs: any[], type: string, startId: number) =>
+        (recs || []).map((rec: any, i: number) => ({
+          id: startId + i,
           name: rec.name,
           brand: rec.brand,
           price: rec.price,
@@ -831,11 +841,28 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           retailer: "Amazon",
           url: amazonUrl(rec.name, rec.brand),
           reason: rec.reason,
-        };
-      });
+          type,
+        }));
 
-      // Fallback to mock results if Gemini didn't return recommendations
-      const finalProducts = products.length >= 3 ? products : generateMockResults(analysis.aesthetic);
+      const outfitProducts = mapRecs(analysis.outfitRecs, "outfit", 1);
+      const similarProducts = mapRecs(analysis.similarRecs, "similar", 100);
+      const products = [...outfitProducts, ...similarProducts];
+
+      // Fallback: if new schema fields missing (old response), try legacy recommendations field
+      const legacyProducts = (analysis.recommendations || []).map((rec: any, i: number) => ({
+        id: i + 1,
+        name: rec.name,
+        brand: rec.brand,
+        price: rec.price,
+        image: `https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80`,
+        match: Math.max(75, 97 - i * 4),
+        retailer: "Amazon",
+        url: amazonUrl(rec.name, rec.brand),
+        reason: rec.reason,
+        type: "outfit",
+      }));
+
+      const finalProducts = products.length >= 3 ? products : legacyProducts.length >= 3 ? legacyProducts : generateMockResults(analysis.aesthetic);
       const imageDataUrl = `data:${mimeType};base64,${imageBase64}`;
 
       // Sync primary style score to Gemini's actual confidence so it reflects reality
