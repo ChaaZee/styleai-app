@@ -22,6 +22,7 @@ export default function ResultsPage() {
   const [, setLocation] = useLocation();
   const [activeRetailer, setActiveRetailer] = useState("All");
   const [activeBudget, setActiveBudget] = useState("All");
+  const [depopMode, setDepopMode] = useState(false);
 
   const { data: scan, isLoading, isError } = useQuery<Scan>({
     queryKey: ["/api/scans", Number(id)],
@@ -65,9 +66,11 @@ export default function ResultsPage() {
         : results;
 
   const retailers = ["All", ...Array.from(new Set(results.map(r => r.retailer)))];
-  const filteredProducts = activeRetailer === "All"
+  const filteredProducts = depopMode
     ? budgetFiltered
-    : budgetFiltered.filter(r => r.retailer === activeRetailer);
+    : activeRetailer === "All"
+      ? budgetFiltered
+      : budgetFiltered.filter(r => r.retailer === activeRetailer);
 
   return (
     <div className="max-w-4xl mx-auto fade-up">
@@ -192,13 +195,29 @@ export default function ResultsPage() {
 
       {/* Retailer tabs */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 sm:px-8 pb-3">
+        {/* Depop tab — shown for thrift-friendly aesthetics */}
+        {isDepopAesthetic(scan.aesthetic) && (
+          <button
+            key="depop"
+            onClick={() => { setDepopMode(true); setActiveRetailer("All"); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${
+              depopMode
+                ? "text-white border border-transparent"
+                : "bg-muted text-muted-foreground border border-border hover:text-foreground"
+            }`}
+            style={depopMode ? { backgroundColor: "#FF2300" } : {}}
+          >
+            <span className={depopMode ? "font-bold" : ""}>d</span>
+            Depop
+          </button>
+        )}
         {retailers.map((r) => (
           <button
             key={r}
-            onClick={() => setActiveRetailer(r)}
+            onClick={() => { setActiveRetailer(r); setDepopMode(false); }}
             data-testid={`filter-${r.toLowerCase()}`}
             className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${
-              activeRetailer === r
+              !depopMode && activeRetailer === r
                 ? "bg-foreground text-background"
                 : "bg-muted text-muted-foreground border border-border hover:text-foreground"
             }`}
@@ -215,7 +234,12 @@ export default function ResultsPage() {
             key={product.id}
             data-testid={`card-product-${product.id}`}
             className="rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/40 transition-colors group cursor-pointer"
-            onClick={() => window.open(product.url, '_blank', 'noopener,noreferrer')}
+            onClick={() => {
+              const url = depopMode
+                ? depopUrl(scan.aesthetic, [`${product.brand} ${product.name}`])
+                : product.url;
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }}
           >
             {/* Match score badge */}
             <div className="absolute top-2 left-2 z-10">
@@ -230,7 +254,9 @@ export default function ResultsPage() {
             />
             {/* Info */}
             <div className="p-2">
-              <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">{product.retailer}</p>
+              <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">
+                {depopMode ? "Depop" : product.retailer}
+              </p>
               <p className="text-xs font-semibold text-foreground leading-tight mb-0.5">{product.name}</p>
               <p className="text-xs text-primary font-semibold">${product.price}</p>
             </div>
