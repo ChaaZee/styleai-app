@@ -59,6 +59,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Health check — used by loading screen to detect when server is ready
+app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
 (async () => {
   await registerRoutes(httpServer, app);
 

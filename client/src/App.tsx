@@ -3,7 +3,7 @@ import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import HomePage from "@/pages/home";
 import ScanPage from "@/pages/scan";
 import ResultsPage from "@/pages/results";
@@ -76,7 +76,71 @@ function AppContent() {
   );
 }
 
+function LoadingScreen({ onDone }: { onDone: () => void }) {
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    // Ping the health endpoint — once it responds, start fade-out
+    const start = Date.now();
+    const minDisplay = 1200; // always show for at least 1.2s
+
+    fetch("/api/health", { cache: "no-store" })
+      .catch(() => {}) // ignore errors — just use the timer
+      .finally(() => {
+        const elapsed = Date.now() - start;
+        const remaining = Math.max(0, minDisplay - elapsed);
+        setTimeout(() => {
+          setFading(true);
+          setTimeout(onDone, 500);
+        }, remaining);
+      });
+  }, [onDone]);
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "#5088B8",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        gap: "24px",
+        opacity: fading ? 0 : 1,
+        transition: "opacity 0.5s ease",
+        pointerEvents: fading ? "none" : "all",
+      }}
+    >
+      {/* Stitch logo — white on blue */}
+      <svg viewBox="0 -9 67 41" width="160" height="98" xmlns="http://www.w3.org/2000/svg" aria-label="Stitch">
+        <text x="0"  y="19" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="white">S</text>
+        <text x="12" y="19" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="white">T</text>
+        <line x1="25" y1="-7.97" x2="28.9" y2="31.04" stroke="white" strokeWidth="2.5" strokeLinecap="butt"/>
+        <text x="30" y="22" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="white">T</text>
+        <text x="42" y="22" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="white">C</text>
+        <text x="54" y="22" fontFamily="'Bebas Neue',sans-serif" fontSize="30" fill="white">H</text>
+      </svg>
+      {/* Subtle pulse dots */}
+      <div style={{ display: "flex", gap: "8px" }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{
+            width: 7, height: 7, borderRadius: "50%",
+            background: "rgba(255,255,255,0.6)",
+            animation: `stitch-pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+          }}/>
+        ))}
+      </div>
+      <style>{`
+        @keyframes stitch-pulse {
+          0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+          40% { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function App() {
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     document.documentElement.classList.remove("dark");
   }, []);
@@ -84,6 +148,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router hook={useHashLocation}>
+        {loading && <LoadingScreen onDone={() => setLoading(false)} />}
         <AppContent />
         <Toaster />
       </Router>
