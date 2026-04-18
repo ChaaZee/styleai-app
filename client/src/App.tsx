@@ -30,13 +30,16 @@ function TopBar() {
     <header className="sticky top-0 z-40 surface-glass">
       <div className="max-w-4xl mx-auto px-5 sm:px-8 h-12 sm:h-14 flex items-center justify-between">
         <Link href="/">
-          <div className="flex items-center gap-2 cursor-pointer">
-            <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-label="Stitch logo">
-              <rect x="1" y="1" width="20" height="20" rx="5" stroke="hsl(24 42% 60%)" strokeWidth="1.2" fill="none"/>
-              <path d="M6 13 C6 9.5 8.5 7.5 11 7.5 C13.5 7.5 16 9.5 16 13" stroke="hsl(24 42% 60%)" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
-              <circle cx="11" cy="15.5" r="2" fill="hsl(24 42% 60%)"/>
+          <div className="flex items-center cursor-pointer" aria-label="Stitch home">
+            {/* Stitch logo — Bebas Neue, diagonal slash as the I, ST up / TCH down */}
+            <svg viewBox="0 0 108 33" width="90" height="27" xmlns="http://www.w3.org/2000/svg" aria-label="Stitch">
+              <text x="0" y="19" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">S</text>
+              <text x="16.5" y="19" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">T</text>
+              <line x1="35" y1="1" x2="39" y2="32" stroke="#5088B8" strokeWidth="3" strokeLinecap="round"/>
+              <text x="41" y="26" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">T</text>
+              <text x="58" y="26" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">C</text>
+              <text x="75.5" y="26" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">H</text>
             </svg>
-            <span className="font-display text-[16px] tracking-[0.01em] text-foreground">Stitch</span>
           </div>
         </Link>
         <Link href="/profile">
