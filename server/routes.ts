@@ -647,7 +647,8 @@ const ANALYSIS_SCHEMA = {
     "occasions",
     "keyPieces",
     "colorPalette",
-    "recommendations",
+    "outfitRecs",
+    "similarRecs",
   ],
 };
 
