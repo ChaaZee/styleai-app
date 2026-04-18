@@ -1,6 +1,7 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { X, ShoppingBag, ExternalLink } from "lucide-react";
+import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 import { useState } from "react";
 import type { Scan } from "@shared/schema";
 
@@ -145,6 +146,30 @@ export default function ResultsPage() {
           </div>
         </div>
       </div>
+
+      {/* Depop CTA — only for thrift-friendly aesthetics */}
+      {isDepopAesthetic(scan.aesthetic) && (
+        <div className="mx-5 sm:mx-8 mb-3">
+          <a
+            href={depopUrl(scan.aesthetic, keyPieces)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between w-full px-4 py-3 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              {/* Depop wordmark dot */}
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#FF2300" }}>
+                <span className="text-white font-bold text-xs">d</span>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-foreground">Shop this look on Depop</p>
+                <p className="text-[10px] text-muted-foreground">Find secondhand &amp; vintage pieces</p>
+              </div>
+            </div>
+            <ExternalLink size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+          </a>
+        </div>
+      )}
 
       {/* Budget toggle */}
       <div className="px-5 sm:px-8 mb-3">
