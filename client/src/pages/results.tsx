@@ -225,42 +225,59 @@ export default function ResultsPage() {
         ))}
       </div>
 
-      {/* Product grid — 3 cols mobile, 4 cols on lg+ */}
-      <div className="px-5 sm:px-8 grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 pb-4">
-        {filteredProducts.map((product) => (
-          <div
-            key={product.id}
-            data-testid={`card-product-${product.id}`}
-            className="rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/40 transition-colors group cursor-pointer"
-            onClick={() => {
-              const url = depopMode
-                ? depopUrl(scan.aesthetic, [`${product.brand} ${product.name}`])
-                : product.url;
-              window.open(url, '_blank', 'noopener,noreferrer');
-            }}
-          >
-            {/* Match score badge */}
-            <div className="absolute top-2 left-2 z-10">
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-background/90 border border-border text-foreground font-semibold">
-                {product.match}%
-              </span>
-            </div>
-            {/* Product image */}
+      {/* Product grid — image cards (default) or text list (Depop mode) */}
+      {depopMode ? (
+        <div className="px-5 sm:px-8 flex flex-col gap-2 pb-4">
+          {filteredProducts.map((product) => (
+            <a
+              key={product.id}
+              href={depopUrl(scan.aesthetic, [product.name])}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between px-4 py-3 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors group"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground leading-tight">{product.name}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Search on Depop</p>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 ml-3">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div className="px-5 sm:px-8 grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 pb-4">
+          {filteredProducts.map((product) => (
             <div
-              className="aspect-[3/4] bg-cover bg-top bg-muted group-hover:scale-[1.02] transition-transform duration-500"
-              style={{ backgroundImage: `url('${product.image}')` }}
-            />
-            {/* Info */}
-            <div className="p-2">
-              <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">
-                {depopMode ? "Depop" : product.retailer}
-              </p>
-              <p className="text-xs font-semibold text-foreground leading-tight mb-0.5">{product.name}</p>
-              <p className="text-xs text-primary font-semibold">${product.price}</p>
+              key={product.id}
+              data-testid={`card-product-${product.id}`}
+              className="rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/40 transition-colors group cursor-pointer"
+              onClick={() => window.open(product.url, '_blank', 'noopener,noreferrer')}
+            >
+              {/* Match score badge */}
+              <div className="absolute top-2 left-2 z-10">
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-background/90 border border-border text-foreground font-semibold">
+                  {product.match}%
+                </span>
+              </div>
+              {/* Product image */}
+              <div
+                className="aspect-[3/4] bg-cover bg-top bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                style={{ backgroundImage: `url('${product.image}')` }}
+              />
+              {/* Info */}
+              <div className="p-2">
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">{product.retailer}</p>
+                <p className="text-xs font-semibold text-foreground leading-tight mb-0.5">{product.name}</p>
+                <p className="text-xs text-primary font-semibold">${product.price}</p>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
