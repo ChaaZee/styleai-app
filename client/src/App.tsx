@@ -19,10 +19,10 @@ function ProfileInitial() {
     const raw = localStorage.getItem("stitch_profile");
     if (raw) {
       const p = JSON.parse(raw);
-      if (p.name) return <span className="text-xs font-semibold text-primary">{p.name[0].toUpperCase()}</span>;
+      if (p.name) return <span className="text-xs font-semibold" style={{color:'white'}}>{p.name[0].toUpperCase()}</span>;
     }
   } catch {}
-  return <span className="text-xs font-medium text-muted-foreground">A</span>;
+  return <span className="text-xs font-medium" style={{color:'rgba(255,255,255,0.8)'}}>A</span>;
 }
 
 function TopBar() {
@@ -33,17 +33,17 @@ function TopBar() {
           <div className="flex items-center cursor-pointer" aria-label="Stitch home">
             {/* Stitch logo — Bebas Neue, diagonal slash as the I, ST up / TCH down */}
             <svg viewBox="0 0 108 33" width="90" height="27" xmlns="http://www.w3.org/2000/svg" aria-label="Stitch">
-              <text x="0" y="19" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">S</text>
-              <text x="16.5" y="19" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">T</text>
-              <line x1="35" y1="1" x2="39" y2="32" stroke="#5088B8" strokeWidth="3" strokeLinecap="round"/>
-              <text x="41" y="26" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">T</text>
-              <text x="58" y="26" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">C</text>
-              <text x="75.5" y="26" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="hsl(30 12% 12%)">H</text>
+              <text x="0" y="19" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="white">S</text>
+              <text x="16.5" y="19" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="white">T</text>
+              <line x1="35" y1="1" x2="39" y2="32" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+              <text x="41" y="26" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="white">T</text>
+              <text x="58" y="26" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="white">C</text>
+              <text x="75.5" y="26" fontFamily="'Bebas Neue', sans-serif" fontSize="30" fill="white">H</text>
             </svg>
           </div>
         </Link>
         <Link href="/profile">
-          <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors" style={{background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.35)'}}>
             <ProfileInitial />
           </div>
         </Link>
