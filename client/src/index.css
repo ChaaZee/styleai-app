@@ -13,19 +13,19 @@
     --card-foreground: 30 12% 12%;
     --popover:       36 18% 99%;
     --popover-foreground: 30 12% 12%;
-    --primary:       210 40% 51%;       /* #5088B8 Stitch blue */
-    --primary-foreground: 0 0% 100%;
+    --primary:       24 42% 60%;        /* #C8956A terracotta gold */
+    --primary-foreground: 36 20% 97%;
     --secondary:     36 14% 93%;        /* #EDEBE6 warm stone */
     --secondary-foreground: 30 10% 35%;
     --muted:         36 12% 94%;        /* #F0EDE8 */
     --muted-foreground: 30 8% 52%;      /* #8A8680 */
-    --accent:        210 40% 51%;       /* #5088B8 Stitch blue */
-    --accent-foreground: 0 0% 100%;
+    --accent:        24 42% 60%;
+    --accent-foreground: 36 20% 97%;
     --destructive:   0 72% 51%;
     --destructive-foreground: 0 0% 98%;
     --border:        36 10% 88%;        /* #E2DED8 subtle warm border */
     --input:         36 10% 88%;
-    --ring:          210 40% 51%;       /* #5088B8 Stitch blue */
+    --ring:          24 42% 60%;
     --radius:        0.5rem;
   }
 }
@@ -63,9 +63,9 @@
     font-family: 'Cormorant Garamond', Georgia, serif;
   }
 
-  /* Stitch blue gradient text */
+  /* Warm terracotta gradient text */
   .gold-gradient {
-    background: linear-gradient(135deg, #3A6EA5 0%, #5088B8 45%, #6BA0CC 100%);
+    background: linear-gradient(135deg, #B8855A 0%, #C8956A 45%, #D4A070 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -78,10 +78,12 @@
     border-radius: 12px;
   }
 
-  /* Stitch blue header */
+  /* Frosted glass header */
   .surface-glass {
-    background: #5088B8;
-    border-bottom: none;
+    background: rgba(250, 250, 248, 0.90);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid hsl(var(--border));
   }
 
   /* Scan line animation */
