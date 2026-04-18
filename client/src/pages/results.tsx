@@ -196,8 +196,7 @@ export default function ResultsPage() {
       {/* Retailer tabs */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 sm:px-8 pb-3">
         {/* Depop tab — shown for thrift-friendly aesthetics */}
-        {isDepopAesthetic(scan.aesthetic) && (
-          <button
+        <button
             key="depop"
             onClick={() => { setDepopMode(true); setActiveRetailer("All"); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${
@@ -210,7 +209,6 @@ export default function ResultsPage() {
             <span className={depopMode ? "font-bold" : ""}>d</span>
             Depop
           </button>
-        )}
         {retailers.map((r) => (
           <button
             key={r}
