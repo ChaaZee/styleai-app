@@ -336,7 +336,7 @@ export default function ResultsPage() {
 
       {/* Product sections */}
       {depopMode ? (
-        // Depop mode — text list, no images
+        // Depop mode — illustration + name list
         <div className="px-5 sm:px-8 flex flex-col gap-2 pb-4">
           {filteredProducts.map((product) => (
             <a
@@ -344,13 +344,16 @@ export default function ResultsPage() {
               href={depopUrl(scan.aesthetic, [product.name])}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between px-4 py-3 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors group"
+              className="flex items-center gap-3 px-3 py-3 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors group"
             >
+              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-foreground/40 group-hover:text-primary transition-colors">
+                {ClothingIcons[iconForProduct(product.name)]}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-foreground leading-tight">{product.name}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Search on Depop</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{product.retailer} · Search on Depop</p>
               </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 ml-3">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                 <polyline points="15 3 21 3 21 9"/>
                 <line x1="10" y1="14" x2="21" y2="3"/>
