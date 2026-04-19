@@ -7,7 +7,7 @@
 @layer base {
   :root {
     /* Stitch — White Rain: cool blue-white background */
-    --background:    228 67% 97%;       /* #F4F6FE white rain */
+    --background:    248 100% 99%;      /* #F8F7FF */
     --foreground:    225 25% 12%;       /* near-black with cool tint */
     --card:          0 0% 100%;         /* pure white cards */
     --card-foreground: 225 25% 12%;
@@ -80,7 +80,7 @@
 
   /* Frosted glass header */
   .surface-glass {
-    background: rgba(244, 246, 254, 0.90);
+    background: rgba(248, 247, 255, 0.90);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid hsl(var(--border));
