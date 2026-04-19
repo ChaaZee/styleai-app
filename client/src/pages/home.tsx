@@ -1,19 +1,102 @@
 import { useLocation } from "wouter";
 
-const FEED_ITEMS = [
-  { id: 1, brand: "& Other Stories", name: "Linen Blazer Dress", price: 149, match: true, height: 180, img: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=300&q=80", pos: "top center" },
-  { id: 2, brand: "Mango", name: "Structured Tote", price: 79, match: false, height: 130, img: "https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=300&q=80", pos: "center" },
-  { id: 3, brand: "Arket", name: "Cashmere Crew Neck", price: 195, match: false, height: 210, img: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=300&q=80", pos: "top" },
-  { id: 4, brand: "COS", name: "Wide Leg Trousers", price: 89, sale: "-30%", match: false, height: 160, img: "https://images.unsplash.com/photo-1544966503-7cc5ac882d5f?w=300&q=80", pos: "center" },
-  { id: 5, brand: "New Balance", name: "990v6 Sneaker", price: 185, match: true, height: 145, img: "https://images.unsplash.com/photo-1491553895911-0055eca6402d?w=300&q=80", pos: "center" },
-  { id: 6, brand: "Totême", name: "Silk Wrap Dress", price: 420, match: false, height: 195, img: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=300&q=80", pos: "top" },
+// ── Clothing SVG illustrations (same set as discover) ───────────────────────
+const Icons: Record<string, JSX.Element> = {
+  shirt: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <path d="M14 4 L8 10 L4 8 L2 18 L8 17 L8 36 L32 36 L32 17 L38 18 L36 8 L32 10 L26 4 Q23 8 20 8 Q17 8 14 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  pants: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <path d="M6 4 L34 4 L34 10 L26 10 L26 36 L20 36 L20 18 L20 36 L14 36 L14 10 L6 10 Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  dress: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <path d="M15 4 Q20 8 25 4 L30 12 L26 14 L30 36 L10 36 L14 14 L10 12 Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  shoes: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <path d="M4 28 L4 20 Q4 14 10 14 L18 14 L18 20 L28 20 Q36 20 36 26 L36 28 L16 28 Q12 28 12 32 L4 32 Q4 30 4 28Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  bag: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <rect x="6" y="14" width="28" height="22" rx="3" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+      <path d="M14 14 Q14 6 20 6 Q26 6 26 14" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+      <line x1="6" y1="22" x2="34" y2="22" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  jacket: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <path d="M14 4 L8 10 L4 8 L2 20 L8 19 L8 36 L32 36 L32 19 L38 20 L36 8 L32 10 L26 4 Q23 9 20 9 Q17 9 14 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+      <line x1="20" y1="9" x2="20" y2="36" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  skirt: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <path d="M10 8 L30 8 L36 36 L4 36 Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+      <line x1="8" y1="14" x2="32" y2="14" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  accessory: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+      <circle cx="20" cy="20" r="10" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+      <circle cx="20" cy="20" r="4" stroke="currentColor" strokeWidth="1.4" fill="none"/>
+      <line x1="10" y1="10" x2="16" y2="16" stroke="currentColor" strokeWidth="1.4"/>
+      <line x1="30" y1="10" x2="24" y2="16" stroke="currentColor" strokeWidth="1.4"/>
+      <line x1="10" y1="30" x2="16" y2="24" stroke="currentColor" strokeWidth="1.4"/>
+      <line x1="30" y1="30" x2="24" y2="24" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+};
+
+// ── Depop badge ──────────────────────────────────────────────────────────────
+function DepopBadge() {
+  return (
+    <div className="flex items-center gap-1">
+      <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#FF2300" }}>
+        <span className="text-white font-bold" style={{ fontSize: "9px", lineHeight: 1 }}>d</span>
+      </div>
+      <span className="text-[10px] text-muted-foreground">Depop</span>
+    </div>
+  );
+}
+
+// ── Data ─────────────────────────────────────────────────────────────────────
+type IconKey = keyof typeof Icons;
+
+interface FeedItem {
+  id: number;
+  label: string;
+  icon: IconKey;
+  query: string;
+  aesthetic: string;
+  tag?: string; // "Match" | sale string
+}
+
+const FEED_ITEMS: FeedItem[] = [
+  { id: 1, label: "Linen Blazer Dress",     icon: "dress",     query: "linen blazer dress minimalist",       aesthetic: "Minimalist", tag: "Match" },
+  { id: 2, label: "Structured Tote",         icon: "bag",       query: "structured tote bag neutral",         aesthetic: "Clean Girl" },
+  { id: 3, label: "Cashmere Crew Neck",      icon: "shirt",     query: "cashmere crew neck sweater neutral",  aesthetic: "Old Money", tag: "-30%" },
+  { id: 4, label: "Wide Leg Trousers",       icon: "pants",     query: "wide leg trousers minimal beige",     aesthetic: "Minimalist" },
+  { id: 5, label: "990v6 Sneaker",           icon: "shoes",     query: "new balance 990 sneakers",            aesthetic: "Streetwear", tag: "Match" },
+  { id: 6, label: "Silk Wrap Dress",         icon: "dress",     query: "silk wrap dress elegant",             aesthetic: "Romantic" },
 ];
 
-const COMPLETE_LOOK = [
-  { name: "Linen Trousers", price: 68, img: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=240&q=80" },
-  { name: "White Sneakers", price: 112, img: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=240&q=80" },
-  { name: "Tote Bag", price: 89, img: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=240&q=80" },
-  { name: "Linen Scarf", price: 45, img: "https://images.unsplash.com/photo-1594938298603-c8148e4f4a24?w=240&q=80" },
+interface CompleteItem {
+  name: string;
+  icon: IconKey;
+  query: string;
+}
+
+const COMPLETE_LOOK: CompleteItem[] = [
+  { name: "Linen Trousers",  icon: "pants",  query: "linen trousers wide leg coastal" },
+  { name: "White Sneakers",  icon: "shoes",  query: "white sneakers minimal clean" },
+  { name: "Tote Bag",        icon: "bag",    query: "tote bag minimalist neutral" },
+  { name: "Linen Scarf",     icon: "accessory", query: "linen scarf neutral accessory" },
 ];
 
 const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Trending"];
@@ -51,20 +134,24 @@ export default function HomePage() {
       <div className="px-5 sm:px-8 mb-5">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-semibold text-foreground">Complete Your Look</span>
-          <span className="text-xs text-primary underline underline-offset-2 cursor-pointer">See all</span>
+          <DepopBadge />
         </div>
         <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1">
           {COMPLETE_LOOK.map((item) => (
-            <div key={item.name} className="flex-shrink-0 w-28 sm:w-36 rounded-xl border border-border bg-card overflow-hidden">
-              <div
-                className="h-32 sm:h-40 bg-muted bg-cover bg-center"
-                style={{ backgroundImage: `url('${item.img}')` }}
-              />
-              <div className="p-2 sm:p-3">
-                <p className="text-xs font-semibold text-primary">${item.price}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{item.name}</p>
+            <a
+              key={item.name}
+              href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-shrink-0 w-28 sm:w-36 rounded-xl border border-border bg-card overflow-hidden hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+            >
+              <div className="h-28 sm:h-36 flex items-center justify-center text-foreground/50 group-hover:text-primary transition-colors">
+                {Icons[item.icon]}
               </div>
-            </div>
+              <div className="p-2 sm:p-3 border-t border-border">
+                <p className="text-xs font-medium text-foreground truncate">{item.name}</p>
+              </div>
+            </a>
           ))}
         </div>
       </div>
@@ -76,40 +163,38 @@ export default function HomePage() {
       </div>
 
       {/* Masonry grid — 2 cols mobile, 3 cols on md+ */}
-      <div className="px-5 sm:px-8 columns-2 md:columns-3 gap-3 space-y-0">
+      <div className="px-5 sm:px-8 columns-2 md:columns-3 gap-3 space-y-0 pb-6">
         {FEED_ITEMS.map((item) => (
-          <div
+          <a
             key={item.id}
-            className="break-inside-avoid mb-3 rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/30 transition-colors cursor-pointer"
-            onClick={() => setLocation("/")}
+            href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-inside-avoid mb-3 rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/30 transition-colors cursor-pointer block group"
           >
-            {item.match && (
+            {item.tag === "Match" && (
               <div className="absolute top-2 left-2 z-10 text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-medium">Match</div>
             )}
-            {item.sale && (
-              <div className="absolute top-2 left-2 z-10 text-[10px] px-2 py-0.5 rounded-full bg-foreground text-background font-medium">{item.sale}</div>
+            {item.tag && item.tag !== "Match" && (
+              <div className="absolute top-2 left-2 z-10 text-[10px] px-2 py-0.5 rounded-full bg-foreground text-background font-medium">{item.tag}</div>
             )}
-            <div
-              className="w-full bg-muted bg-cover"
-              style={{
-                height: item.height,
-                backgroundImage: `url('${item.img}')`,
-                backgroundPosition: item.pos,
-              }}
-            />
-            <div className="p-2.5">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-0.5">{item.brand}</p>
-              <p className="text-xs text-foreground font-medium leading-snug mb-1.5">{item.name}</p>
+            {/* Illustration area */}
+            <div className="w-full flex items-center justify-center py-8 text-foreground/40 group-hover:text-primary transition-colors">
+              {Icons[item.icon]}
+            </div>
+            <div className="p-2.5 border-t border-border">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-0.5">{item.aesthetic}</p>
+              <p className="text-xs text-foreground font-medium leading-snug mb-1.5">{item.label}</p>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground">${item.price}</span>
-                <button className="text-muted-foreground hover:text-primary transition-colors">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill={item.match ? "hsl(24 42% 60%)" : "none"} stroke="currentColor" strokeWidth="1.75">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                  </svg>
-                </button>
+                <DepopBadge />
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground group-hover:text-primary transition-colors">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
               </div>
             </div>
-          </div>
+          </a>
         ))}
       </div>
     </div>
