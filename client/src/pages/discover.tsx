@@ -1,6 +1,169 @@
 import { useState, useCallback } from "react";
 import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 
+// ── Clothing SVG illustrations ────────────────────────────────────────────────
+const ClothingIcons: Record<string, JSX.Element> = {
+  shirt: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+      <path d="M14 4 L8 10 L4 8 L2 18 L8 17 L8 36 L32 36 L32 17 L38 18 L36 8 L32 10 L26 4 Q23 8 20 8 Q17 8 14 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  pants: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+      <path d="M6 4 L34 4 L34 10 L26 10 L26 36 L20 36 L20 18 L20 36 L14 36 L14 10 L6 10 Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  dress: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+      <path d="M15 4 Q20 8 25 4 L30 12 L26 14 L30 36 L10 36 L14 14 L10 12 Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  shoes: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+      <path d="M4 28 L4 20 Q4 14 10 14 L18 14 L18 20 L28 20 Q36 20 36 26 L36 28 L16 28 Q12 28 12 32 L4 32 Q4 30 4 28Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  bag: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+      <rect x="6" y="14" width="28" height="22" rx="3" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+      <path d="M14 14 Q14 6 20 6 Q26 6 26 14" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+      <line x1="6" y1="22" x2="34" y2="22" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  jacket: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+      <path d="M14 4 L8 10 L4 8 L2 20 L8 19 L8 36 L32 36 L32 19 L38 20 L36 8 L32 10 L26 4 Q23 9 20 9 Q17 9 14 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+      <line x1="20" y1="9" x2="20" y2="36" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  skirt: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+      <path d="M10 8 L30 8 L36 36 L4 36 Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+      <line x1="8" y1="14" x2="32" y2="14" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  accessory: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+      <circle cx="20" cy="20" r="10" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+      <circle cx="20" cy="20" r="4" stroke="currentColor" strokeWidth="1.4" fill="none"/>
+      <line x1="10" y1="10" x2="16" y2="16" stroke="currentColor" strokeWidth="1.4"/>
+      <line x1="30" y1="10" x2="24" y2="16" stroke="currentColor" strokeWidth="1.4"/>
+      <line x1="10" y1="30" x2="16" y2="24" stroke="currentColor" strokeWidth="1.4"/>
+      <line x1="30" y1="30" x2="24" y2="24" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+};
+
+// ── Shop items per card ───────────────────────────────────────────────────────
+interface ShopItem {
+  label: string;
+  icon: keyof typeof ClothingIcons;
+  query: string; // Depop search query
+}
+
+const CARD_ITEMS: Record<string, ShopItem[]> = {
+  cg1: [
+    { label: "Linen shirt", icon: "shirt", query: "clean girl linen shirt neutral" },
+    { label: "Straight trousers", icon: "pants", query: "minimalist straight leg trousers beige" },
+    { label: "Simple flats", icon: "shoes", query: "ballet flats neutral minimalist" },
+  ],
+  cg2: [
+    { label: "Midi skirt", icon: "skirt", query: "clean girl midi skirt monochrome" },
+    { label: "Fitted top", icon: "shirt", query: "fitted ribbed top neutral tones" },
+    { label: "Tote bag", icon: "bag", query: "minimalist tote bag neutral" },
+  ],
+  sw1: [
+    { label: "Oversized hoodie", icon: "jacket", query: "oversized hoodie streetwear" },
+    { label: "Cargo pants", icon: "pants", query: "cargo pants streetwear urban" },
+    { label: "Sneakers", icon: "shoes", query: "streetwear sneakers kicks" },
+  ],
+  sw2: [
+    { label: "Graphic tee", icon: "shirt", query: "graphic tee streetwear indie" },
+    { label: "Wide-leg jeans", icon: "pants", query: "wide leg jeans streetwear" },
+    { label: "Crossbody bag", icon: "bag", query: "crossbody bag streetwear" },
+  ],
+  da1: [
+    { label: "Tweed blazer", icon: "jacket", query: "dark academia tweed blazer" },
+    { label: "Plaid trousers", icon: "pants", query: "dark academia plaid trousers" },
+    { label: "Loafers", icon: "shoes", query: "dark academia loafers vintage" },
+  ],
+  cc1: [
+    { label: "Prairie dress", icon: "dress", query: "cottagecore prairie dress floral" },
+    { label: "Mary Janes", icon: "shoes", query: "cottagecore mary jane shoes" },
+    { label: "Wicker bag", icon: "bag", query: "cottagecore wicker basket bag" },
+  ],
+  at1: [
+    { label: "Sports bra", icon: "shirt", query: "athleisure sports bra sleek" },
+    { label: "Leggings", icon: "pants", query: "athleisure leggings high waist" },
+    { label: "Trainers", icon: "shoes", query: "athleisure trainers running" },
+  ],
+  at2: [
+    { label: "Matching set top", icon: "shirt", query: "athleisure matching set top" },
+    { label: "Matching set bottoms", icon: "pants", query: "athleisure matching set shorts" },
+    { label: "Gym bag", icon: "bag", query: "gym bag sporty minimalist" },
+  ],
+  bh1: [
+    { label: "Boho dress", icon: "dress", query: "boho maxi dress earthy fringe" },
+    { label: "Suede boots", icon: "shoes", query: "boho suede boots fringe" },
+    { label: "Fringe bag", icon: "bag", query: "boho fringe bag earthy" },
+  ],
+  hb1: [
+    { label: "Logo tee", icon: "shirt", query: "hypebeast logo tee bold" },
+    { label: "Joggers", icon: "pants", query: "hypebeast joggers streetwear" },
+    { label: "Hype sneakers", icon: "shoes", query: "hype sneakers limited drop" },
+  ],
+  om1: [
+    { label: "Cashmere knit", icon: "shirt", query: "old money cashmere knit sweater" },
+    { label: "Tailored trousers", icon: "pants", query: "old money tailored trousers" },
+    { label: "Leather loafers", icon: "shoes", query: "old money leather loafers" },
+  ],
+  om2: [
+    { label: "Wool blazer", icon: "jacket", query: "old money heritage wool blazer" },
+    { label: "Slim trousers", icon: "pants", query: "old money slim neutral trousers" },
+    { label: "Structured bag", icon: "bag", query: "old money structured leather bag" },
+  ],
+  y2k1: [
+    { label: "Low-rise jeans", icon: "pants", query: "y2k low rise jeans 2000s" },
+    { label: "Crop top", icon: "shirt", query: "y2k crop top metallic 2000s" },
+    { label: "Platform shoes", icon: "shoes", query: "y2k platform shoes chunky" },
+  ],
+  pp1: [
+    { label: "Polo shirt", icon: "shirt", query: "preppy polo shirt varsity" },
+    { label: "Chinos", icon: "pants", query: "preppy chinos classic" },
+    { label: "Boat shoes", icon: "shoes", query: "preppy boat shoes sperry" },
+  ],
+  mn1: [
+    { label: "Clean white tee", icon: "shirt", query: "minimalist white tee structured" },
+    { label: "Straight jeans", icon: "pants", query: "minimalist straight jeans white" },
+    { label: "Simple sneakers", icon: "shoes", query: "minimalist clean sneakers white" },
+  ],
+  ro1: [
+    { label: "Floral dress", icon: "dress", query: "romantic floral dress lace" },
+    { label: "Kitten heels", icon: "shoes", query: "romantic kitten heels feminine" },
+    { label: "Dainty bag", icon: "bag", query: "romantic small bag feminine" },
+  ],
+  bc1: [
+    { label: "Tailored blazer", icon: "jacket", query: "business casual blazer polished" },
+    { label: "Slim trousers", icon: "pants", query: "business casual trousers smart" },
+    { label: "Oxford shoes", icon: "shoes", query: "business casual oxford shoes" },
+  ],
+  in1: [
+    { label: "Vintage band tee", icon: "shirt", query: "indie vintage band tee thrifted" },
+    { label: "Wide-leg cords", icon: "pants", query: "indie corduroy wide leg pants" },
+    { label: "Doc Martens", icon: "shoes", query: "doc martens indie thrifted" },
+  ],
+  cs1: [
+    { label: "Linen shirt", icon: "shirt", query: "coastal linen shirt breezy" },
+    { label: "Linen trousers", icon: "pants", query: "coastal linen trousers wide leg" },
+    { label: "Espadrilles", icon: "shoes", query: "espadrilles coastal summer" },
+  ],
+  mn2: [
+    { label: "Neutral knit", icon: "shirt", query: "minimalist neutral knit warm" },
+    { label: "Tailored trousers", icon: "pants", query: "minimalist tailored trousers warm" },
+    { label: "Simple mules", icon: "shoes", query: "minimalist mules neutral" },
+  ],
+};
+
 // ── Types ────────────────────────────────────────────────────────────────────
 interface OutfitCard {
   id: string;
@@ -335,6 +498,29 @@ function DiscoverCard({
             </div>
           </div>
         </div>
+
+        {/* Shop the Look — clothing items with Depop links */}
+        {CARD_ITEMS[card.id] && CARD_ITEMS[card.id].length > 0 && (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Shop the Look</p>
+            <div className="flex gap-2">
+              {CARD_ITEMS[card.id].map((item) => (
+                <a
+                  key={item.label}
+                  href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex flex-col items-center gap-1.5 py-3 px-1 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+                >
+                  <span className="text-foreground/60 group-hover:text-primary transition-colors">
+                    {ClothingIcons[item.icon]}
+                  </span>
+                  <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground text-center leading-tight transition-colors">{item.label}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Depop CTA — only for thrift-friendly aesthetics */}
         {isDepopAesthetic(card.aesthetic) && (
