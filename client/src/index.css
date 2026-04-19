@@ -6,25 +6,25 @@
 
 @layer base {
   :root {
-    /* Stitch — White Rain: soft sage-green background */
-    --background:    154 17% 81%;       /* #C8D8D1 White Rain */
-    --foreground:    160 15% 12%;       /* near-black with cool tint */
-    --card:          154 14% 88%;       /* slightly lighter sage for cards */
-    --card-foreground: 160 15% 12%;
-    --popover:       154 14% 88%;
-    --popover-foreground: 160 15% 12%;
+    /* Stitch — White Rain: cool blue-white background */
+    --background:    228 67% 97%;       /* #F4F6FE white rain */
+    --foreground:    225 25% 12%;       /* near-black with cool tint */
+    --card:          0 0% 100%;         /* pure white cards */
+    --card-foreground: 225 25% 12%;
+    --popover:       0 0% 100%;
+    --popover-foreground: 225 25% 12%;
     --primary:       210 40% 51%;       /* #5088B8 Stitch blue */
     --primary-foreground: 0 0% 100%;
-    --secondary:     154 12% 74%;       /* muted sage */
-    --secondary-foreground: 160 12% 30%;
-    --muted:         154 12% 76%;       /* #BFD0CA */
-    --muted-foreground: 160 8% 40%;    /* medium sage-grey */
+    --secondary:     228 40% 93%;       /* soft blue-grey */
+    --secondary-foreground: 225 15% 35%;
+    --muted:         228 40% 94%;       /* #EAEEF9 */
+    --muted-foreground: 225 10% 52%;
     --accent:        210 40% 51%;       /* #5088B8 Stitch blue */
     --accent-foreground: 0 0% 100%;
     --destructive:   0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border:        154 12% 70%;       /* subtle sage border */
-    --input:         154 12% 70%;
+    --border:        228 30% 88%;       /* subtle blue-tinted border */
+    --input:         228 30% 88%;
     --ring:          210 40% 51%;       /* #5088B8 Stitch blue */
     --radius:        0.5rem;
   }
@@ -80,7 +80,7 @@
 
   /* Frosted glass header */
   .surface-glass {
-    background: rgba(200, 216, 209, 0.90);
+    background: rgba(244, 246, 254, 0.90);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid hsl(var(--border));
