@@ -5,7 +5,77 @@ import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 import { useState } from "react";
 import type { Scan } from "@shared/schema";
 
+// ── Clothing SVG illustrations ────────────────────────────────────────────────
+const ClothingIcons: Record<string, JSX.Element> = {
+  shirt: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+      <path d="M14 4 L8 10 L4 8 L2 18 L8 17 L8 36 L32 36 L32 17 L38 18 L36 8 L32 10 L26 4 Q23 8 20 8 Q17 8 14 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  pants: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+      <path d="M6 4 L34 4 L34 10 L26 10 L26 36 L20 36 L20 18 L20 36 L14 36 L14 10 L6 10 Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  dress: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+      <path d="M15 4 Q20 8 25 4 L30 12 L26 14 L30 36 L10 36 L14 14 L10 12 Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  shoes: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+      <path d="M4 28 L4 20 Q4 14 10 14 L18 14 L18 20 L28 20 Q36 20 36 26 L36 28 L16 28 Q12 28 12 32 L4 32 Q4 30 4 28Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+    </svg>
+  ),
+  bag: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+      <rect x="6" y="14" width="28" height="22" rx="3" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+      <path d="M14 14 Q14 6 20 6 Q26 6 26 14" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+      <line x1="6" y1="22" x2="34" y2="22" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  jacket: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+      <path d="M14 4 L8 10 L4 8 L2 20 L8 19 L8 36 L32 36 L32 19 L38 20 L36 8 L32 10 L26 4 Q23 9 20 9 Q17 9 14 4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+      <line x1="20" y1="9" x2="20" y2="36" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  skirt: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+      <path d="M10 8 L30 8 L36 36 L4 36 Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none"/>
+      <line x1="8" y1="14" x2="32" y2="14" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+  accessory: (
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+      <circle cx="20" cy="20" r="10" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+      <circle cx="20" cy="20" r="4" stroke="currentColor" strokeWidth="1.4" fill="none"/>
+      <line x1="10" y1="10" x2="16" y2="16" stroke="currentColor" strokeWidth="1.4"/>
+      <line x1="30" y1="10" x2="24" y2="16" stroke="currentColor" strokeWidth="1.4"/>
+      <line x1="10" y1="30" x2="16" y2="24" stroke="currentColor" strokeWidth="1.4"/>
+      <line x1="30" y1="30" x2="24" y2="24" stroke="currentColor" strokeWidth="1.4"/>
+    </svg>
+  ),
+};
+
+/** Pick the best icon based on the product name */
+function iconForProduct(name: string): keyof typeof ClothingIcons {
+  const n = name.toLowerCase();
+  if (/dress|gown|romper|jumpsuit|overall/.test(n)) return "dress";
+  if (/skirt/.test(n)) return "skirt";
+  if (/jacket|blazer|coat|hoodie|cardigan|sweater|knit|pullover|zip|anorak|parka|windbreaker/.test(n)) return "jacket";
+  if (/shirt|tee|t-shirt|top|blouse|cami|tank|crop|polo|henley/.test(n)) return "shirt";
+  if (/pant|trouser|jean|denim|cargo|chino|short|legging|jogger/.test(n)) return "pants";
+  if (/shoe|sneaker|boot|heel|loafer|flat|sandal|mule|clog|oxford|trainer|pump/.test(n)) return "shoes";
+  if (/bag|tote|purse|clutch|backpack|pouch|wallet|satchel/.test(n)) return "bag";
+  return "accessory";
+}
+
 function ProductCard({ product }: { product: any }) {
+  const [imgError, setImgError] = useState(false);
+  const hasImage = product.image && product.image.length > 0 && !imgError;
+  const icon = iconForProduct(product.name);
+
   return (
     <div
       className="rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/40 transition-colors group cursor-pointer"
@@ -16,10 +86,19 @@ function ProductCard({ product }: { product: any }) {
           {product.match}%
         </span>
       </div>
-      <div
-        className="aspect-[3/4] bg-cover bg-top bg-muted group-hover:scale-[1.02] transition-transform duration-500"
-        style={{ backgroundImage: `url('${product.image}')` }}
-      />
+      {hasImage ? (
+        <div
+          className="aspect-[3/4] bg-cover bg-top bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+          style={{ backgroundImage: `url('${product.image}')` }}
+        >
+          {/* hidden img to detect load errors */}
+          <img src={product.image} onError={() => setImgError(true)} className="hidden" alt="" />
+        </div>
+      ) : (
+        <div className="aspect-[3/4] bg-muted flex items-center justify-center text-foreground/30 group-hover:text-primary/50 transition-colors">
+          {ClothingIcons[icon]}
+        </div>
+      )}
       <div className="p-2">
         <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">{product.retailer}</p>
         <p className="text-xs font-semibold text-foreground leading-tight mb-0.5">{product.name}</p>
