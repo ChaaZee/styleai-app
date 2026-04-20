@@ -3,8 +3,29 @@ import type { Server } from "http";
 import { storage, initDB } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
+import cors from "cors";
 
-const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
+// ── Rate limiter: 10 analysis requests per IP per minute ─────────────────────
+const analyzeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests — please wait a moment before trying again." },
+});
+
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const upload = multer({
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, WebP, and GIF images are allowed."));
+    }
+  },
+});
 
 // Mock product results for MVP (replace with Skimlinks affiliate API)
 
@@ -764,7 +785,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   await initDB();
 
   // Analyze outfit image with Gemini Flash
-  app.post("/api/analyze", upload.single("image"), async (req, res) => {
+  app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res) => {
     try {
       const file = req.file;
       if (!file) return res.status(400).json({ error: "No image provided" });
@@ -889,7 +910,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       res.json({ scanId: scan.id });
     } catch (err: any) {
       console.error("Analyze error:", err);
-      res.status(500).json({ error: err.message || "Analysis failed" });
+      res.status(500).json({ error: process.env.NODE_ENV === "production" ? "Analysis failed. Please try again." : err.message || "Analysis failed" });
     }
   });
 
@@ -924,7 +945,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const item = await storage.createWardrobeItem({ name, category, brand, color, aesthetic, imageData, source: "manual" });
       res.json(item);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      console.error("Wardrobe error:", err);
+      res.status(500).json({ error: process.env.NODE_ENV === "production" ? "Failed to save item. Please try again." : err.message });
     }
   });
 

@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -11,6 +12,15 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// CORS — allow only the production domain and localhost in dev
+app.use(cors({
+  origin: process.env.NODE_ENV === "production"
+    ? ["https://styleai-app-i25n.onrender.com"]
+    : true, // allow all in dev
+  methods: ["GET", "POST", "DELETE"],
+  allowedHeaders: ["Content-Type", "x-device-id"],
+}));
 
 app.use(
   express.json({
