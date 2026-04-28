@@ -28,10 +28,9 @@ function ProfileInitial() {
   return <span className="text-xs font-medium text-muted-foreground">A</span>;
 }
 
-function TopBar() {
+function TopBar({ theme, toggleTheme }: { theme: string; toggleTheme: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [theme, toggleTheme] = useTheme();
 
   // Close on outside click
   useEffect(() => {
@@ -159,6 +158,7 @@ function AppContent() {
   // Redirect new users to style quiz on first visit
   const [showQuiz] = useState(() => !localStorage.getItem("stitch_quiz_done"));
   const [, setLocation] = useLocation();
+  const [theme, toggleTheme] = useTheme();
 
   useEffect(() => {
     if (showQuiz) setLocation("/quiz");
@@ -168,7 +168,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {!isQuizRoute && <TopBar />}
+      {!isQuizRoute && <TopBar theme={theme} toggleTheme={toggleTheme} />}
       <main className={isQuizRoute ? "flex-1" : "flex-1 pb-20 sm:pb-24"}>
         <Switch>
           <Route path="/quiz" component={StyleQuizPage} />
@@ -254,18 +254,6 @@ function LoadingScreen({ onDone }: { onDone: () => void }) {
 
 export default function App() {
   const [loading, setLoading] = useState(true);
-
-  // Apply saved theme before first paint (also handled by useTheme inside TopBar,
-  // but doing it here avoids a flash for the loading screen)
-  useEffect(() => {
-    const saved = localStorage.getItem("stitch_theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    if (saved === "dark" || (!saved && prefersDark)) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
