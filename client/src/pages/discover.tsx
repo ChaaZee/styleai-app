@@ -553,7 +553,19 @@ function DiscoverCard({
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+function getTopAesthetic(): string | null {
+  try {
+    const raw = localStorage.getItem("stitch_profile");
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p.aesthetics?.length) return p.aesthetics[0];
+    }
+  } catch {}
+  return null;
+}
+
 export default function DiscoverPage() {
+  const [topAesthetic] = useState<string | null>(getTopAesthetic);
   const [cards] = useState<OutfitCard[]>(() => shuffled(OUTFITS));
   const [likes, setLikes] = useState<Record<string, boolean>>(() => {
     try {
@@ -597,6 +609,26 @@ export default function DiscoverPage() {
         height: "calc(100svh - 48px - 64px)", // subtract TopBar + NavBar
       }}
     >
+      {/* Style DNA banner — only shown if quiz completed */}
+      {topAesthetic && (
+        <div
+          className="w-full flex-shrink-0 flex items-center justify-center px-5"
+          style={{ scrollSnapAlign: "start", minHeight: "calc(100svh - 48px - 64px)" }}
+        >
+          <div className="text-center max-w-xs">
+            <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">Your Style</p>
+            <h2 className="font-display text-4xl text-foreground mb-2">{topAesthetic}</h2>
+            <p className="text-sm text-muted-foreground mb-6">Scroll down to explore fits curated for your vibe</p>
+            <div className="flex items-center justify-center gap-1 text-muted-foreground/60">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M12 5v14M5 12l7 7 7-7"/>
+              </svg>
+              <span className="text-xs">Swipe</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {cards.map((card) => (
         <DiscoverCard
           key={card.id}

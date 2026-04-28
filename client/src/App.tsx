@@ -12,6 +12,7 @@ import HistoryPage from "@/pages/history";
 import ProfilePage from "@/pages/profile";
 import DiscoverPage from "@/pages/discover";
 import HowItWorksPage from "@/pages/howItWorks";
+import StyleQuizPage from "@/pages/styleQuiz";
 import NavBar from "@/components/NavBar";
 import { Link } from "wouter";
 
@@ -127,11 +128,22 @@ function TopBar() {
 }
 
 function AppContent() {
+  // Redirect new users to style quiz on first visit
+  const [showQuiz] = useState(() => !localStorage.getItem("stitch_quiz_done"));
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (showQuiz) setLocation("/quiz");
+  }, [showQuiz, setLocation]);
+
+  const isQuizRoute = typeof window !== "undefined" && window.location.hash === "#/quiz";
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <TopBar />
-      <main className="flex-1 pb-20 sm:pb-24">
+      {!isQuizRoute && <TopBar />}
+      <main className={isQuizRoute ? "flex-1" : "flex-1 pb-20 sm:pb-24"}>
         <Switch>
+          <Route path="/quiz" component={StyleQuizPage} />
           <Route path="/" component={HomePage} />
           <Route path="/scan" component={ScanPage} />
           <Route path="/results/:id" component={ResultsPage} />
@@ -145,7 +157,7 @@ function AppContent() {
           </Route>
         </Switch>
       </main>
-      <NavBar />
+      {!isQuizRoute && <NavBar />}
     </div>
   );
 }

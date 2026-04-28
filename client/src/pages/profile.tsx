@@ -255,6 +255,65 @@ const EMPTY: Profile = {
   hips: "", shoulders: "", sleeve: "", inseam: "", thigh: "", weight: "",
 };
 
+// ── Style DNA Section ────────────────────────────────────────────────────────
+function StyleDNASection() {
+  const [aesthetics, setAesthetics] = useState<string[]>([]);
+  const [hasQuiz, setHasQuiz] = useState(false);
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("stitch_profile");
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p.aesthetics?.length) {
+          setAesthetics(p.aesthetics);
+          setHasQuiz(true);
+        }
+      }
+    } catch {}
+  }, []);
+
+  const retakeQuiz = () => {
+    localStorage.removeItem("stitch_quiz_done");
+    setLocation("/quiz");
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your Style DNA</p>
+        <button
+          onClick={retakeQuiz}
+          className="text-xs text-primary hover:text-primary/80 transition-colors"
+        >
+          {hasQuiz ? "Retake" : "Take quiz"}
+        </button>
+      </div>
+      {hasQuiz ? (
+        <div className="flex flex-wrap gap-2">
+          {aesthetics.map((a, i) => (
+            <span
+              key={a}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+                i === 0
+                  ? "bg-primary text-white border-primary"
+                  : "bg-primary/10 text-primary border-primary/30"
+              }`}
+            >
+              {i === 0 && <span className="mr-1">✦</span>}{a}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Take the style quiz to discover your aesthetic.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -332,6 +391,9 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Style DNA */}
+      <StyleDNASection />
 
       {/* Measurements */}
       <div className="space-y-2 mb-4">
