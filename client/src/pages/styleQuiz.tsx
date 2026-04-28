@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { initVectorFromQuiz } from "@/lib/styleVector";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Option {
@@ -144,6 +145,8 @@ export default function StyleQuizPage() {
         quizCompleted: true,
       }));
       localStorage.setItem("stitch_quiz_done", "1");
+      // Seed the style preference vector from quiz results
+      initVectorFromQuiz(topAesthetics);
 
       setLeaving(true);
       setTimeout(() => setLocation("/"), 400);

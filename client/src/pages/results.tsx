@@ -2,8 +2,9 @@ import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { X, ShoppingBag, ExternalLink } from "lucide-react";
 import { depopUrl, isDepopAesthetic } from "@/lib/depop";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Scan } from "@shared/schema";
+import { onResultViewed, onResultSaved } from "@/lib/styleVector";
 
 // ── Clothing SVG illustrations ────────────────────────────────────────────────
 const ClothingIcons: Record<string, JSX.Element> = {
@@ -135,6 +136,22 @@ export default function ResultsPage() {
       return res.json();
     },
   });
+
+  // Passive signal: viewed for > 2s → mild boost to this outfit's aesthetic
+  const vectorFiredRef = useRef(false);
+  useEffect(() => {
+    if (!scan || vectorFiredRef.current) return;
+    const timer = setTimeout(() => {
+      vectorFiredRef.current = true;
+      const styleBreakdown: { label: string }[] = JSON.parse(scan.styleBreakdown || "[]");
+      const aesthetics = [
+        scan.aesthetic,
+        ...styleBreakdown.map((s) => s.label),
+      ].filter(Boolean) as string[];
+      onResultViewed(aesthetics);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [scan]);
 
   if (isLoading) {
     return (

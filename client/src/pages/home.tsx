@@ -1,4 +1,6 @@
 import { useLocation } from "wouter";
+import { useState } from "react";
+import { rankByVector, getTopAesthetics } from "@/lib/styleVector";
 
 // ── Clothing SVG illustrations (same set as discover) ───────────────────────
 const Icons: Record<string, JSX.Element> = {
@@ -104,19 +106,41 @@ const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Tre
 export default function HomePage() {
   const [, setLocation] = useLocation();
 
+  // Rank feed items by style vector affinity on mount
+  const [feedItems] = useState<FeedItem[]>(() => rankByVector(FEED_ITEMS));
+
+  // Personalised greeting
+  const [topAesthetic] = useState<string | null>(() => {
+    const tops = getTopAesthetics(1);
+    // Only show if vector has been seeded (i.e. quiz done)
+    if (!localStorage.getItem("stitch_quiz_done")) return null;
+    return tops[0] ?? null;
+  });
+
+  // Time-based greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  // Dynamic chips — put user's top aesthetic first if available
+  const chips = topAesthetic
+    ? ["For You", topAesthetic, ...CHIPS.filter(c => c !== "For You" && c !== topAesthetic).slice(0, 4)]
+    : CHIPS;
+
   return (
     <div className="max-w-4xl mx-auto fade-up">
       {/* Greeting */}
       <div className="px-5 sm:px-8 pt-5 sm:pt-7 pb-3 flex items-center justify-between">
         <div>
-          <p className="text-xs text-muted-foreground">Good morning</p>
-          <h1 className="font-display text-2xl sm:text-3xl text-foreground leading-tight">Your Feed</h1>
+          <p className="text-xs text-muted-foreground">{greeting}</p>
+          <h1 className="font-display text-2xl sm:text-3xl text-foreground leading-tight">
+            {topAesthetic ? `Your ${topAesthetic} Feed` : "Your Feed"}
+          </h1>
         </div>
       </div>
 
       {/* Aesthetic chips */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 sm:px-8 pb-3">
-        {CHIPS.map((c, i) => (
+        {chips.map((c, i) => (
           <button
             key={c}
             className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${
@@ -164,7 +188,7 @@ export default function HomePage() {
 
       {/* Masonry grid — 2 cols mobile, 3 cols on md+ */}
       <div className="px-5 sm:px-8 columns-2 md:columns-3 gap-3 space-y-0 pb-6">
-        {FEED_ITEMS.map((item) => (
+        {feedItems.map((item) => (
           <a
             key={item.id}
             href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}

@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { depopUrl, isDepopAesthetic } from "@/lib/depop";
+import { onLike, onUnlike, rankByVector } from "@/lib/styleVector";
 
 // ── Clothing SVG illustrations ────────────────────────────────────────────────
 const ClothingIcons: Record<string, JSX.Element> = {
@@ -566,7 +567,13 @@ function getTopAesthetic(): string | null {
 
 export default function DiscoverPage() {
   const [topAesthetic] = useState<string | null>(getTopAesthetic);
-  const [cards] = useState<OutfitCard[]>(() => shuffled(OUTFITS));
+  // Rank by vector affinity on mount, then shuffle within score tiers for variety
+  const [cards] = useState<OutfitCard[]>(() => {
+    const ranked = rankByVector(OUTFITS);
+    // Shuffle within top-half vs bottom-half to keep some variety
+    const mid = Math.ceil(ranked.length / 2);
+    return [...shuffled(ranked.slice(0, mid)), ...shuffled(ranked.slice(mid))];
+  });
   const [likes, setLikes] = useState<Record<string, boolean>>(() => {
     try {
       const raw = localStorage.getItem("stitch_likes");
@@ -581,6 +588,12 @@ export default function DiscoverPage() {
   const toggleLike = useCallback((card: OutfitCard) => {
     setLikes((prev) => {
       const next = { ...prev, [card.id]: !prev[card.id] };
+      // Update style vector
+      if (next[card.id]) {
+        onLike(card.aesthetic, card.tags);
+      } else {
+        onUnlike(card.aesthetic, card.tags);
+      }
       try {
         const raw = localStorage.getItem("stitch_likes");
         const arr: LikedItem[] = raw ? JSON.parse(raw) : [];
