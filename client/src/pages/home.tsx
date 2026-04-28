@@ -147,32 +147,33 @@ export default function HomePage() {
         <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">↑ 24 new</span>
       </div>
 
-      {/* Masonry grid — 2 cols mobile, 3 cols on md+ */}
-      <div className="px-5 sm:px-8 columns-2 md:columns-3 gap-3 space-y-0 pb-6">
+      {/* Grid — 2 cols, equal height rows, seamless with page background */}
+      <div className="px-5 sm:px-8 grid grid-cols-2 md:grid-cols-3 gap-px pb-6" style={{ background: "hsl(var(--border))" }}>
         {feedItems.map((item) => (
           <a
             key={item.id}
             href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}
             target="_blank"
             rel="noopener noreferrer"
-            className="break-inside-avoid mb-3 rounded-xl border border-border bg-card overflow-hidden relative hover:border-primary/30 transition-colors cursor-pointer block group"
+            className="relative bg-background hover:bg-muted/40 transition-colors cursor-pointer block group"
           >
             {item.tag === "Match" && (
-              <div className="absolute top-2 left-2 z-10 text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-medium">Match</div>
+              <div className="absolute top-2.5 left-2.5 z-10 text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-medium">Match</div>
             )}
             {item.tag && item.tag !== "Match" && (
-              <div className="absolute top-2 left-2 z-10 text-[10px] px-2 py-0.5 rounded-full bg-foreground text-background font-medium">{item.tag}</div>
+              <div className="absolute top-2.5 left-2.5 z-10 text-[10px] px-2 py-0.5 rounded-full bg-foreground text-background font-medium">{item.tag}</div>
             )}
-            {/* Illustration area */}
-            <div className="w-full flex items-center justify-center py-8 text-foreground/40 group-hover:text-primary transition-colors">
+            {/* Illustration */}
+            <div className="w-full flex items-center justify-center py-10 text-foreground/30 group-hover:text-primary transition-colors">
               {Icons[item.icon]}
             </div>
-            <div className="p-2.5 border-t border-border">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mb-0.5">{item.aesthetic}</p>
-              <p className="text-xs text-foreground font-medium leading-snug mb-1.5">{item.label}</p>
+            {/* Info */}
+            <div className="px-3 pb-4">
+              <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">{item.aesthetic}</p>
+              <p className="text-xs text-foreground font-medium leading-snug mb-2">{item.label}</p>
               <div className="flex items-center justify-between">
                 <DepopBadge />
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground group-hover:text-primary transition-colors">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/50 group-hover:text-primary transition-colors flex-shrink-0">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                   <polyline points="15 3 21 3 21 9"/>
                   <line x1="10" y1="14" x2="21" y2="3"/>
