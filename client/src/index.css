@@ -5,6 +5,29 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Dark theme variables ── */
+  .dark {
+    --background:    228 20% 8%;        /* #0E0F16 deep navy-black */
+    --foreground:    220 20% 92%;       /* near-white, cool tint */
+    --card:          228 18% 12%;       /* #191B26 slightly lighter surface */
+    --card-foreground: 220 20% 92%;
+    --popover:       228 18% 12%;
+    --popover-foreground: 220 20% 92%;
+    --primary:       210 50% 62%;       /* #6BA8D4 lighter Stitch blue for dark bg */
+    --primary-foreground: 228 20% 8%;
+    --secondary:     228 18% 17%;       /* muted surface */
+    --secondary-foreground: 220 15% 65%;
+    --muted:         228 16% 15%;       /* subtle background */
+    --muted-foreground: 220 12% 55%;
+    --accent:        210 50% 62%;
+    --accent-foreground: 228 20% 8%;
+    --destructive:   0 65% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border:        228 18% 20%;       /* subtle dark border */
+    --input:         228 18% 20%;
+    --ring:          210 50% 62%;
+  }
+
   :root {
     /* Stitch — White Rain: cool blue-white background */
     --background:    248 100% 99%;      /* #F8F7FF */
@@ -86,6 +109,10 @@
     border-bottom: 1px solid hsl(var(--border));
   }
 
+  .dark .surface-glass {
+    background: rgba(14, 14, 22, 0.88);
+  }
+
   /* Scan line animation */
   .scan-pulse {
     animation: scan-line 2s ease-in-out infinite;
@@ -109,9 +136,20 @@
   /* Skeleton shimmer — light mode */
   .shimmer {
     background: linear-gradient(90deg,
-      hsl(36 12% 93%) 0%,
-      hsl(36 12% 97%) 50%,
-      hsl(36 12% 93%) 100%
+      hsl(228 16% 91%) 0%,
+      hsl(228 16% 96%) 50%,
+      hsl(228 16% 91%) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+
+  /* Skeleton shimmer — dark mode */
+  .dark .shimmer {
+    background: linear-gradient(90deg,
+      hsl(228 16% 14%) 0%,
+      hsl(228 16% 19%) 50%,
+      hsl(228 16% 14%) 100%
     );
     background-size: 200% 100%;
     animation: shimmer 1.4s ease infinite;
