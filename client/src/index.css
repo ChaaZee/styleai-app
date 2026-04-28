@@ -5,29 +5,6 @@
 @tailwind utilities;
 
 @layer base {
-  /* ── Dark theme variables ── */
-  .dark {
-    --background:    228 20% 8%;        /* #0E0F16 deep navy-black */
-    --foreground:    220 20% 92%;       /* near-white, cool tint */
-    --card:          228 18% 12%;       /* #191B26 slightly lighter surface */
-    --card-foreground: 220 20% 92%;
-    --popover:       228 18% 12%;
-    --popover-foreground: 220 20% 92%;
-    --primary:       210 50% 62%;       /* #6BA8D4 lighter Stitch blue for dark bg */
-    --primary-foreground: 228 20% 8%;
-    --secondary:     228 18% 17%;       /* muted surface */
-    --secondary-foreground: 220 15% 65%;
-    --muted:         228 16% 15%;       /* subtle background */
-    --muted-foreground: 220 12% 55%;
-    --accent:        210 50% 62%;
-    --accent-foreground: 228 20% 8%;
-    --destructive:   0 65% 55%;
-    --destructive-foreground: 0 0% 98%;
-    --border:        228 18% 20%;       /* subtle dark border */
-    --input:         228 18% 20%;
-    --ring:          210 50% 62%;
-  }
-
   :root {
     /* Stitch — White Rain: cool blue-white background */
     --background:    248 100% 99%;      /* #F8F7FF */
@@ -50,6 +27,29 @@
     --input:         228 30% 88%;
     --ring:          210 40% 51%;       /* #5088B8 Stitch blue */
     --radius:        0.5rem;
+  }
+
+  /* ── Dark theme — must come AFTER :root to win on specificity ── */
+  .dark {
+    --background:    228 20% 8%;        /* #0E0F16 deep navy-black */
+    --foreground:    220 20% 92%;       /* near-white, cool tint */
+    --card:          228 18% 12%;       /* #191B26 slightly lighter surface */
+    --card-foreground: 220 20% 92%;
+    --popover:       228 18% 12%;
+    --popover-foreground: 220 20% 92%;
+    --primary:       210 50% 62%;       /* #6BA8D4 lighter Stitch blue for dark bg */
+    --primary-foreground: 228 20% 8%;
+    --secondary:     228 18% 17%;       /* muted surface */
+    --secondary-foreground: 220 15% 65%;
+    --muted:         228 16% 15%;       /* subtle background */
+    --muted-foreground: 220 12% 55%;
+    --accent:        210 50% 62%;
+    --accent-foreground: 228 20% 8%;
+    --destructive:   0 65% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border:        228 18% 20%;       /* subtle dark border */
+    --input:         228 18% 20%;
+    --ring:          210 50% 62%;
   }
 }
 
