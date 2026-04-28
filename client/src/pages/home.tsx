@@ -88,19 +88,6 @@ const FEED_ITEMS: FeedItem[] = [
   { id: 6, label: "Silk Wrap Dress",         icon: "dress",     query: "silk wrap dress elegant",             aesthetic: "Romantic" },
 ];
 
-interface CompleteItem {
-  name: string;
-  icon: IconKey;
-  query: string;
-}
-
-const COMPLETE_LOOK: CompleteItem[] = [
-  { name: "Linen Trousers",  icon: "pants",  query: "linen trousers wide leg coastal" },
-  { name: "White Sneakers",  icon: "shoes",  query: "white sneakers minimal clean" },
-  { name: "Tote Bag",        icon: "bag",    query: "tote bag minimalist neutral" },
-  { name: "Linen Scarf",     icon: "accessory", query: "linen scarf neutral accessory" },
-];
-
 const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Trending"];
 
 export default function HomePage() {
@@ -152,32 +139,6 @@ export default function HomePage() {
             {c}
           </button>
         ))}
-      </div>
-
-      {/* Complete Your Look */}
-      <div className="px-5 sm:px-8 mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold text-foreground">Complete Your Look</span>
-          <DepopBadge />
-        </div>
-        <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1">
-          {COMPLETE_LOOK.map((item) => (
-            <a
-              key={item.name}
-              href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-shrink-0 w-28 sm:w-36 rounded-xl border border-border bg-card overflow-hidden hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-            >
-              <div className="h-28 sm:h-36 flex items-center justify-center text-foreground/50 group-hover:text-primary transition-colors">
-                {Icons[item.icon]}
-              </div>
-              <div className="p-2 sm:p-3 border-t border-border">
-                <p className="text-xs font-medium text-foreground truncate">{item.name}</p>
-              </div>
-            </a>
-          ))}
-        </div>
       </div>
 
       {/* For You header */}
