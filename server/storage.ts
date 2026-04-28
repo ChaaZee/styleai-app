@@ -4,10 +4,13 @@ import { eq, desc } from "drizzle-orm";
 import {
   scans,
   wardrobeItems,
+  discoverCards,
   type Scan,
   type InsertScan,
   type WardrobeItem,
   type InsertWardrobeItem,
+  type DiscoverCard,
+  type InsertDiscoverCard,
 } from "@shared/schema";
 
 if (!process.env.DATABASE_URL) {
@@ -55,6 +58,21 @@ export async function initDB() {
       added_at TIMESTAMP DEFAULT NOW()
     )
   `;
+
+  await client`
+    CREATE TABLE IF NOT EXISTS discover_cards (
+      id SERIAL PRIMARY KEY,
+      image_url TEXT NOT NULL,
+      aesthetic TEXT NOT NULL,
+      confidence INTEGER NOT NULL DEFAULT 80,
+      style_breakdown TEXT NOT NULL,
+      key_pieces TEXT NOT NULL,
+      color_palette TEXT NOT NULL,
+      tags TEXT NOT NULL,
+      source TEXT DEFAULT 'unsplash',
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
 }
 
 export interface IStorage {
@@ -64,6 +82,10 @@ export interface IStorage {
   createWardrobeItem(item: InsertWardrobeItem): Promise<WardrobeItem>;
   getWardrobeItems(): Promise<WardrobeItem[]>;
   deleteWardrobeItem(id: number): Promise<void>;
+  // Discover
+  getDiscoverCards(): Promise<DiscoverCard[]>;
+  createDiscoverCard(card: InsertDiscoverCard): Promise<DiscoverCard>;
+  discoverCardCount(): Promise<number>;
 }
 
 export const storage: IStorage = {
@@ -90,5 +112,16 @@ export const storage: IStorage = {
   },
   async deleteWardrobeItem(id) {
     await db.delete(wardrobeItems).where(eq(wardrobeItems.id, id));
+  },
+  async getDiscoverCards() {
+    return db.select().from(discoverCards).orderBy(desc(discoverCards.id));
+  },
+  async createDiscoverCard(card) {
+    const [row] = await db.insert(discoverCards).values(card).returning();
+    return row;
+  },
+  async discoverCardCount() {
+    const rows = await db.select().from(discoverCards);
+    return rows.length;
   },
 };

@@ -45,3 +45,25 @@ export const insertWardrobeItemSchema = createInsertSchema(wardrobeItems).omit({
 
 export type InsertWardrobeItem = z.infer<typeof insertWardrobeItemSchema>;
 export type WardrobeItem = typeof wardrobeItems.$inferSelect;
+
+// Discover cards — AI-analyzed outfit images for the discovery feed
+export const discoverCards = pgTable("discover_cards", {
+  id: serial("id").primaryKey(),
+  imageUrl: text("image_url").notNull(),
+  aesthetic: text("aesthetic").notNull(),
+  confidence: integer("confidence").notNull().default(80),
+  styleBreakdown: text("style_breakdown").notNull(), // JSON: [{label, pct}]
+  keyPieces: text("key_pieces").notNull(),            // JSON: string[]
+  colorPalette: text("color_palette").notNull(),      // JSON: string[] hex codes
+  tags: text("tags").notNull(),                       // JSON: string[]
+  source: text("source").default("unsplash"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDiscoverCardSchema = createInsertSchema(discoverCards).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertDiscoverCard = z.infer<typeof insertDiscoverCardSchema>;
+export type DiscoverCard = typeof discoverCards.$inferSelect;

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 import { onLike, onUnlike, rankByVector } from "@/lib/styleVector";
 
@@ -171,9 +171,12 @@ interface OutfitCard {
   imageUrl: string;
   aesthetic: string;
   secondaryAesthetic?: string;
-  description: string;
+  description?: string;
+  confidence?: number;
+  styleBreakdown?: { label: string; pct: number }[];
   palette: string[];
   tags: string[];
+  keyPieces?: string[];
 }
 
 interface LikedItem {
@@ -500,8 +503,8 @@ function DiscoverCard({
           </div>
         </div>
 
-        {/* Shop the Look — clothing items with Depop links */}
-        {CARD_ITEMS[card.id] && CARD_ITEMS[card.id].length > 0 && (
+        {/* Shop the Look — static items OR key pieces from AI analysis */}
+        {(CARD_ITEMS[card.id]?.length > 0 || (card.keyPieces && card.keyPieces.length > 0)) && (
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em]">Shop the Look</p>
@@ -513,7 +516,16 @@ function DiscoverCard({
               </div>
             </div>
             <div className="flex gap-2">
-              {CARD_ITEMS[card.id].map((item) => (
+              {(CARD_ITEMS[card.id] || (card.keyPieces || []).map(piece => ({
+                label: piece,
+                icon: (piece.toLowerCase().includes("pant") || piece.toLowerCase().includes("jean") || piece.toLowerCase().includes("trouser")) ? "pants"
+                  : (piece.toLowerCase().includes("shoe") || piece.toLowerCase().includes("sneaker") || piece.toLowerCase().includes("boot")) ? "shoes"
+                  : (piece.toLowerCase().includes("bag") || piece.toLowerCase().includes("tote")) ? "bag"
+                  : (piece.toLowerCase().includes("dress") || piece.toLowerCase().includes("skirt")) ? "dress"
+                  : (piece.toLowerCase().includes("jacket") || piece.toLowerCase().includes("coat") || piece.toLowerCase().includes("blazer")) ? "jacket"
+                  : "shirt",
+                query: `${piece} ${card.aesthetic} fashion`,
+              } as { label: string; icon: string; query: string }))).map((item) => (
                 <a
                   key={item.label}
                   href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}
@@ -567,13 +579,38 @@ function getTopAesthetic(): string | null {
 
 export default function DiscoverPage() {
   const [topAesthetic] = useState<string | null>(getTopAesthetic);
-  // Rank by vector affinity on mount, then shuffle within score tiers for variety
-  const [cards] = useState<OutfitCard[]>(() => {
+  const [cards, setCards] = useState<OutfitCard[]>(() => {
+    // Start with ranked static fallback while API loads
     const ranked = rankByVector(OUTFITS);
-    // Shuffle within top-half vs bottom-half to keep some variety
     const mid = Math.ceil(ranked.length / 2);
     return [...shuffled(ranked.slice(0, mid)), ...shuffled(ranked.slice(mid))];
   });
+  const [loadingFeed, setLoadingFeed] = useState(true);
+
+  // Fetch real AI-analyzed cards from the server
+  useEffect(() => {
+    fetch("/api/discover")
+      .then(r => r.json())
+      .then((data: any[]) => {
+        if (!Array.isArray(data) || data.length === 0) return;
+        // Map DB rows to OutfitCard shape
+        const apiCards: OutfitCard[] = data.map(row => ({
+          id: String(row.id),
+          imageUrl: row.image_url || row.imageUrl,
+          aesthetic: row.aesthetic,
+          confidence: row.confidence,
+          styleBreakdown: (() => { try { return JSON.parse(row.style_breakdown || row.styleBreakdown || "[]"); } catch { return []; } })(),
+          palette: (() => { try { return JSON.parse(row.color_palette || row.colorPalette || "[]"); } catch { return []; } })(),
+          tags: (() => { try { return JSON.parse(row.tags || "[]"); } catch { return []; } })(),
+          keyPieces: (() => { try { return JSON.parse(row.key_pieces || row.keyPieces || "[]"); } catch { return []; } })(),
+        }));
+        const ranked = rankByVector(apiCards);
+        const mid = Math.ceil(ranked.length / 2);
+        setCards([...shuffled(ranked.slice(0, mid)), ...shuffled(ranked.slice(mid))]);
+      })
+      .catch(() => { /* keep fallback */ })
+      .finally(() => setLoadingFeed(false));
+  }, []);
   const [likes, setLikes] = useState<Record<string, boolean>>(() => {
     try {
       const raw = localStorage.getItem("stitch_likes");

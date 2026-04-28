@@ -955,4 +955,142 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     await storage.deleteWardrobeItem(Number(req.params.id));
     res.json({ ok: true });
   });
+
+  // ── Discover feed ─────────────────────────────────────────────────────────────────
+
+  // GET /api/discover — returns stored discover cards
+  app.get("/api/discover", async (_req, res) => {
+    try {
+      const cards = await storage.getDiscoverCards();
+      res.json(cards);
+    } catch (err: any) {
+      console.error("Discover fetch error:", err);
+      res.status(500).json({ error: "Failed to fetch discover feed" });
+    }
+  });
+
+  // POST /api/discover/seed — fetches Unsplash outfit images, runs Gemini, stores cards
+  // Idempotent: skips seed if cards already exist
+  app.post("/api/discover/seed", async (_req, res) => {
+    try {
+      const existing = await storage.discoverCardCount();
+      if (existing >= 12) {
+        return res.json({ ok: true, skipped: true, count: existing });
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: "Gemini API key not configured" });
+
+      // Curated Unsplash outfit image URLs — diverse aesthetics, real fashion photos
+      const SEED_IMAGES: { url: string; hint: string }[] = [
+        { url: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=800&q=80", hint: "Dark Academia" },
+        { url: "https://images.unsplash.com/photo-1594938298603-c8148c4b4057?w=800&q=80", hint: "Clean Girl" },
+        { url: "https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=800&q=80", hint: "Streetwear" },
+        { url: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&q=80", hint: "Minimalist" },
+        { url: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800&q=80", hint: "Romantic" },
+        { url: "https://images.unsplash.com/photo-1600950207944-0d63e8edbc3f?w=800&q=80", hint: "Cottagecore" },
+        { url: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800&q=80", hint: "Athleisure" },
+        { url: "https://images.unsplash.com/photo-1556906781-9a412961a28c?w=800&q=80", hint: "Streetwear" },
+        { url: "https://images.unsplash.com/photo-1583744946564-b52d01e7f922?w=800&q=80", hint: "Old Money" },
+        { url: "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=800&q=80", hint: "Boho" },
+        { url: "https://images.unsplash.com/photo-1554412933-514a83d2f3c8?w=800&q=80", hint: "Y2K" },
+        { url: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&q=80", hint: "Coastal" },
+        { url: "https://images.unsplash.com/photo-1491553895911-0055eca6402d?w=800&q=80", hint: "Athleisure" },
+        { url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80", hint: "Business Casual" },
+        { url: "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=800&q=80", hint: "Minimalist" },
+        { url: "https://images.unsplash.com/photo-1548544149-4835e62ee5b3?w=800&q=80", hint: "Preppy" },
+      ];
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const results: any[] = [];
+      const errors: string[] = [];
+
+      for (const { url, hint } of SEED_IMAGES) {
+        try {
+          // Fetch image from Unsplash
+          const imgRes = await fetch(url);
+          if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status}`);
+          const buffer = Buffer.from(await imgRes.arrayBuffer());
+          const imageBase64 = buffer.toString("base64");
+          const mimeType = "image/jpeg";
+
+          // Pass 1: garment detection
+          const detModel = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash-lite",
+            systemInstruction: GARMENT_SYSTEM_INSTRUCTION,
+            generationConfig: { responseMimeType: "application/json", responseSchema: GARMENT_SCHEMA as any, temperature: 0.0 },
+          });
+          const det = await detModel.generateContent([
+            { inlineData: { data: imageBase64, mimeType } },
+            "List every visible garment and accessory. Be specific.",
+          ]);
+          const detJson = det.response.text().match(/\{[\s\S]*\}/);
+          if (!detJson) throw new Error("garment parse failed");
+          const garmentData = JSON.parse(detJson[0]);
+
+          const garmentSummary = [
+            `Detected garments:`,
+            ...garmentData.garments.map((g: any) =>
+              `- ${g.item}: ${g.color}, ${g.fabric} fabric, ${g.fit} fit${
+                g.details !== "none" ? `, details: ${g.details}` : ""
+              }`
+            ),
+            `Overall palette: ${garmentData.overallPalette}`,
+            `Layering: ${garmentData.layering}`,
+          ].join("\n");
+
+          // Pass 2: aesthetic classification
+          const clsModel = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            systemInstruction: SYSTEM_INSTRUCTION,
+            generationConfig: { responseMimeType: "application/json", responseSchema: ANALYSIS_SCHEMA as any, temperature: 0.0 },
+          });
+          const cls = await clsModel.generateContent([
+            { inlineData: { data: imageBase64, mimeType } },
+            `Garment inventory:\n${garmentSummary}\n\nClassify the aesthetic. Hint: likely ${hint}.`,
+          ]);
+          const clsJson = cls.response.text().match(/\{[\s\S]*\}/);
+          if (!clsJson) throw new Error("aesthetic parse failed");
+          const analysis = JSON.parse(clsJson[0]);
+
+          // Extract palette from colorPalette field
+          const palette: string[] = Array.isArray(analysis.colorPalette)
+            ? analysis.colorPalette.map((c: any) => (typeof c === "string" ? c : c.hex || c.color || "#888"))
+            : [];
+
+          const styleBreakdown: { label: string; pct: number }[] = Array.isArray(analysis.styleBreakdown)
+            ? analysis.styleBreakdown
+            : [];
+
+          const tags: string[] = Array.isArray(analysis.occasions)
+            ? analysis.occasions.slice(0, 3)
+            : [];
+
+          const card = await storage.createDiscoverCard({
+            imageUrl: url,
+            aesthetic: analysis.aesthetic || hint,
+            confidence: analysis.confidence || 80,
+            styleBreakdown: JSON.stringify(styleBreakdown),
+            keyPieces: JSON.stringify(analysis.keyPieces || []),
+            colorPalette: JSON.stringify(palette),
+            tags: JSON.stringify(tags),
+            source: "unsplash",
+          });
+
+          results.push({ id: card.id, aesthetic: card.aesthetic });
+
+          // Small delay between requests to avoid rate limits
+          await new Promise(r => setTimeout(r, 500));
+        } catch (err: any) {
+          console.error(`Seed error for ${url}:`, err.message);
+          errors.push(`${hint}: ${err.message}`);
+        }
+      }
+
+      res.json({ ok: true, seeded: results.length, errors, cards: results });
+    } catch (err: any) {
+      console.error("Seed error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
