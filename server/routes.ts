@@ -836,13 +836,14 @@ async function fetchSubredditImages(
 }
 
 // Core analysis + store function (module-level)
+// Returns null if the image is not a real outfit photo (meme, product shot, no person, etc.)
 async function analyzeAndStore(
   imageUrl: string,
   postUrl: string,
   subreddit: string,
   aesthetic: string,
   genAI: any
-) {
+): Promise<any | null> {
   const imgRes = await fetch(imageUrl, {
     headers: { "User-Agent": "StitchApp/1.0" },
   });
@@ -851,6 +852,27 @@ async function analyzeAndStore(
   const mimeType = contentType.startsWith("image/") ? contentType.split(";")[0] : "image/jpeg";
   const buffer = Buffer.from(await imgRes.arrayBuffer());
   const imageBase64 = buffer.toString("base64");
+
+  // Gate check: reject memes, product shots, illustrations, non-outfit images
+  const gateModel = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash-lite",
+    generationConfig: { responseMimeType: "application/json", temperature: 0.0 },
+  });
+  const gateResult = await gateModel.generateContent([
+    { inlineData: { data: imageBase64, mimeType } },
+    `Does this image show a real person or people wearing actual clothing/an outfit? Reply with JSON only: {"pass": true/false, "reason": "brief reason"}. Reject if: meme, text overlay, illustration/drawing, product-only shot (no person), screenshot, collage without outfit focus, or no visible clothing on a real person.`,
+  ]);
+  const gateText = gateResult.response.text();
+  const gateJson = gateText.match(/\{[\s\S]*?\}/);
+  if (gateJson) {
+    try {
+      const gate = JSON.parse(gateJson[0]);
+      if (!gate.pass) {
+        console.log(`[seed] Skipping ${imageUrl} — gate rejected: ${gate.reason}`);
+        return null;
+      }
+    } catch {}
+  }
 
   // Pass 1: garment detection
   const detModel = genAI.getGenerativeModel({
@@ -930,8 +952,8 @@ export async function triggerSeedIfEmpty() {
         const posts = await fetchSubredditImages(sub, 2, "month");
         for (const post of posts) {
           try {
-            await analyzeAndStore(post.imageUrl, post.postUrl, sub, aesthetic, genAI);
-            seeded++;
+            const card = await analyzeAndStore(post.imageUrl, post.postUrl, sub, aesthetic, genAI);
+            if (card) seeded++;
             await new Promise(r => setTimeout(r, 600));
           } catch (e: any) {
             console.warn(`[seed] ${sub} image error: ${e.message}`);
@@ -1154,7 +1176,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           for (const post of posts) {
             try {
               const card = await analyzeAndStore(post.imageUrl, post.postUrl, sub, aesthetic, genAI);
-              results.push({ id: card.id, aesthetic: card.aesthetic, sub });
+              if (card) results.push({ id: card.id, aesthetic: card.aesthetic, sub });
               await new Promise(r => setTimeout(r, 600));
             } catch (e: any) {
               errors.push(`${sub} image: ${e.message}`);
@@ -1186,7 +1208,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           for (const post of posts) {
             try {
               const card = await analyzeAndStore(post.imageUrl, post.postUrl, sub, aesthetic, genAI);
-              results.push({ id: card.id, aesthetic: card.aesthetic, sub });
+              if (card) results.push({ id: card.id, aesthetic: card.aesthetic, sub });
               await new Promise(r => setTimeout(r, 600));
             } catch (e: any) {
               errors.push(`${sub} image: ${e.message}`);
