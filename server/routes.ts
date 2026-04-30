@@ -982,7 +982,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     { sub: "preppyfashion",         aesthetic: "Preppy" },
     { sub: "Witch_Fash",            aesthetic: "Grunge" },
     { sub: "malefashionadvice",      aesthetic: "Business Casual" },
-    { sub: "gym_fashion",           aesthetic: "Athleisure" },
+    { sub: "gym_style",             aesthetic: "Athleisure" },
   ];
 
   // Fetch top image posts from a subreddit (no auth needed for read-only)
@@ -1099,7 +1099,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.post("/api/discover/seed", async (_req, res) => {
     try {
       const existing = await storage.discoverCardCount();
-      if (existing >= 12) {
+      if (existing >= 30) {
         return res.json({ ok: true, skipped: true, count: existing });
       }
       const apiKey = process.env.GEMINI_API_KEY;

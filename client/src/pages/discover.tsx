@@ -185,189 +185,8 @@ interface LikedItem {
   likedAt: number;
 }
 
-// ── Outfit inspiration data ──────────────────────────────────────────────────
-const OUTFITS: OutfitCard[] = [
-  {
-    id: "cg1",
-    imageUrl: "https://images.unsplash.com/photo-1594938298603-c8148c4b4057?w=800&q=80",
-    aesthetic: "Clean Girl",
-    secondaryAesthetic: "Minimalist",
-    description: "Effortless neutrals, sleek silhouettes",
-    palette: ["#F5EFE6", "#D4C5B0", "#8C7B6B", "#4A3F35"],
-    tags: ["Neutral tones", "Everyday", "Casual"],
-  },
-  {
-    id: "cg2",
-    imageUrl: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&q=80",
-    aesthetic: "Clean Girl",
-    secondaryAesthetic: "Old Money",
-    description: "Tonal dressing — monochrome done right",
-    palette: ["#E8E0D8", "#B8A898", "#786858", "#2C2420"],
-    tags: ["Monochrome", "Polished", "Chic"],
-  },
-  {
-    id: "sw1",
-    imageUrl: "https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=800&q=80",
-    aesthetic: "Streetwear",
-    secondaryAesthetic: "Hypebeast",
-    description: "Urban edge — hoodies, cargos, kicks",
-    palette: ["#1A1A1A", "#3D3D3D", "#C8956A", "#F0F0F0"],
-    tags: ["Urban", "Oversized", "Sneakers"],
-  },
-  {
-    id: "sw2",
-    imageUrl: "https://images.unsplash.com/photo-1556906781-9a412961a28c?w=800&q=80",
-    aesthetic: "Streetwear",
-    secondaryAesthetic: "Indie",
-    description: "Street-ready layering with graphic energy",
-    palette: ["#2B2B2B", "#5C4033", "#D4A574", "#E8E0D0"],
-    tags: ["Graphic tee", "Layered", "Bold"],
-  },
-  {
-    id: "da1",
-    imageUrl: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=800&q=80",
-    aesthetic: "Dark Academia",
-    secondaryAesthetic: "Preppy",
-    description: "Tweed, plaid, and brooding intellectual energy",
-    palette: ["#2C2416", "#5C4A2A", "#8B7355", "#C4A882"],
-    tags: ["Tweed", "Vintage", "Academic"],
-  },
-  {
-    id: "cc1",
-    imageUrl: "https://images.unsplash.com/photo-1600950207944-0d63e8edbc3f?w=800&q=80",
-    aesthetic: "Cottagecore",
-    secondaryAesthetic: "Romantic",
-    description: "Floral prints, prairie silhouettes, golden hour",
-    palette: ["#F2E8D9", "#D4A96A", "#8B6E4E", "#4A7C59"],
-    tags: ["Floral", "Prairie", "Feminine"],
-  },
-  {
-    id: "at1",
-    imageUrl: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=800&q=80",
-    aesthetic: "Athleisure",
-    secondaryAesthetic: "Minimalist",
-    description: "Performance meets polish — sleek and active",
-    palette: ["#1C1C1E", "#3A3A3C", "#8E8E93", "#F2F2F7"],
-    tags: ["Active", "Sleek", "Functional"],
-  },
-  {
-    id: "at2",
-    imageUrl: "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?w=800&q=80",
-    aesthetic: "Athleisure",
-    secondaryAesthetic: "Clean Girl",
-    description: "Matching sets that move with you",
-    palette: ["#E8F4F8", "#B0CDD8", "#6B9EAE", "#2C5F6F"],
-    tags: ["Matching set", "Sporty", "Casual"],
-  },
-  {
-    id: "bh1",
-    imageUrl: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800&q=80",
-    aesthetic: "Boho",
-    secondaryAesthetic: "Cottagecore",
-    description: "Free-spirited layers, earthy textures, fringe",
-    palette: ["#C4956A", "#8B6347", "#5C3D2E", "#E8D5C0"],
-    tags: ["Earthy", "Layered", "Free-spirited"],
-  },
-  {
-    id: "hb1",
-    imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80",
-    aesthetic: "Hypebeast",
-    secondaryAesthetic: "Streetwear",
-    description: "Limited drops, bold logos, sneaker culture",
-    palette: ["#FF4500", "#1A1A1A", "#F5F5F5", "#FFD700"],
-    tags: ["Logo", "Sneakers", "Bold"],
-  },
-  {
-    id: "om1",
-    imageUrl: "https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?w=800&q=80",
-    aesthetic: "Old Money",
-    secondaryAesthetic: "Business Casual",
-    description: "Quiet luxury — cashmere, blazers, understated",
-    palette: ["#F5F0E8", "#C8B89A", "#8B7355", "#3C2F1E"],
-    tags: ["Cashmere", "Tailored", "Luxury"],
-  },
-  {
-    id: "om2",
-    imageUrl: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800&q=80",
-    aesthetic: "Old Money",
-    secondaryAesthetic: "Minimalist",
-    description: "Heritage tailoring, neutral palette, effortless class",
-    palette: ["#EAE4DC", "#B8A898", "#7A6A5A", "#2E2418"],
-    tags: ["Heritage", "Neutral", "Refined"],
-  },
-  {
-    id: "y2k1",
-    imageUrl: "https://images.unsplash.com/photo-1571513722275-4b41940f54b8?w=800&q=80",
-    aesthetic: "Y2K",
-    secondaryAesthetic: "Indie Sleaze",
-    description: "Low-rise, metallics, and early-2000s nostalgia",
-    palette: ["#E8C8E8", "#C878C8", "#784878", "#F8F8E8"],
-    tags: ["Nostalgic", "Metallic", "Bold"],
-  },
-  {
-    id: "pp1",
-    imageUrl: "https://images.unsplash.com/photo-1617127365659-c47fa864d8bc?w=800&q=80",
-    aesthetic: "Preppy",
-    secondaryAesthetic: "Old Money",
-    description: "Polo shirts, chinos, varsity energy",
-    palette: ["#1B4F72", "#2E86C1", "#D4E6F1", "#F8F9FA"],
-    tags: ["Polo", "Varsity", "Classic"],
-  },
-  {
-    id: "mn1",
-    imageUrl: "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=800&q=80",
-    aesthetic: "Minimalist",
-    secondaryAesthetic: "Clean Girl",
-    description: "Less is more — clean silhouettes, zero noise",
-    palette: ["#FFFFFF", "#E8E8E8", "#B0B0B0", "#404040"],
-    tags: ["Structural", "Clean", "Modern"],
-  },
-  {
-    id: "ro1",
-    imageUrl: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800&q=80",
-    aesthetic: "Romantic",
-    secondaryAesthetic: "Cottagecore",
-    description: "Soft florals, lace, and feminine grace",
-    palette: ["#F8E8E8", "#E8A8A8", "#C87878", "#8B4858"],
-    tags: ["Floral", "Lace", "Soft"],
-  },
-  {
-    id: "bc1",
-    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=80",
-    aesthetic: "Business Casual",
-    secondaryAesthetic: "Old Money",
-    description: "Smart-casual balance — polished but approachable",
-    palette: ["#2C3E50", "#5D6D7E", "#AEB6BF", "#F0F3F4"],
-    tags: ["Blazer", "Smart", "Professional"],
-  },
-  {
-    id: "in1",
-    imageUrl: "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=800&q=80",
-    aesthetic: "Indie",
-    secondaryAesthetic: "Dark Academia",
-    description: "Thrifted layers, band tees, creative expression",
-    palette: ["#3D2B1F", "#7B5E45", "#B8956A", "#E8D5C0"],
-    tags: ["Thrifted", "Layered", "Creative"],
-  },
-  {
-    id: "cs1",
-    imageUrl: "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800&q=80",
-    aesthetic: "Coastal",
-    secondaryAesthetic: "Boho",
-    description: "Breezy linens, nautical accents, sun-kissed ease",
-    palette: ["#F0F8FF", "#87CEEB", "#4682B4", "#F5DEB3"],
-    tags: ["Linen", "Nautical", "Breezy"],
-  },
-  {
-    id: "mn2",
-    imageUrl: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&q=80",
-    aesthetic: "Minimalist",
-    secondaryAesthetic: "Business Casual",
-    description: "Structural simplicity in warm neutral tones",
-    palette: ["#EDE8E3", "#C4B8A8", "#8C7D6D", "#3C332C"],
-    tags: ["Structured", "Neutral", "Warm"],
-  },
-];
+// ── Outfit inspiration data (empty — all cards come from Reddit API) ────────
+const OUTFITS: OutfitCard[] = [];
 
 function shuffled(arr: OutfitCard[]): OutfitCard[] {
   const a = [...arr];
@@ -594,21 +413,15 @@ function getTopAesthetic(): string | null {
 
 export default function DiscoverPage() {
   const [topAesthetic] = useState<string | null>(getTopAesthetic);
-  const [cards, setCards] = useState<OutfitCard[]>(() => {
-    // Start with ranked static fallback while API loads
-    const ranked = rankByVector(OUTFITS);
-    const mid = Math.ceil(ranked.length / 2);
-    return [...shuffled(ranked.slice(0, mid)), ...shuffled(ranked.slice(mid))];
-  });
+  const [cards, setCards] = useState<OutfitCard[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
 
-  // Fetch real AI-analyzed cards from the server
+  // Fetch AI-analyzed cards from Reddit pipeline
   useEffect(() => {
     fetch("/api/discover")
       .then(r => r.json())
       .then((data: any[]) => {
         if (!Array.isArray(data) || data.length === 0) return;
-        // Map DB rows to OutfitCard shape
         const apiCards: OutfitCard[] = data.map(row => ({
           id: String(row.id),
           imageUrl: row.image_url || row.imageUrl,
@@ -625,7 +438,7 @@ export default function DiscoverPage() {
         const mid = Math.ceil(ranked.length / 2);
         setCards([...shuffled(ranked.slice(0, mid)), ...shuffled(ranked.slice(mid))]);
       })
-      .catch(() => { /* keep fallback */ })
+      .catch(() => {})
       .finally(() => setLoadingFeed(false));
   }, []);
   const [likes, setLikes] = useState<Record<string, boolean>>(() => {
@@ -666,6 +479,30 @@ export default function DiscoverPage() {
   }, []);
 
   const likedCount = Object.values(likes).filter(Boolean).length;
+
+  // Loading skeleton
+  if (loadingFeed) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4" style={{ height: "calc(100svh - 48px - 64px)" }}>
+        <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading outfits…</p>
+      </div>
+    );
+  }
+
+  // Empty state — seed hasn't been run yet
+  if (cards.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 px-8 text-center" style={{ height: "calc(100svh - 48px - 64px)" }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/40">
+          <rect x="3" y="3" width="18" height="18" rx="3"/>
+          <path d="M3 9h18M9 21V9"/>
+        </svg>
+        <p className="text-sm font-medium text-foreground">No outfits yet</p>
+        <p className="text-xs text-muted-foreground">The discover feed is being populated. Check back soon.</p>
+      </div>
+    );
+  }
 
   return (
     <div
