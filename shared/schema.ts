@@ -56,7 +56,9 @@ export const discoverCards = pgTable("discover_cards", {
   keyPieces: text("key_pieces").notNull(),            // JSON: string[]
   colorPalette: text("color_palette").notNull(),      // JSON: string[] hex codes
   tags: text("tags").notNull(),                       // JSON: string[]
-  source: text("source").default("unsplash"),
+  source: text("source").default("reddit"),
+  postUrl: text("post_url"),      // link back to original Reddit post
+  subreddit: text("subreddit"),   // e.g. "streetwear"
   createdAt: timestamp("created_at").defaultNow(),
 });
 

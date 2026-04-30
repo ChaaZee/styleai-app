@@ -69,10 +69,15 @@ export async function initDB() {
       key_pieces TEXT NOT NULL,
       color_palette TEXT NOT NULL,
       tags TEXT NOT NULL,
-      source TEXT DEFAULT 'unsplash',
+      source TEXT DEFAULT 'reddit',
+      post_url TEXT,
+      subreddit TEXT,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `;
+  // Add columns if they don't exist (idempotent migration)
+  await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS post_url TEXT`;
+  await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS subreddit TEXT`;
 }
 
 export interface IStorage {

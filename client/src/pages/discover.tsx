@@ -545,6 +545,21 @@ function DiscoverCard({
 
 
 
+        {/* Reddit source attribution */}
+        {(card as any).postUrl && (
+          <a
+            href={(card as any).postUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-primary transition-colors w-fit"
+          >
+            <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 0C4.478 0 0 4.478 0 10s4.478 10 10 10 10-4.478 10-10S15.522 0 10 0zm4.898 7.01a1.333 1.333 0 1 1 0 2.667 1.333 1.333 0 0 1 0-2.667zm-9.796 0a1.333 1.333 0 1 1 0 2.667 1.333 1.333 0 0 1 0-2.667zM10 15.5c-2.56 0-4.7-1.46-5.5-3.5h11c-.8 2.04-2.94 3.5-5.5 3.5z"/>
+            </svg>
+            r/{(card as any).subreddit || "reddit"} · View post
+          </a>
+        )}
+
         {/* Bottom row — tags + heart */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex gap-1.5 flex-wrap">
@@ -603,7 +618,9 @@ export default function DiscoverPage() {
           palette: (() => { try { return JSON.parse(row.color_palette || row.colorPalette || "[]"); } catch { return []; } })(),
           tags: (() => { try { return JSON.parse(row.tags || "[]"); } catch { return []; } })(),
           keyPieces: (() => { try { return JSON.parse(row.key_pieces || row.keyPieces || "[]"); } catch { return []; } })(),
-        }));
+          postUrl: row.post_url || row.postUrl || null,
+          subreddit: row.subreddit || null,
+        } as OutfitCard & { postUrl?: string; subreddit?: string }));
         const ranked = rankByVector(apiCards);
         const mid = Math.ceil(ranked.length / 2);
         setCards([...shuffled(ranked.slice(0, mid)), ...shuffled(ranked.slice(mid))]);
