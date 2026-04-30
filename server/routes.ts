@@ -973,16 +973,20 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   const SUBREDDIT_MAP: { sub: string; aesthetic: string }[] = [
     { sub: "streetwear",           aesthetic: "Streetwear" },
     { sub: "femalefashionadvice",   aesthetic: "Minimalist" },
-    { sub: "OldMoneyAesthetic",     aesthetic: "Old Money" },
+    { sub: "malefashionadvice",     aesthetic: "Old Money" },
     { sub: "DarkAcademia",          aesthetic: "Dark Academia" },
     { sub: "cottagecore",           aesthetic: "Cottagecore" },
     { sub: "y2kfashion",            aesthetic: "Y2K" },
-    { sub: "CleanGirlAesthetic",    aesthetic: "Clean Girl" },
-    { sub: "BohoAesthetic",         aesthetic: "Boho" },
-    { sub: "preppyfashion",         aesthetic: "Preppy" },
-    { sub: "Witch_Fash",            aesthetic: "Grunge" },
-    { sub: "malefashionadvice",      aesthetic: "Business Casual" },
-    { sub: "gym_style",             aesthetic: "Athleisure" },
+    { sub: "OUTFITS",               aesthetic: "Clean Girl" },
+    { sub: "findfashion",           aesthetic: "Boho" },
+    { sub: "weddingfashion",        aesthetic: "Romantic" },
+    { sub: "crossdressing",         aesthetic: "Grunge" },
+    { sub: "businessprofessionals", aesthetic: "Business Casual" },
+    { sub: "AthleticWear",          aesthetic: "Athleisure" },
+    { sub: "FashionAdvice",         aesthetic: "Preppy" },
+    { sub: "streetstyle",           aesthetic: "Indie" },
+    { sub: "Sneakers",              aesthetic: "Hypebeast" },
+    { sub: "fashionadvice",         aesthetic: "Coastal" },
   ];
 
   // Fetch top image posts from a subreddit (no auth needed for read-only)
@@ -1002,12 +1006,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const images: { imageUrl: string; postUrl: string; title: string }[] = [];
     for (const { data: post } of posts) {
       if (images.length >= limit) break;
-      // Only image posts hosted on Reddit's CDN
-      const url = post.url as string;
+      // Only image posts hosted on Reddit's CDN or direct image URLs
+      const url = (post.url_overridden_by_dest || post.url) as string;
       if (!url) continue;
       const isRedditImg = url.includes("i.redd.it") || url.includes("preview.redd.it");
       const isDirectImg = /\.(jpg|jpeg|png|webp)(\?|$)/i.test(url);
-      if (!isRedditImg && !isDirectImg) continue;
+      // Also accept imgur direct images
+      const isImgur = url.includes("i.imgur.com") && /\.(jpg|jpeg|png|gif|webp)/i.test(url);
+      if (!isRedditImg && !isDirectImg && !isImgur) continue;
       // Skip NSFW
       if (post.over_18) continue;
       // Clean up preview URLs to get full-size image
@@ -1099,7 +1105,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.post("/api/discover/seed", async (_req, res) => {
     try {
       const existing = await storage.discoverCardCount();
-      if (existing >= 30) {
+      if (existing >= 60) {
         return res.json({ ok: true, skipped: true, count: existing });
       }
       const apiKey = process.env.GEMINI_API_KEY;
