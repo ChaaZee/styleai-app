@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
-import { registerRoutes } from "./routes";
+import { registerRoutes, triggerSeedIfEmpty } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
@@ -111,6 +111,8 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
     },
     () => {
       log(`serving on port ${port}`);
+      // Auto-seed discover feed if empty (non-blocking)
+      triggerSeedIfEmpty().catch(err => log(`Auto-seed error: ${err.message}`, "seed"));
     },
   );
 })();

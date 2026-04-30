@@ -781,6 +781,172 @@ similarRecs — COMPLETE THE LOOK (4 items):
 
 Both sets: real brands, specific names (not "jeans" but "Washed Barrel-Fit Jeans"), match gender expression, realistic prices: Zara = 30–100, Levi's = 60–120, Dr. Martens = 140–200, The Row = 300–800.`;
 
+// ── Reddit subreddit → aesthetic map (module-level for auto-seed access) ─────
+const SUBREDDIT_MAP: { sub: string; aesthetic: string }[] = [
+  { sub: "streetwear",           aesthetic: "Streetwear" },
+  { sub: "femalefashionadvice",   aesthetic: "Minimalist" },
+  { sub: "malefashionadvice",     aesthetic: "Old Money" },
+  { sub: "DarkAcademia",          aesthetic: "Dark Academia" },
+  { sub: "cottagecore",           aesthetic: "Cottagecore" },
+  { sub: "y2kfashion",            aesthetic: "Y2K" },
+  { sub: "OUTFITS",               aesthetic: "Clean Girl" },
+  { sub: "findfashion",           aesthetic: "Boho" },
+  { sub: "weddingfashion",        aesthetic: "Romantic" },
+  { sub: "crossdressing",         aesthetic: "Grunge" },
+  { sub: "businessprofessionals", aesthetic: "Business Casual" },
+  { sub: "AthleticWear",          aesthetic: "Athleisure" },
+  { sub: "FashionAdvice",         aesthetic: "Preppy" },
+  { sub: "streetstyle",           aesthetic: "Indie" },
+  { sub: "Sneakers",              aesthetic: "Hypebeast" },
+  { sub: "fashionadvice",         aesthetic: "Coastal" },
+];
+
+// Fetch top image posts from a subreddit (no auth needed for read-only)
+async function fetchSubredditImages(
+  sub: string,
+  limit = 3,
+  time: "week" | "month" = "week"
+): Promise<{ imageUrl: string; postUrl: string; title: string }[]> {
+  const url = `https://www.reddit.com/r/${sub}/top.json?limit=25&t=${time}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "StitchApp/1.0 (fashion discovery)" },
+  });
+  if (!res.ok) throw new Error(`Reddit ${sub}: HTTP ${res.status}`);
+  const json = await res.json() as any;
+  const posts = json?.data?.children ?? [];
+
+  const images: { imageUrl: string; postUrl: string; title: string }[] = [];
+  for (const { data: post } of posts) {
+    if (images.length >= limit) break;
+    const postUrl = (post.url_overridden_by_dest || post.url) as string;
+    if (!postUrl) continue;
+    const isRedditImg = postUrl.includes("i.redd.it") || postUrl.includes("preview.redd.it");
+    const isDirectImg = /\.(jpg|jpeg|png|webp)(\?|$)/i.test(postUrl);
+    const isImgur = postUrl.includes("i.imgur.com") && /\.(jpg|jpeg|png|gif|webp)/i.test(postUrl);
+    if (!isRedditImg && !isDirectImg && !isImgur) continue;
+    if (post.over_18) continue;
+    const imageUrl = postUrl.replace("preview.redd.it", "i.redd.it").split("?")[0];
+    images.push({
+      imageUrl,
+      postUrl: `https://reddit.com${post.permalink}`,
+      title: post.title,
+    });
+  }
+  return images;
+}
+
+// Core analysis + store function (module-level)
+async function analyzeAndStore(
+  imageUrl: string,
+  postUrl: string,
+  subreddit: string,
+  aesthetic: string,
+  genAI: any
+) {
+  const imgRes = await fetch(imageUrl, {
+    headers: { "User-Agent": "StitchApp/1.0" },
+  });
+  if (!imgRes.ok) throw new Error(`Image fetch HTTP ${imgRes.status}`);
+  const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+  const mimeType = contentType.startsWith("image/") ? contentType.split(";")[0] : "image/jpeg";
+  const buffer = Buffer.from(await imgRes.arrayBuffer());
+  const imageBase64 = buffer.toString("base64");
+
+  // Pass 1: garment detection
+  const detModel = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash-lite",
+    systemInstruction: GARMENT_SYSTEM_INSTRUCTION,
+    generationConfig: { responseMimeType: "application/json", responseSchema: GARMENT_SCHEMA as any, temperature: 0.0 },
+  });
+  const det = await detModel.generateContent([
+    { inlineData: { data: imageBase64, mimeType } },
+    "List every visible garment and accessory.",
+  ]);
+  const detJson = det.response.text().match(/\{[\s\S]*\}/);
+  if (!detJson) throw new Error("garment parse failed");
+  const garmentData = JSON.parse(detJson[0]);
+  const garmentSummary = [
+    "Detected garments:",
+    ...garmentData.garments.map((g: any) =>
+      `- ${g.item}: ${g.color}, ${g.fabric}, ${g.fit}${
+        g.details !== "none" ? `, ${g.details}` : ""
+      }`
+    ),
+    `Palette: ${garmentData.overallPalette}`,
+  ].join("\n");
+
+  // Pass 2: aesthetic classification
+  const clsModel = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: SYSTEM_INSTRUCTION,
+    generationConfig: { responseMimeType: "application/json", responseSchema: ANALYSIS_SCHEMA as any, temperature: 0.0 },
+  });
+  const cls = await clsModel.generateContent([
+    { inlineData: { data: imageBase64, mimeType } },
+    `Garment inventory:\n${garmentSummary}\n\nClassify the aesthetic. Hint: likely ${aesthetic}.`,
+  ]);
+  const clsJson = cls.response.text().match(/\{[\s\S]*\}/);
+  if (!clsJson) throw new Error("aesthetic parse failed");
+  const analysis = JSON.parse(clsJson[0]);
+
+  const palette: string[] = Array.isArray(analysis.colorPalette)
+    ? analysis.colorPalette.map((c: any) => typeof c === "string" ? c : c.hex || "#888")
+    : [];
+  const styleBreakdown = Array.isArray(analysis.styleBreakdown) ? analysis.styleBreakdown : [];
+  const tags: string[] = Array.isArray(analysis.occasions) ? analysis.occasions.slice(0, 3) : [];
+
+  return storage.createDiscoverCard({
+    imageUrl,
+    aesthetic: analysis.aesthetic || aesthetic,
+    confidence: analysis.confidence || 80,
+    styleBreakdown: JSON.stringify(styleBreakdown),
+    keyPieces: JSON.stringify(analysis.keyPieces || []),
+    colorPalette: JSON.stringify(palette),
+    tags: JSON.stringify(tags),
+    source: "reddit",
+    postUrl,
+    subreddit,
+  });
+}
+
+// ── Auto-seed on startup ─────────────────────────────────────────────────────
+export async function triggerSeedIfEmpty() {
+  try {
+    const existing = await storage.discoverCardCount();
+    if (existing > 0) {
+      console.log(`[seed] ${existing} cards already in DB — skipping auto-seed`);
+      return;
+    }
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.log("[seed] No GEMINI_API_KEY — skipping auto-seed");
+      return;
+    }
+    console.log("[seed] 0 cards found — starting background seed from Reddit...");
+    const genAI = new GoogleGenerativeAI(apiKey);
+    let seeded = 0;
+    for (const { sub, aesthetic } of SUBREDDIT_MAP) {
+      try {
+        const posts = await fetchSubredditImages(sub, 2, "month");
+        for (const post of posts) {
+          try {
+            await analyzeAndStore(post.imageUrl, post.postUrl, sub, aesthetic, genAI);
+            seeded++;
+            await new Promise(r => setTimeout(r, 600));
+          } catch (e: any) {
+            console.warn(`[seed] ${sub} image error: ${e.message}`);
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[seed] ${sub} fetch error: ${e.message}`);
+      }
+    }
+    console.log(`[seed] Auto-seed complete — ${seeded} cards added`);
+  } catch (err: any) {
+    console.error("[seed] Auto-seed failed:", err.message);
+  }
+}
+
 export async function registerRoutes(httpServer: Server, app: Express) {
   await initDB();
 
@@ -968,138 +1134,6 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       res.status(500).json({ error: "Failed to fetch discover feed" });
     }
   });
-
-  // ── Reddit subreddit → aesthetic map ──────────────────────────────────────────────
-  const SUBREDDIT_MAP: { sub: string; aesthetic: string }[] = [
-    { sub: "streetwear",           aesthetic: "Streetwear" },
-    { sub: "femalefashionadvice",   aesthetic: "Minimalist" },
-    { sub: "malefashionadvice",     aesthetic: "Old Money" },
-    { sub: "DarkAcademia",          aesthetic: "Dark Academia" },
-    { sub: "cottagecore",           aesthetic: "Cottagecore" },
-    { sub: "y2kfashion",            aesthetic: "Y2K" },
-    { sub: "OUTFITS",               aesthetic: "Clean Girl" },
-    { sub: "findfashion",           aesthetic: "Boho" },
-    { sub: "weddingfashion",        aesthetic: "Romantic" },
-    { sub: "crossdressing",         aesthetic: "Grunge" },
-    { sub: "businessprofessionals", aesthetic: "Business Casual" },
-    { sub: "AthleticWear",          aesthetic: "Athleisure" },
-    { sub: "FashionAdvice",         aesthetic: "Preppy" },
-    { sub: "streetstyle",           aesthetic: "Indie" },
-    { sub: "Sneakers",              aesthetic: "Hypebeast" },
-    { sub: "fashionadvice",         aesthetic: "Coastal" },
-  ];
-
-  // Fetch top image posts from a subreddit (no auth needed for read-only)
-  async function fetchSubredditImages(
-    sub: string,
-    limit = 3,
-    time: "week" | "month" = "week"
-  ): Promise<{ imageUrl: string; postUrl: string; title: string }[]> {
-    const url = `https://www.reddit.com/r/${sub}/top.json?limit=25&t=${time}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "StitchApp/1.0 (fashion discovery)" },
-    });
-    if (!res.ok) throw new Error(`Reddit ${sub}: HTTP ${res.status}`);
-    const json = await res.json() as any;
-    const posts = json?.data?.children ?? [];
-
-    const images: { imageUrl: string; postUrl: string; title: string }[] = [];
-    for (const { data: post } of posts) {
-      if (images.length >= limit) break;
-      // Only image posts hosted on Reddit's CDN or direct image URLs
-      const url = (post.url_overridden_by_dest || post.url) as string;
-      if (!url) continue;
-      const isRedditImg = url.includes("i.redd.it") || url.includes("preview.redd.it");
-      const isDirectImg = /\.(jpg|jpeg|png|webp)(\?|$)/i.test(url);
-      // Also accept imgur direct images
-      const isImgur = url.includes("i.imgur.com") && /\.(jpg|jpeg|png|gif|webp)/i.test(url);
-      if (!isRedditImg && !isDirectImg && !isImgur) continue;
-      // Skip NSFW
-      if (post.over_18) continue;
-      // Clean up preview URLs to get full-size image
-      const imageUrl = url.replace("preview.redd.it", "i.redd.it").split("?")[0];
-      images.push({
-        imageUrl,
-        postUrl: `https://reddit.com${post.permalink}`,
-        title: post.title,
-      });
-    }
-    return images;
-  }
-
-  // Core analysis function — shared by seed and refresh
-  async function analyzeAndStore(
-    imageUrl: string,
-    postUrl: string,
-    subreddit: string,
-    aesthetic: string,
-    genAI: any
-  ) {
-    const imgRes = await fetch(imageUrl, {
-      headers: { "User-Agent": "StitchApp/1.0" },
-    });
-    if (!imgRes.ok) throw new Error(`Image fetch HTTP ${imgRes.status}`);
-    const contentType = imgRes.headers.get("content-type") || "image/jpeg";
-    const mimeType = contentType.startsWith("image/") ? contentType.split(";")[0] : "image/jpeg";
-    const buffer = Buffer.from(await imgRes.arrayBuffer());
-    const imageBase64 = buffer.toString("base64");
-
-    // Pass 1: garment detection
-    const detModel = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
-      systemInstruction: GARMENT_SYSTEM_INSTRUCTION,
-      generationConfig: { responseMimeType: "application/json", responseSchema: GARMENT_SCHEMA as any, temperature: 0.0 },
-    });
-    const det = await detModel.generateContent([
-      { inlineData: { data: imageBase64, mimeType } },
-      "List every visible garment and accessory.",
-    ]);
-    const detJson = det.response.text().match(/\{[\s\S]*\}/);
-    if (!detJson) throw new Error("garment parse failed");
-    const garmentData = JSON.parse(detJson[0]);
-    const garmentSummary = [
-      "Detected garments:",
-      ...garmentData.garments.map((g: any) =>
-        `- ${g.item}: ${g.color}, ${g.fabric}, ${g.fit}${
-          g.details !== "none" ? `, ${g.details}` : ""
-        }`
-      ),
-      `Palette: ${garmentData.overallPalette}`,
-    ].join("\n");
-
-    // Pass 2: aesthetic classification
-    const clsModel = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: SYSTEM_INSTRUCTION,
-      generationConfig: { responseMimeType: "application/json", responseSchema: ANALYSIS_SCHEMA as any, temperature: 0.0 },
-    });
-    const cls = await clsModel.generateContent([
-      { inlineData: { data: imageBase64, mimeType } },
-      `Garment inventory:\n${garmentSummary}\n\nClassify the aesthetic. Hint: likely ${aesthetic}.`,
-    ]);
-    const clsJson = cls.response.text().match(/\{[\s\S]*\}/);
-    if (!clsJson) throw new Error("aesthetic parse failed");
-    const analysis = JSON.parse(clsJson[0]);
-
-    const palette: string[] = Array.isArray(analysis.colorPalette)
-      ? analysis.colorPalette.map((c: any) => typeof c === "string" ? c : c.hex || "#888")
-      : [];
-    const styleBreakdown = Array.isArray(analysis.styleBreakdown) ? analysis.styleBreakdown : [];
-    const tags: string[] = Array.isArray(analysis.occasions) ? analysis.occasions.slice(0, 3) : [];
-
-    return storage.createDiscoverCard({
-      imageUrl,
-      aesthetic: analysis.aesthetic || aesthetic,
-      confidence: analysis.confidence || 80,
-      styleBreakdown: JSON.stringify(styleBreakdown),
-      keyPieces: JSON.stringify(analysis.keyPieces || []),
-      colorPalette: JSON.stringify(palette),
-      tags: JSON.stringify(tags),
-      source: "reddit",
-      postUrl,
-      subreddit,
-    });
-  }
 
   // POST /api/discover/seed — initial seed from Reddit (idempotent)
   app.post("/api/discover/seed", async (_req, res) => {
