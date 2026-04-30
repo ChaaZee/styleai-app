@@ -91,6 +91,8 @@ export interface IStorage {
   getDiscoverCards(): Promise<DiscoverCard[]>;
   createDiscoverCard(card: InsertDiscoverCard): Promise<DiscoverCard>;
   discoverCardCount(): Promise<number>;
+  clearDiscoverCards(): Promise<void>;
+  postUrlExists(postUrl: string): Promise<boolean>;
 }
 
 export const storage: IStorage = {
@@ -128,5 +130,15 @@ export const storage: IStorage = {
   async discoverCardCount() {
     const rows = await db.select().from(discoverCards);
     return rows.length;
+  },
+  async clearDiscoverCards() {
+    await db.delete(discoverCards);
+  },
+  async postUrlExists(postUrl: string) {
+    const rows = await db.select({ id: discoverCards.id })
+      .from(discoverCards)
+      .where(eq(discoverCards.postUrl, postUrl))
+      .limit(1);
+    return rows.length > 0;
   },
 };

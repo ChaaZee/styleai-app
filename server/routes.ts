@@ -874,6 +874,12 @@ async function analyzeAndStore(
     } catch {}
   }
 
+  // Dedup: skip if this postUrl is already stored
+  if (await storage.postUrlExists(postUrl)) {
+    console.log(`[seed] Skipping duplicate postUrl: ${postUrl}`);
+    return null;
+  }
+
   // Pass 1: garment detection
   const detModel = genAI.getGenerativeModel({
     model: "gemini-2.5-flash-lite",
@@ -1154,6 +1160,19 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     } catch (err: any) {
       console.error("Discover fetch error:", err);
       res.status(500).json({ error: "Failed to fetch discover feed" });
+    }
+  });
+
+  // DELETE /api/discover/reset — wipe all cards and re-seed fresh
+  app.delete("/api/discover/reset", async (_req, res) => {
+    try {
+      await storage.clearDiscoverCards();
+      console.log("[reset] Discover cards cleared — triggering fresh seed...");
+      // Fire-and-forget re-seed in background
+      triggerSeedIfEmpty().catch(err => console.error("[reset] re-seed error:", err.message));
+      res.json({ ok: true, message: "Cards cleared, re-seeding in background" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
