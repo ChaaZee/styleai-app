@@ -176,7 +176,8 @@ const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Tre
 export default function HomePage() {
   const [, setLocation] = useLocation();
 
-  // Gender-filter + vector-rank — re-runs on vector or profile change
+  // Gender-filter + vector-rank
+  // Reads gender fresh from localStorage every time (profile page unmounts home, so events don't work)
   const rerank = useCallback(() => {
     const genderPref = getGenderPref();
     const filtered = genderPref === "both"
@@ -187,14 +188,16 @@ export default function HomePage() {
 
   const [feedItems, setFeedItems] = useState<FeedItem[]>(rerank);
 
+  // Re-rank on mount (catches returning from profile page where gender may have changed)
+  useEffect(() => {
+    setFeedItems(rerank());
+  }, [rerank]);
+
+  // Also re-rank when vector changes (like/unlike signals while on home)
   useEffect(() => {
     const handler = () => setFeedItems(rerank());
     window.addEventListener("stitch_vector_updated", handler);
-    window.addEventListener("stitch_profile_updated", handler);
-    return () => {
-      window.removeEventListener("stitch_vector_updated", handler);
-      window.removeEventListener("stitch_profile_updated", handler);
-    };
+    return () => window.removeEventListener("stitch_vector_updated", handler);
   }, [rerank]);
 
   // Personalised greeting
