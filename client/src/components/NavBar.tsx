@@ -12,7 +12,7 @@ export default function NavBar() {
 
   return (
     <nav
-      className="sticky bottom-0 left-0 right-0 z-[100] surface-glass border-t border-border flex-shrink-0"
+      className="fixed bottom-0 left-0 right-0 z-[9999] surface-glass border-t border-border"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       role="navigation"
       aria-label="Main navigation"

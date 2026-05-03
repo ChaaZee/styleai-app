@@ -419,7 +419,7 @@ export default function DiscoverPage() {
   // Loading + empty rendered WITHOUT scroll container — NavBar always tappable
   if (loadingFeed) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 bg-background" style={{ height: "100%" }}>
+      <div className="flex flex-col items-center justify-center gap-4 bg-background" style={{ height: "100%", paddingBottom: "64px", boxSizing: "border-box" }}>
         <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         <p className="text-sm text-muted-foreground">Loading outfits…</p>
         <p className="text-xs text-muted-foreground/50">Server is waking up, this may take a moment</p>
@@ -429,7 +429,7 @@ export default function DiscoverPage() {
 
   if (cards.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 px-8 text-center bg-background" style={{ height: "100%" }}>
+      <div className="flex flex-col items-center justify-center gap-3 px-8 text-center bg-background" style={{ height: "100%", paddingBottom: "64px", boxSizing: "border-box" }}>
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/40">
           <rect x="3" y="3" width="18" height="18" rx="3"/>
           <path d="M3 9h18M9 21V9"/>
@@ -441,13 +441,15 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div style={{ height: "100%", overflow: "hidden" }}>
+    <div style={{ height: "100%", paddingBottom: "64px", boxSizing: "border-box" }}>
       <div
         className="overflow-y-scroll"
         style={{
           scrollSnapType: "y mandatory",
           overscrollBehavior: "contain",
           height: "100%",
+          touchAction: "pan-y",
+          WebkitOverflowScrolling: "auto",
         }}
       >
         {/* Style DNA intro card */}

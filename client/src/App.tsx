@@ -171,7 +171,7 @@ function AppContent() {
   return (
     <div className="bg-background text-foreground flex flex-col" style={{ height: "100dvh" }}>
       {!isQuizRoute && <TopBar theme={theme} toggleTheme={toggleTheme} />}
-      <main className={isQuizRoute ? "flex-1 overflow-auto" : isDiscoverRoute ? "flex-1 overflow-hidden" : "flex-1 overflow-auto pb-4"}>
+      <main className={isQuizRoute ? "flex-1 overflow-auto" : "flex-1 overflow-auto"} style={isDiscoverRoute ? { paddingBottom: 0 } : { paddingBottom: "64px" }}>
         <Switch>
           <Route path="/quiz" component={StyleQuizPage} />
           <Route path="/" component={HomePage} />
