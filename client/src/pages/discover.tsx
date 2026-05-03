@@ -110,7 +110,7 @@ function HeartButton({ liked, onToggle }: { liked: boolean; onToggle: () => void
     <button
       onClick={handle}
       aria-label={liked ? "Unlike" : "Like"}
-      className="relative flex items-center justify-center w-10 h-10 rounded-full transition-transform active:scale-90 bg-black/30 backdrop-blur-sm"
+      className="relative flex items-center justify-center w-10 h-10 rounded-full transition-transform active:scale-90"
       style={{ WebkitTapHighlightColor: "transparent" }}
     >
       {burst && (
@@ -118,9 +118,9 @@ function HeartButton({ liked, onToggle }: { liked: boolean; onToggle: () => void
       )}
       <svg width="24" height="24" viewBox="0 0 24 24"
         fill={liked ? "#E8405A" : "none"}
-        stroke={liked ? "#E8405A" : "currentColor"}
+        stroke="white"
         strokeWidth="1.75" strokeLinecap="round"
-        style={{ transition: "fill 0.2s ease, transform 0.15s ease", transform: burst ? "scale(1.3)" : "scale(1)", color: "hsl(var(--muted-foreground))" }}
+        style={{ transition: "fill 0.2s ease, transform 0.15s ease", transform: burst ? "scale(1.3)" : "scale(1)", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.4))" }}
       >
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
       </svg>
