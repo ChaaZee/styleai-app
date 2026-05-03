@@ -76,73 +76,99 @@ interface FeedItem {
   icon: IconKey;
   query: string;
   aesthetic: string;
+  gender: "male" | "female" | "both"; // used to filter by profile preference
   tag?: string; // "Match" | sale string
 }
 
+// Helper to get current gender preference
+function getGenderPref(): "male" | "female" | "both" {
+  try {
+    const p = JSON.parse(localStorage.getItem("stitch_profile") || "{}");
+    return (p.gender as "male" | "female" | "both") || "both";
+  } catch { return "both"; }
+}
+
 const FEED_ITEMS: FeedItem[] = [
-  // Minimalist
-  { id: 1,  label: "Linen Blazer Dress",        icon: "dress",     query: "linen blazer dress minimalist",           aesthetic: "Minimalist",       tag: "Match" },
-  { id: 2,  label: "Wide Leg Trousers",          icon: "pants",     query: "wide leg trousers minimal beige",         aesthetic: "Minimalist" },
-  { id: 3,  label: "Oversized White Tee",        icon: "shirt",     query: "oversized white t-shirt minimalist",      aesthetic: "Minimalist" },
+  // Minimalist — female-leaning but some both
+  { id: 1,  label: "Linen Blazer Dress",        icon: "dress",     query: "linen blazer dress minimalist",            aesthetic: "Minimalist",       gender: "female", tag: "Match" },
+  { id: 2,  label: "Wide Leg Trousers",          icon: "pants",     query: "wide leg trousers minimal beige women",    aesthetic: "Minimalist",       gender: "female" },
+  { id: 3,  label: "Oversized White Tee",        icon: "shirt",     query: "oversized white t-shirt minimalist",       aesthetic: "Minimalist",       gender: "both" },
+  { id: 49, label: "Slim Chino",                 icon: "pants",     query: "slim chino minimalist neutral men",        aesthetic: "Minimalist",       gender: "male" },
+  { id: 50, label: "Linen Button-Down",          icon: "shirt",     query: "linen button down shirt men minimalist",   aesthetic: "Minimalist",       gender: "male" },
   // Streetwear
-  { id: 4,  label: "990v6 Sneaker",              icon: "shoes",     query: "new balance 990 sneakers",                aesthetic: "Streetwear",       tag: "Match" },
-  { id: 5,  label: "Graphic Hoodie",             icon: "shirt",     query: "graphic hoodie streetwear oversized",     aesthetic: "Streetwear" },
-  { id: 6,  label: "Cargo Pants",                icon: "pants",     query: "cargo pants streetwear baggy",            aesthetic: "Streetwear" },
-  { id: 7,  label: "Puffer Jacket",              icon: "jacket",    query: "puffer jacket streetwear",                aesthetic: "Streetwear" },
+  { id: 4,  label: "990v6 Sneaker",              icon: "shoes",     query: "new balance 990 sneakers",                 aesthetic: "Streetwear",       gender: "both",  tag: "Match" },
+  { id: 5,  label: "Graphic Hoodie",             icon: "shirt",     query: "graphic hoodie streetwear oversized men",  aesthetic: "Streetwear",       gender: "male" },
+  { id: 6,  label: "Cargo Pants",                icon: "pants",     query: "cargo pants streetwear baggy men",         aesthetic: "Streetwear",       gender: "male" },
+  { id: 7,  label: "Puffer Jacket",              icon: "jacket",    query: "puffer jacket streetwear",                 aesthetic: "Streetwear",       gender: "both" },
+  { id: 51, label: "Cropped Hoodie",             icon: "shirt",     query: "cropped hoodie streetwear women",          aesthetic: "Streetwear",       gender: "female" },
   // Old Money
-  { id: 8,  label: "Cashmere Crew Neck",         icon: "shirt",     query: "cashmere crew neck sweater neutral",      aesthetic: "Old Money",        tag: "-30%" },
-  { id: 9,  label: "Pleated Wool Trousers",      icon: "pants",     query: "pleated wool trousers old money",         aesthetic: "Old Money" },
-  { id: 10, label: "Leather Loafers",            icon: "shoes",     query: "leather loafers penny old money",         aesthetic: "Old Money" },
-  { id: 11, label: "Trench Coat",                icon: "jacket",    query: "trench coat classic camel",               aesthetic: "Old Money" },
+  { id: 8,  label: "Cashmere Crew Neck",         icon: "shirt",     query: "cashmere crew neck sweater men neutral",   aesthetic: "Old Money",        gender: "male",  tag: "-30%" },
+  { id: 9,  label: "Pleated Wool Trousers",      icon: "pants",     query: "pleated wool trousers men old money",      aesthetic: "Old Money",        gender: "male" },
+  { id: 10, label: "Leather Loafers",            icon: "shoes",     query: "leather loafers penny old money",          aesthetic: "Old Money",        gender: "both" },
+  { id: 11, label: "Trench Coat",                icon: "jacket",    query: "trench coat classic camel men",            aesthetic: "Old Money",        gender: "male" },
+  { id: 52, label: "Silk Blouse",                icon: "shirt",     query: "silk blouse old money women elegant",      aesthetic: "Old Money",        gender: "female" },
   // Clean Girl
-  { id: 12, label: "Structured Tote",            icon: "bag",       query: "structured tote bag neutral",             aesthetic: "Clean Girl" },
-  { id: 13, label: "Ribbed Tank Top",            icon: "shirt",     query: "ribbed tank top clean girl neutral",      aesthetic: "Clean Girl" },
-  { id: 14, label: "High Waist Leggings",        icon: "pants",     query: "high waist leggings clean girl",          aesthetic: "Clean Girl" },
+  { id: 12, label: "Structured Tote",            icon: "bag",       query: "structured tote bag neutral",              aesthetic: "Clean Girl",       gender: "female" },
+  { id: 13, label: "Ribbed Tank Top",            icon: "shirt",     query: "ribbed tank top clean girl neutral women", aesthetic: "Clean Girl",       gender: "female" },
+  { id: 14, label: "High Waist Leggings",        icon: "pants",     query: "high waist leggings clean girl women",     aesthetic: "Clean Girl",       gender: "female" },
   // Dark Academia
-  { id: 15, label: "Plaid Blazer",               icon: "jacket",    query: "plaid blazer dark academia",              aesthetic: "Dark Academia" },
-  { id: 16, label: "Oxford Brogues",             icon: "shoes",     query: "oxford brogues dark academia leather",    aesthetic: "Dark Academia" },
-  { id: 17, label: "Turtleneck Knit",            icon: "shirt",     query: "turtleneck knit dark academia brown",     aesthetic: "Dark Academia" },
-  { id: 18, label: "Plaid Mini Skirt",           icon: "skirt",     query: "plaid mini skirt dark academia",          aesthetic: "Dark Academia" },
+  { id: 15, label: "Plaid Blazer",               icon: "jacket",    query: "plaid blazer dark academia",               aesthetic: "Dark Academia",    gender: "both" },
+  { id: 16, label: "Oxford Brogues",             icon: "shoes",     query: "oxford brogues dark academia leather",     aesthetic: "Dark Academia",    gender: "both" },
+  { id: 17, label: "Turtleneck Knit",            icon: "shirt",     query: "turtleneck knit dark academia brown men",  aesthetic: "Dark Academia",    gender: "male" },
+  { id: 18, label: "Plaid Mini Skirt",           icon: "skirt",     query: "plaid mini skirt dark academia women",     aesthetic: "Dark Academia",    gender: "female" },
+  { id: 53, label: "Wool Flat Cap",              icon: "accessory", query: "wool flat cap dark academia men",          aesthetic: "Dark Academia",    gender: "male" },
   // Cottagecore
-  { id: 19, label: "Floral Midi Dress",          icon: "dress",     query: "floral midi dress cottagecore",           aesthetic: "Cottagecore" },
-  { id: 20, label: "Puff Sleeve Blouse",         icon: "shirt",     query: "puff sleeve blouse cottagecore",          aesthetic: "Cottagecore" },
-  { id: 21, label: "Lace-Trim Skirt",            icon: "skirt",     query: "lace trim skirt cottagecore",             aesthetic: "Cottagecore" },
+  { id: 19, label: "Floral Midi Dress",          icon: "dress",     query: "floral midi dress cottagecore women",      aesthetic: "Cottagecore",      gender: "female" },
+  { id: 20, label: "Puff Sleeve Blouse",         icon: "shirt",     query: "puff sleeve blouse cottagecore women",     aesthetic: "Cottagecore",      gender: "female" },
+  { id: 21, label: "Lace-Trim Skirt",            icon: "skirt",     query: "lace trim skirt cottagecore women",        aesthetic: "Cottagecore",      gender: "female" },
+  { id: 54, label: "Linen Overshirt",            icon: "shirt",     query: "linen overshirt cottagecore men natural",  aesthetic: "Cottagecore",      gender: "male" },
   // Y2K
-  { id: 22, label: "Low Rise Jeans",             icon: "pants",     query: "low rise jeans y2k 2000s",                aesthetic: "Y2K" },
-  { id: 23, label: "Butterfly Top",             icon: "shirt",     query: "butterfly print top y2k crop",            aesthetic: "Y2K" },
-  { id: 24, label: "Platform Sandals",           icon: "shoes",     query: "platform sandals y2k 2000s",              aesthetic: "Y2K" },
-  { id: 25, label: "Mini Skirt & Tube Top",      icon: "skirt",     query: "tube top mini skirt y2k",                 aesthetic: "Y2K",              tag: "Match" },
+  { id: 22, label: "Low Rise Jeans",             icon: "pants",     query: "low rise jeans y2k 2000s women",           aesthetic: "Y2K",              gender: "female" },
+  { id: 23, label: "Butterfly Crop Top",         icon: "shirt",     query: "butterfly print crop top y2k women",       aesthetic: "Y2K",              gender: "female" },
+  { id: 24, label: "Platform Sandals",           icon: "shoes",     query: "platform sandals y2k 2000s women",         aesthetic: "Y2K",              gender: "female" },
+  { id: 25, label: "Mini Skirt & Tube Top",      icon: "skirt",     query: "tube top mini skirt y2k women",            aesthetic: "Y2K",              gender: "female", tag: "Match" },
+  { id: 55, label: "Baggy Y2K Jeans",            icon: "pants",     query: "baggy jeans y2k 2000s men",                aesthetic: "Y2K",              gender: "male" },
   // Boho
-  { id: 26, label: "Crochet Vest",               icon: "shirt",     query: "crochet vest boho festival",              aesthetic: "Boho" },
-  { id: 27, label: "Maxi Wrap Skirt",            icon: "skirt",     query: "maxi wrap skirt boho print",              aesthetic: "Boho" },
-  { id: 28, label: "Fringe Bag",                 icon: "bag",       query: "fringe crossbody bag boho",               aesthetic: "Boho" },
+  { id: 26, label: "Crochet Vest",               icon: "shirt",     query: "crochet vest boho festival women",         aesthetic: "Boho",             gender: "female" },
+  { id: 27, label: "Maxi Wrap Skirt",            icon: "skirt",     query: "maxi wrap skirt boho print women",         aesthetic: "Boho",             gender: "female" },
+  { id: 28, label: "Fringe Bag",                 icon: "bag",       query: "fringe crossbody bag boho",                aesthetic: "Boho",             gender: "both" },
+  { id: 56, label: "Linen Drawstring Pants",     icon: "pants",     query: "linen drawstring pants boho men",          aesthetic: "Boho",             gender: "male" },
   // Romantic
-  { id: 29, label: "Silk Wrap Dress",            icon: "dress",     query: "silk wrap dress elegant",                 aesthetic: "Romantic" },
-  { id: 30, label: "Pearl Drop Earrings",        icon: "accessory", query: "pearl drop earrings romantic",            aesthetic: "Romantic" },
-  { id: 31, label: "Ruffle Midi Dress",          icon: "dress",     query: "ruffle midi dress romantic feminine",     aesthetic: "Romantic" },
+  { id: 29, label: "Silk Wrap Dress",            icon: "dress",     query: "silk wrap dress elegant women",            aesthetic: "Romantic",         gender: "female" },
+  { id: 30, label: "Pearl Drop Earrings",        icon: "accessory", query: "pearl drop earrings romantic women",       aesthetic: "Romantic",         gender: "female" },
+  { id: 31, label: "Ruffle Midi Dress",          icon: "dress",     query: "ruffle midi dress romantic women",         aesthetic: "Romantic",         gender: "female" },
   // Grunge
-  { id: 32, label: "Band Tee",                   icon: "shirt",     query: "vintage band tee grunge oversized",       aesthetic: "Grunge" },
-  { id: 33, label: "Distressed Jeans",           icon: "pants",     query: "distressed ripped jeans grunge",          aesthetic: "Grunge" },
-  { id: 34, label: "Combat Boots",               icon: "shoes",     query: "combat boots black lace up grunge",       aesthetic: "Grunge" },
-  { id: 35, label: "Leather Moto Jacket",        icon: "jacket",    query: "leather moto jacket grunge black",        aesthetic: "Grunge",           tag: "Match" },
+  { id: 32, label: "Band Tee",                   icon: "shirt",     query: "vintage band tee grunge oversized",        aesthetic: "Grunge",           gender: "both" },
+  { id: 33, label: "Distressed Jeans",           icon: "pants",     query: "distressed ripped jeans grunge",           aesthetic: "Grunge",           gender: "both" },
+  { id: 34, label: "Combat Boots",               icon: "shoes",     query: "combat boots black lace up grunge",        aesthetic: "Grunge",           gender: "both" },
+  { id: 35, label: "Leather Moto Jacket",        icon: "jacket",    query: "leather moto jacket grunge black",         aesthetic: "Grunge",           gender: "both",  tag: "Match" },
   // Business Casual
-  { id: 36, label: "Tailored Blazer",            icon: "jacket",    query: "tailored blazer business casual neutral", aesthetic: "Business Casual" },
-  { id: 37, label: "Straight Leg Trousers",      icon: "pants",     query: "straight leg trousers business casual",   aesthetic: "Business Casual" },
-  { id: 38, label: "Block Heel Mules",           icon: "shoes",     query: "block heel mules business casual",        aesthetic: "Business Casual" },
+  { id: 36, label: "Tailored Blazer",            icon: "jacket",    query: "tailored blazer business casual men",      aesthetic: "Business Casual",  gender: "male" },
+  { id: 37, label: "Straight Leg Trousers",      icon: "pants",     query: "straight leg trousers business casual men",aesthetic: "Business Casual",  gender: "male" },
+  { id: 38, label: "Block Heel Mules",           icon: "shoes",     query: "block heel mules business casual women",   aesthetic: "Business Casual",  gender: "female" },
+  { id: 57, label: "Oxford Button-Down",         icon: "shirt",     query: "oxford button down shirt men business",    aesthetic: "Business Casual",  gender: "male" },
+  { id: 58, label: "Tailored Blazer Women",      icon: "jacket",    query: "tailored blazer women business casual",    aesthetic: "Business Casual",  gender: "female" },
   // Athleisure
-  { id: 39, label: "Seamless Sports Set",        icon: "shirt",     query: "seamless sports set matching athleisure", aesthetic: "Athleisure" },
-  { id: 40, label: "Oversized Track Jacket",     icon: "jacket",    query: "track jacket oversized athleisure",       aesthetic: "Athleisure" },
-  { id: 41, label: "Sporty Sneakers",            icon: "shoes",     query: "sporty sneakers white athleisure",        aesthetic: "Athleisure" },
+  { id: 39, label: "Seamless Sports Set",        icon: "shirt",     query: "seamless sports set women athleisure",     aesthetic: "Athleisure",       gender: "female" },
+  { id: 40, label: "Oversized Track Jacket",     icon: "jacket",    query: "track jacket oversized athleisure men",    aesthetic: "Athleisure",       gender: "male" },
+  { id: 41, label: "Sporty Sneakers",            icon: "shoes",     query: "sporty sneakers white athleisure",         aesthetic: "Athleisure",       gender: "both" },
+  { id: 59, label: "Athletic Shorts",            icon: "pants",     query: "athletic shorts men gym athleisure",       aesthetic: "Athleisure",       gender: "male" },
   // Hypebeast
-  { id: 42, label: "Jordan 1 High",              icon: "shoes",     query: "jordan 1 high sneakers hypebeast",        aesthetic: "Hypebeast" },
-  { id: 43, label: "Logo Hoodie",                icon: "shirt",     query: "supreme off-white logo hoodie hype",      aesthetic: "Hypebeast" },
-  { id: 44, label: "Techwear Pants",             icon: "pants",     query: "techwear cargo pants hypebeast",          aesthetic: "Hypebeast" },
+  { id: 42, label: "Jordan 1 High",              icon: "shoes",     query: "jordan 1 high sneakers hypebeast",         aesthetic: "Hypebeast",        gender: "both" },
+  { id: 43, label: "Logo Hoodie",                icon: "shirt",     query: "supreme off-white logo hoodie hype men",   aesthetic: "Hypebeast",        gender: "male" },
+  { id: 44, label: "Techwear Pants",             icon: "pants",     query: "techwear cargo pants hypebeast men",       aesthetic: "Hypebeast",        gender: "male" },
+  { id: 60, label: "Oversized Graphic Tee",      icon: "shirt",     query: "oversized graphic tee hype women",         aesthetic: "Hypebeast",        gender: "female" },
   // Coastal
-  { id: 45, label: "Linen Shirt Dress",          icon: "dress",     query: "linen shirt dress coastal summer",        aesthetic: "Coastal" },
-  { id: 46, label: "Wicker Tote",                icon: "bag",       query: "wicker basket tote coastal summer",       aesthetic: "Coastal" },
-  { id: 47, label: "Espadrille Sandals",         icon: "shoes",     query: "espadrille sandals coastal",              aesthetic: "Coastal" },
+  { id: 45, label: "Linen Shirt Dress",          icon: "dress",     query: "linen shirt dress coastal summer women",   aesthetic: "Coastal",          gender: "female" },
+  { id: 46, label: "Wicker Tote",                icon: "bag",       query: "wicker basket tote coastal summer",        aesthetic: "Coastal",          gender: "both" },
+  { id: 47, label: "Espadrille Sandals",         icon: "shoes",     query: "espadrille sandals coastal",               aesthetic: "Coastal",          gender: "both" },
+  { id: 61, label: "Linen Shorts",               icon: "pants",     query: "linen shorts men coastal summer",          aesthetic: "Coastal",          gender: "male" },
+  { id: 62, label: "Striped Nautical Tee",       icon: "shirt",     query: "striped nautical tee men coastal",         aesthetic: "Coastal",          gender: "male" },
   // Indie / Preppy
-  { id: 48, label: "Corduroy Jacket",            icon: "jacket",    query: "corduroy jacket indie vintage",           aesthetic: "Indie" },
+  { id: 48, label: "Corduroy Jacket",            icon: "jacket",    query: "corduroy jacket indie vintage men",        aesthetic: "Indie",            gender: "male" },
+  { id: 63, label: "Corduroy Skirt",             icon: "skirt",     query: "corduroy mini skirt indie women",          aesthetic: "Indie",            gender: "female" },
+  { id: 64, label: "Varsity Jacket",             icon: "jacket",    query: "varsity jacket preppy",                    aesthetic: "Preppy",           gender: "both" },
+  { id: 65, label: "Polo Shirt",                 icon: "shirt",     query: "polo shirt preppy men",                    aesthetic: "Preppy",           gender: "male" },
 ];
 
 const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Trending"];
@@ -150,14 +176,25 @@ const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Tre
 export default function HomePage() {
   const [, setLocation] = useLocation();
 
-  // Rank feed items by style vector — re-ranks whenever the vector changes
-  const rerank = useCallback(() => rankByVector(FEED_ITEMS), []);
+  // Gender-filter + vector-rank — re-runs on vector or profile change
+  const rerank = useCallback(() => {
+    const genderPref = getGenderPref();
+    const filtered = genderPref === "both"
+      ? FEED_ITEMS
+      : FEED_ITEMS.filter(item => item.gender === genderPref || item.gender === "both");
+    return rankByVector(filtered);
+  }, []);
+
   const [feedItems, setFeedItems] = useState<FeedItem[]>(rerank);
 
   useEffect(() => {
     const handler = () => setFeedItems(rerank());
     window.addEventListener("stitch_vector_updated", handler);
-    return () => window.removeEventListener("stitch_vector_updated", handler);
+    window.addEventListener("stitch_profile_updated", handler);
+    return () => {
+      window.removeEventListener("stitch_vector_updated", handler);
+      window.removeEventListener("stitch_profile_updated", handler);
+    };
   }, [rerank]);
 
   // Personalised greeting

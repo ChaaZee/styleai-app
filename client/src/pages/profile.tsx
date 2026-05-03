@@ -332,6 +332,8 @@ export default function ProfilePage() {
 
   const handleSave = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    // Notify home feed and other listeners to refresh
+    window.dispatchEvent(new CustomEvent("stitch_profile_updated"));
     setSaved(true);
     toast({ title: "Profile saved" });
     setTimeout(() => setSaved(false), 2000);
