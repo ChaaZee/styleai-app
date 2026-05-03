@@ -199,16 +199,23 @@ function LoadingScreen({ onDone }: { onDone: () => void }) {
     // Ping the health endpoint — once it responds, start fade-out
     const start = Date.now();
     const minDisplay = 1200; // always show for at least 1.2s
+    const maxDisplay = 3000; // never block for more than 3s (Render cold start)
+
+    function dismiss() {
+      setFading(true);
+      setTimeout(onDone, 500);
+    }
+
+    // Hard cap — dismiss after 3s no matter what
+    const maxTimer = setTimeout(dismiss, maxDisplay);
 
     fetch("/api/health", { cache: "no-store" })
-      .catch(() => {}) // ignore errors — just use the timer
+      .catch(() => {})
       .finally(() => {
+        clearTimeout(maxTimer);
         const elapsed = Date.now() - start;
         const remaining = Math.max(0, minDisplay - elapsed);
-        setTimeout(() => {
-          setFading(true);
-          setTimeout(onDone, 500);
-        }, remaining);
+        setTimeout(dismiss, remaining);
       });
   }, [onDone]);
 
