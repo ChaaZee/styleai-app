@@ -169,9 +169,9 @@ function AppContent() {
   const isDiscoverRoute = currentLocation.startsWith("/discover");
 
   return (
-    <div className="bg-background text-foreground flex flex-col" style={{ height: "100dvh", overflow: "hidden" }}>
+    <div className="bg-background text-foreground flex flex-col" style={{ height: "100dvh" }}>
       {!isQuizRoute && <TopBar theme={theme} toggleTheme={toggleTheme} />}
-      <main className={isQuizRoute ? "flex-1 overflow-auto" : isDiscoverRoute ? "flex-1 overflow-hidden" : "flex-1 overflow-auto pb-20 sm:pb-24"}>
+      <main className={isQuizRoute ? "flex-1 overflow-auto" : isDiscoverRoute ? "flex-1 overflow-hidden" : "flex-1 overflow-auto pb-4"}>
         <Switch>
           <Route path="/quiz" component={StyleQuizPage} />
           <Route path="/" component={HomePage} />
