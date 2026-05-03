@@ -44,7 +44,7 @@ function TopBar({ theme, toggleTheme }: { theme: string; toggleTheme: () => void
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 surface-glass">
+    <header className="sticky top-0 z-50 surface-glass">
       <div className="max-w-4xl mx-auto px-5 sm:px-8 h-12 sm:h-14 flex items-center justify-between">
         <Link href="/">
           <div className="flex items-center cursor-pointer" aria-label="Stitch home">

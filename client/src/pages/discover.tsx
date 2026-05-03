@@ -404,29 +404,12 @@ export default function DiscoverPage() {
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Keyframe animations */}
-      <style>{`
-        @keyframes heartPop {
-          0%   { transform: scale(0.4); opacity: 0; }
-          50%  { transform: scale(1.25); opacity: 1; }
-          80%  { transform: scale(0.95); opacity: 1; }
-          100% { transform: scale(1.1); opacity: 0; }
-        }
-        @keyframes fadeOut {
-          0%   { opacity: 1; }
-          60%  { opacity: 1; }
-          100% { opacity: 0; }
-        }
-      `}</style>
-
       <div
         className="overflow-y-scroll"
         style={{
           scrollSnapType: "y mandatory",
           overscrollBehavior: "contain",
           height: "100%",
-          position: "relative",
-          zIndex: 0,
         }}
       >
         {/* Style DNA intro card */}
