@@ -172,7 +172,7 @@ function DiscoverCard({
   return (
     <div
       className="w-full flex-shrink-0 flex flex-col bg-background"
-      style={{ scrollSnapAlign: "start", scrollSnapStop: "always", height: "calc(100svh - 48px - 64px)" }}
+      style={{ scrollSnapAlign: "start", scrollSnapStop: "always", height: "100%" }}
     >
       {/* Image — takes ~60% of screen height */}
       <div
@@ -403,7 +403,7 @@ export default function DiscoverPage() {
   const likedCount = Object.values(likes).filter(Boolean).length;
 
   return (
-    <>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Keyframe animations */}
       <style>{`
         @keyframes heartPop {
@@ -424,7 +424,7 @@ export default function DiscoverPage() {
         style={{
           scrollSnapType: "y mandatory",
           overscrollBehavior: "contain",
-          height: "calc(100svh - 48px - 64px)",
+          height: "100%",
           position: "relative",
           zIndex: 0,
         }}
@@ -433,7 +433,7 @@ export default function DiscoverPage() {
         {topAesthetic && (
           <div
             className="w-full flex-shrink-0 flex items-center justify-center px-5 bg-background"
-            style={{ scrollSnapAlign: "start", height: "calc(100svh - 48px - 64px)" }}
+            style={{ scrollSnapAlign: "start", height: "100%" }}
           >
             <div className="text-center max-w-xs">
               <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">Your Style</p>
@@ -453,7 +453,7 @@ export default function DiscoverPage() {
         {loadingFeed && (
           <div
             className="w-full flex-shrink-0 flex flex-col items-center justify-center gap-4 bg-background"
-            style={{ scrollSnapAlign: "start", height: "calc(100svh - 48px - 64px)" }}
+            style={{ scrollSnapAlign: "start", height: "100%" }}
           >
             <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
             <p className="text-sm text-muted-foreground">Loading outfits…</p>
@@ -464,7 +464,7 @@ export default function DiscoverPage() {
         {!loadingFeed && cards.length === 0 && (
           <div
             className="w-full flex-shrink-0 flex flex-col items-center justify-center gap-3 px-8 text-center bg-background"
-            style={{ scrollSnapAlign: "start", height: "calc(100svh - 48px - 64px)" }}
+            style={{ scrollSnapAlign: "start", height: "100%" }}
           >
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/40">
               <rect x="3" y="3" width="18" height="18" rx="3"/>
@@ -482,7 +482,7 @@ export default function DiscoverPage() {
         {/* End card */}
         <div
           className="w-full flex-shrink-0 flex flex-col items-center justify-center gap-3 bg-background"
-          style={{ scrollSnapAlign: "start", height: "calc(100svh - 48px - 64px)" }}
+          style={{ scrollSnapAlign: "start", height: "100%" }}
         >
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="hsl(24 42% 60%)" strokeWidth="1.5" strokeLinecap="round">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -491,6 +491,6 @@ export default function DiscoverPage() {
           <p className="text-sm text-muted-foreground">{likedCount} outfit{likedCount !== 1 ? "s" : ""} liked</p>
         </div>
       </div>
-    </>
+    </div>
   );
 }
