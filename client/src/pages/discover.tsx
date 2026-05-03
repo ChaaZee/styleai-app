@@ -330,11 +330,24 @@ export default function DiscoverPage() {
   const [loadingFeed, setLoadingFeed] = useState(true);
 
   useEffect(() => {
-    fetch("/api/discover")
-      .then(r => r.json())
-      .then((data: any[]) => {
-        if (!Array.isArray(data) || data.length === 0) return;
-        const apiCards: OutfitCard[] = data.map(row => ({
+    let cancelled = false;
+
+    async function loadCards(attempt = 1) {
+      try {
+        // Use AbortController for timeout — Render free tier can take 30-60s to wake
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 55000); // 55s timeout
+        const r = await fetch("/api/discover", { signal: controller.signal });
+        clearTimeout(timer);
+        const data = await r.json();
+        if (cancelled) return;
+        if (!Array.isArray(data) || data.length === 0) {
+          // Retry once after 3s if empty (server may still be seeding)
+          if (attempt < 2) { setTimeout(() => loadCards(2), 3000); return; }
+          setLoadingFeed(false);
+          return;
+        }
+        const apiCards: OutfitCard[] = data.map((row: any) => ({
           id: String(row.id),
           imageUrl: row.image_url || row.imageUrl,
           aesthetic: row.aesthetic,
@@ -347,23 +360,24 @@ export default function DiscoverPage() {
           subreddit: row.subreddit || null,
           likesCount: row.likes_count ?? row.likesCount ?? 0,
         }));
-        // Sort: vector-ranked first, but boost trending cards (likesCount > 0)
-        // into the top half so new users still see popular content
         const ranked = rankByVector(apiCards);
         const trending = [...apiCards].sort((a, b) => (b.likesCount ?? 0) - (a.likesCount ?? 0)).slice(0, 6);
         const trendingIds = new Set(trending.map(c => c.id));
         const rest = ranked.filter(c => !trendingIds.has(c.id));
-        // Interleave: 1 trending every 4 cards
         const interleaved: OutfitCard[] = [];
         let ti = 0, ri = 0;
         while (ri < rest.length || ti < trending.length) {
           if (ri < rest.length) interleaved.push(rest[ri++]);
           if (ri % 4 === 0 && ti < trending.length) interleaved.push(trending[ti++]);
         }
-        setCards(interleaved);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingFeed(false));
+        if (!cancelled) { setCards(interleaved); setLoadingFeed(false); }
+      } catch {
+        if (!cancelled) setLoadingFeed(false);
+      }
+    }
+
+    loadCards();
+    return () => { cancelled = true; };
   }, []);
 
   const [likes, setLikes] = useState<Record<string, boolean>>(() => {
@@ -402,8 +416,32 @@ export default function DiscoverPage() {
 
   const likedCount = Object.values(likes).filter(Boolean).length;
 
+  // Loading + empty rendered WITHOUT scroll container — NavBar always tappable
+  if (loadingFeed) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 bg-background" style={{ height: "100%" }}>
+        <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading outfits…</p>
+        <p className="text-xs text-muted-foreground/50">Server is waking up, this may take a moment</p>
+      </div>
+    );
+  }
+
+  if (cards.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 px-8 text-center bg-background" style={{ height: "100%" }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/40">
+          <rect x="3" y="3" width="18" height="18" rx="3"/>
+          <path d="M3 9h18M9 21V9"/>
+        </svg>
+        <p className="text-sm font-medium text-foreground">No outfits yet</p>
+        <p className="text-xs text-muted-foreground">The discover feed is being populated. Check back soon.</p>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100%", overflow: "hidden" }}>
       <div
         className="overflow-y-scroll"
         style={{
@@ -429,32 +467,6 @@ export default function DiscoverPage() {
                 <span className="text-xs">Swipe</span>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Loading state — inline so NavBar stays usable */}
-        {loadingFeed && (
-          <div
-            className="w-full flex-shrink-0 flex flex-col items-center justify-center gap-4 bg-background"
-            style={{ scrollSnapAlign: "start", height: "100%" }}
-          >
-            <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            <p className="text-sm text-muted-foreground">Loading outfits…</p>
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loadingFeed && cards.length === 0 && (
-          <div
-            className="w-full flex-shrink-0 flex flex-col items-center justify-center gap-3 px-8 text-center bg-background"
-            style={{ scrollSnapAlign: "start", height: "100%" }}
-          >
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/40">
-              <rect x="3" y="3" width="18" height="18" rx="3"/>
-              <path d="M3 9h18M9 21V9"/>
-            </svg>
-            <p className="text-sm font-medium text-foreground">No outfits yet</p>
-            <p className="text-xs text-muted-foreground">The discover feed is being populated. Check back soon.</p>
           </div>
         )}
 
