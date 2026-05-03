@@ -59,6 +59,7 @@ export const discoverCards = pgTable("discover_cards", {
   source: text("source").default("reddit"),
   postUrl: text("post_url"),      // link back to original Reddit post
   subreddit: text("subreddit"),   // e.g. "streetwear"
+  likesCount: integer("likes_count").notNull().default(0), // incremented when users like
   createdAt: timestamp("created_at").defaultNow(),
 });
 

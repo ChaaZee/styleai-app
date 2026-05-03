@@ -835,9 +835,11 @@ const SUBREDDIT_MAP: { sub: string; aesthetic: string }[] = [
 async function fetchSubredditImages(
   sub: string,
   limit = 3,
-  time: "week" | "month" = "week"
+  time: "week" | "month" | "hot" = "week"
 ): Promise<{ imageUrl: string; postUrl: string; title: string }[]> {
-  const url = `https://www.reddit.com/r/${sub}/top.json?limit=25&t=${time}`;
+  const url = time === "hot"
+    ? `https://www.reddit.com/r/${sub}/hot.json?limit=25`
+    : `https://www.reddit.com/r/${sub}/top.json?limit=25&t=${time}`;
   const res = await fetch(url, {
     headers: { "User-Agent": "StitchApp/1.0 (fashion discovery)" },
   });
@@ -1186,7 +1188,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
   // ── Discover feed ─────────────────────────────────────────────────────────────────
 
-  // GET /api/discover — returns stored discover cards
+  // GET /api/discover — returns all cards, trending first
   app.get("/api/discover", async (_req, res) => {
     try {
       const cards = await storage.getDiscoverCards();
@@ -1197,12 +1199,34 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // GET /api/discover/trending — top liked cards (for surfacing to new users)
+  app.get("/api/discover/trending", async (req, res) => {
+    try {
+      const limit = Math.min(Number(req.query.limit) || 20, 50);
+      const cards = await storage.getTrendingCards(limit);
+      res.json(cards);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/discover/:id/like — increment likes_count for a card
+  app.post("/api/discover/:id/like", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!id) return res.status(400).json({ error: "Invalid id" });
+      await storage.incrementCardLikes(id);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // DELETE /api/discover/reset — wipe all cards and re-seed fresh
   app.delete("/api/discover/reset", async (_req, res) => {
     try {
       await storage.clearDiscoverCards();
       console.log("[reset] Discover cards cleared — triggering fresh seed...");
-      // Fire-and-forget re-seed in background
       triggerSeedIfEmpty().catch(err => console.error("[reset] re-seed error:", err.message));
       res.json({ ok: true, message: "Cards cleared, re-seeding in background" });
     } catch (err: any) {
@@ -1210,7 +1234,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/discover/seed — initial seed from Reddit (idempotent)
+  // POST /api/discover/seed — initial seed from Reddit (idempotent, uses month/top)
   app.post("/api/discover/seed", async (_req, res) => {
     try {
       const existing = await storage.discoverCardCount();
@@ -1222,7 +1246,6 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const genAI = new GoogleGenerativeAI(apiKey);
       const results: any[] = [];
       const errors: string[] = [];
-
       for (const { sub, aesthetic } of SUBREDDIT_MAP) {
         try {
           const posts = await fetchSubredditImages(sub, 2, "month");
@@ -1231,13 +1254,9 @@ export async function registerRoutes(httpServer: Server, app: Express) {
               const card = await analyzeAndStore(post.imageUrl, post.postUrl, sub, aesthetic, genAI);
               if (card) results.push({ id: card.id, aesthetic: card.aesthetic, sub });
               await new Promise(r => setTimeout(r, 600));
-            } catch (e: any) {
-              errors.push(`${sub} image: ${e.message}`);
-            }
+            } catch (e: any) { errors.push(`${sub} image: ${e.message}`); }
           }
-        } catch (e: any) {
-          errors.push(`${sub}: ${e.message}`);
-        }
+        } catch (e: any) { errors.push(`${sub}: ${e.message}`); }
       }
       res.json({ ok: true, seeded: results.length, errors, cards: results });
     } catch (err: any) {
@@ -1245,35 +1264,59 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/discover/refresh — pull fresh posts (run weekly)
-  // Adds new cards without deleting existing ones; caps total at 60
+  // POST /api/discover/refresh — pull HOT posts + prune stale zero-liked cards
   app.post("/api/discover/refresh", async (_req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) return res.status(500).json({ error: "Gemini API key not configured" });
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const results: any[] = [];
-      const errors: string[] = [];
-
-      for (const { sub, aesthetic } of SUBREDDIT_MAP) {
-        try {
-          const posts = await fetchSubredditImages(sub, 1, "week");
-          for (const post of posts) {
-            try {
-              const card = await analyzeAndStore(post.imageUrl, post.postUrl, sub, aesthetic, genAI);
-              if (card) results.push({ id: card.id, aesthetic: card.aesthetic, sub });
-              await new Promise(r => setTimeout(r, 600));
-            } catch (e: any) {
-              errors.push(`${sub} image: ${e.message}`);
-            }
-          }
-        } catch (e: any) {
-          errors.push(`${sub}: ${e.message}`);
-        }
-      }
-      res.json({ ok: true, added: results.length, errors, cards: results });
+      const { added, pruned, errors } = await runDailyRefresh();
+      res.json({ ok: true, added, pruned, errors });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
+}
+
+// ── Daily refresh logic (hot sort + prune) ────────────────────────────────────
+async function runDailyRefresh(): Promise<{ added: number; pruned: number; errors: string[] }> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Gemini API key not configured");
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const errors: string[] = [];
+  let added = 0;
+
+  // Prune cards older than 30 days with 0 likes
+  const pruned = await storage.pruneStaleCards(30);
+  if (pruned > 0) console.log(`[refresh] Pruned ${pruned} stale cards`);
+
+  // Pull 2 new hot posts per subreddit
+  for (const { sub, aesthetic } of SUBREDDIT_MAP) {
+    try {
+      const posts = await fetchSubredditImages(sub, 2, "hot");
+      for (const post of posts) {
+        try {
+          const card = await analyzeAndStore(post.imageUrl, post.postUrl, sub, aesthetic, genAI);
+          if (card) { added++; console.log(`[refresh] +1 ${aesthetic} from r/${sub}`); }
+          await new Promise(r => setTimeout(r, 600));
+        } catch (e: any) { errors.push(`${sub} image: ${e.message}`); }
+      }
+    } catch (e: any) { errors.push(`${sub}: ${e.message}`); }
+  }
+  console.log(`[refresh] Done — added ${added}, pruned ${pruned}`);
+  return { added, pruned, errors };
+}
+
+// ── Start daily refresh cron (runs once per day while server is alive) ────────
+export function startDailyRefreshCron() {
+  const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+  console.log("[cron] Daily discover refresh scheduled (every 24h)");
+  // First run after 1 hour so startup seeding completes first
+  setTimeout(async function tick() {
+    console.log("[cron] Running daily discover refresh...");
+    try {
+      const result = await runDailyRefresh();
+      console.log(`[cron] Refresh complete — added:${result.added} pruned:${result.pruned}`);
+    } catch (err: any) {
+      console.error("[cron] Refresh failed:", err.message);
+    }
+    setTimeout(tick, INTERVAL_MS);
+  }, 60 * 60 * 1000); // start after 1h
 }

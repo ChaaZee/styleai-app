@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, lt, sql } from "drizzle-orm";
 import {
   scans,
   wardrobeItems,
@@ -77,6 +77,7 @@ export async function initDB() {
   `;
   // Add columns if they don't exist (idempotent migration)
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS post_url TEXT`;
+  await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0`;
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS subreddit TEXT`;
 }
 
@@ -93,6 +94,9 @@ export interface IStorage {
   discoverCardCount(): Promise<number>;
   clearDiscoverCards(): Promise<void>;
   postUrlExists(postUrl: string): Promise<boolean>;
+  incrementCardLikes(id: number): Promise<void>;
+  pruneStaleCards(olderThanDays: number): Promise<number>;
+  getTrendingCards(limit: number): Promise<DiscoverCard[]>;
 }
 
 export const storage: IStorage = {
@@ -140,5 +144,31 @@ export const storage: IStorage = {
       .where(eq(discoverCards.postUrl, postUrl))
       .limit(1);
     return rows.length > 0;
+  },
+  async incrementCardLikes(id: number) {
+    await db
+      .update(discoverCards)
+      .set({ likesCount: sql`${discoverCards.likesCount} + 1` })
+      .where(eq(discoverCards.id, id));
+  },
+  async pruneStaleCards(olderThanDays: number) {
+    const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+    const deleted = await db
+      .delete(discoverCards)
+      .where(
+        and(
+          lt(discoverCards.createdAt, cutoff),
+          eq(discoverCards.likesCount, 0)
+        )
+      )
+      .returning({ id: discoverCards.id });
+    return deleted.length;
+  },
+  async getTrendingCards(limit: number) {
+    return db
+      .select()
+      .from(discoverCards)
+      .orderBy(desc(discoverCards.likesCount), desc(discoverCards.createdAt))
+      .limit(limit);
   },
 };

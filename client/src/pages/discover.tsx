@@ -64,6 +64,7 @@ interface OutfitCard {
   keyPieces?: string[];
   postUrl?: string;
   subreddit?: string;
+  likesCount?: number;
 }
 
 interface LikedItem {
@@ -344,10 +345,22 @@ export default function DiscoverPage() {
           keyPieces: (() => { try { return JSON.parse(row.key_pieces || row.keyPieces || "[]"); } catch { return []; } })(),
           postUrl: row.post_url || row.postUrl || null,
           subreddit: row.subreddit || null,
+          likesCount: row.likes_count ?? row.likesCount ?? 0,
         }));
+        // Sort: vector-ranked first, but boost trending cards (likesCount > 0)
+        // into the top half so new users still see popular content
         const ranked = rankByVector(apiCards);
-        const mid = Math.ceil(ranked.length / 2);
-        setCards([...shuffled(ranked.slice(0, mid)), ...shuffled(ranked.slice(mid))]);
+        const trending = [...apiCards].sort((a, b) => (b.likesCount ?? 0) - (a.likesCount ?? 0)).slice(0, 6);
+        const trendingIds = new Set(trending.map(c => c.id));
+        const rest = ranked.filter(c => !trendingIds.has(c.id));
+        // Interleave: 1 trending every 4 cards
+        const interleaved: OutfitCard[] = [];
+        let ti = 0, ri = 0;
+        while (ri < rest.length || ti < trending.length) {
+          if (ri < rest.length) interleaved.push(rest[ri++]);
+          if (ri % 4 === 0 && ti < trending.length) interleaved.push(trending[ti++]);
+        }
+        setCards(interleaved);
       })
       .catch(() => {})
       .finally(() => setLoadingFeed(false));
@@ -365,8 +378,13 @@ export default function DiscoverPage() {
   const toggleLike = useCallback((card: OutfitCard) => {
     setLikes((prev) => {
       const next = { ...prev, [card.id]: !prev[card.id] };
-      if (next[card.id]) onLike(card.aesthetic, card.tags);
-      else onUnlike(card.aesthetic, card.tags);
+      if (next[card.id]) {
+        onLike(card.aesthetic, card.tags);
+        // Increment server-side likes_count (best-effort, non-blocking)
+        fetch(`/api/discover/${card.id}/like`, { method: "POST" }).catch(() => {});
+      } else {
+        onUnlike(card.aesthetic, card.tags);
+      }
       try {
         const raw = localStorage.getItem("stitch_likes");
         const arr: LikedItem[] = raw ? JSON.parse(raw) : [];
