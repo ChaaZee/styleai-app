@@ -423,8 +423,10 @@ export default function DiscoverPage() {
         className="overflow-y-scroll"
         style={{
           scrollSnapType: "y mandatory",
-          WebkitOverflowScrolling: "touch",
+          overscrollBehavior: "contain",
           height: "calc(100svh - 48px - 64px)",
+          position: "relative",
+          zIndex: 0,
         }}
       >
         {/* Style DNA intro card */}

@@ -165,11 +165,12 @@ function AppContent() {
   }, [showQuiz, setLocation]);
 
   const isQuizRoute = typeof window !== "undefined" && window.location.hash === "#/quiz";
+  const isDiscoverRoute = typeof window !== "undefined" && window.location.hash.startsWith("#/discover");
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {!isQuizRoute && <TopBar theme={theme} toggleTheme={toggleTheme} />}
-      <main className={isQuizRoute ? "flex-1" : "flex-1 pb-20 sm:pb-24"}>
+      <main className={isQuizRoute ? "flex-1" : isDiscoverRoute ? "flex-1" : "flex-1 pb-20 sm:pb-24"}>
         <Switch>
           <Route path="/quiz" component={StyleQuizPage} />
           <Route path="/" component={HomePage} />
