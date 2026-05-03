@@ -781,6 +781,36 @@ similarRecs — COMPLETE THE LOOK (4 items):
 
 Both sets: real brands, specific names (not "jeans" but "Washed Barrel-Fit Jeans"), match gender expression, realistic prices: Zara = 30–100, Levi's = 60–120, Dr. Martens = 140–200, The Row = 300–800.`;
 
+// ── Gemini retry helper ───────────────────────────────────────────────────────
+// Retries on 503 / 429 / RESOURCE_EXHAUSTED up to maxAttempts times with
+// exponential backoff. Keeps the user on the loading screen throughout.
+async function geminiWithRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+  baseDelayMs = 2000
+): Promise<T> {
+  let lastErr: any;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastErr = err;
+      const msg: string = err?.message ?? String(err);
+      const isRetryable =
+        msg.includes("503") ||
+        msg.includes("429") ||
+        msg.includes("RESOURCE_EXHAUSTED") ||
+        msg.includes("overloaded") ||
+        msg.includes("quota");
+      if (!isRetryable || attempt === maxAttempts) throw err;
+      const delay = baseDelayMs * attempt; // 2s, 4s
+      console.warn(`[gemini] attempt ${attempt} failed (${msg.slice(0, 80)}), retrying in ${delay}ms…`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
 // ── Reddit subreddit → aesthetic map (module-level for auto-seed access) ─────
 const SUBREDDIT_MAP: { sub: string; aesthetic: string }[] = [
   { sub: "streetwear",           aesthetic: "Streetwear" },
@@ -1002,10 +1032,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         },
       });
 
-      const detectionResult = await detectionModel.generateContent([
-        { inlineData: { data: imageBase64, mimeType } },
-        "List every visible garment and accessory. Be specific with names and details.",
-      ]);
+      const detectionResult = await geminiWithRetry(() =>
+        detectionModel.generateContent([
+          { inlineData: { data: imageBase64, mimeType } },
+          "List every visible garment and accessory. Be specific with names and details.",
+        ])
+      );
 
       const detectionText = detectionResult.response.text();
       const detectionJson = detectionText.match(/\{[\s\S]*\}/);
@@ -1034,10 +1066,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         },
       });
 
-      const result = await classificationModel.generateContent([
-        { inlineData: { data: imageBase64, mimeType } },
-        `Garment inventory:\n${garmentSummary}\n\nClassify the aesthetic using the taxonomy and disambiguation rules.`,
-      ]);
+      const result = await geminiWithRetry(() =>
+        classificationModel.generateContent([
+          { inlineData: { data: imageBase64, mimeType } },
+          `Garment inventory:\n${garmentSummary}\n\nClassify the aesthetic using the taxonomy and disambiguation rules.`,
+        ])
+      );
 
       const text = result.response.text();
       const jsonMatch = text.match(/\{[\s\S]*\}/);

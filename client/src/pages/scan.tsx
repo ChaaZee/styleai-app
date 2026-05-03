@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Upload, Sparkles, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -6,6 +6,14 @@ import { queryClient } from "@/lib/queryClient";
 import { getDeviceId } from "../lib/deviceId";
 
 type UploadState = "idle" | "preview" | "analyzing" | "done";
+
+const ANALYSIS_STEPS = [
+  { label: "Reading silhouette",   sub: "Mapping garment shapes & layers…" },
+  { label: "Detecting fabrics",    sub: "Identifying textures and materials…" },
+  { label: "Reading the palette",  sub: "Extracting colour story…" },
+  { label: "Classifying aesthetic",sub: "Matching to style taxonomy…" },
+  { label: "Building your profile",sub: "Scoring fit, occasion & vibe…" },
+];
 
 export default function ScanPage() {
   const [, setLocation] = useLocation();
@@ -15,6 +23,12 @@ export default function ScanPage() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [stepIdx, setStepIdx] = useState(0);
+  useEffect(() => {
+    if (uploadState !== "analyzing") { setStepIdx(0); return; }
+    const id = setInterval(() => setStepIdx(i => (i + 1) % ANALYSIS_STEPS.length), 2200);
+    return () => clearInterval(id);
+  }, [uploadState]);
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -78,28 +92,53 @@ export default function ScanPage() {
             />
           )}
 
-          {/* Scan corners — matches camera mockup */}
+          {/* Analyzing overlay */}
           {uploadState === "analyzing" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/75 backdrop-blur-sm gap-5">
-              {/* Scan frame */}
-              <div className="relative w-52 h-52">
-                {/* corners */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm gap-6">
+              {/* Scan frame with animated corners + sweep line */}
+              <div className="relative w-56 h-56">
                 {[
                   "top-0 left-0 border-t-2 border-l-2 rounded-tl-lg",
                   "top-0 right-0 border-t-2 border-r-2 rounded-tr-lg",
                   "bottom-0 left-0 border-b-2 border-l-2 rounded-bl-lg",
                   "bottom-0 right-0 border-b-2 border-r-2 rounded-br-lg",
                 ].map((cls, i) => (
-                  <div key={i} className={`absolute w-6 h-6 border-primary ${cls}`} />
+                  <div key={i} className={`absolute w-7 h-7 border-primary ${cls}`} />
                 ))}
-                {/* scan line */}
+                {/* Animated sweep line */}
                 <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent scan-pulse" />
+                {/* Pulsing dot in center */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary animate-ping opacity-75" />
+                </div>
               </div>
-              {/* Detected style pill — matches camera aesthetic-tag */}
-              <div className="bg-background/90 border border-border rounded-xl px-4 py-3 text-center shadow-sm">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Detecting Style</p>
-                <p className="font-display text-lg text-foreground">Analysing aesthetic…</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Gemini is reading silhouette, fabric & palette</p>
+
+              {/* Step card — cycles through ANALYSIS_STEPS */}
+              <div className="bg-background/95 border border-border rounded-2xl px-5 py-4 text-center shadow-lg min-w-[220px]">
+                <p className="text-[10px] text-primary uppercase tracking-widest font-semibold mb-1">
+                  Step {stepIdx + 1} of {ANALYSIS_STEPS.length}
+                </p>
+                <p className="font-display text-xl text-foreground leading-tight transition-all">
+                  {ANALYSIS_STEPS[stepIdx].label}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {ANALYSIS_STEPS[stepIdx].sub}
+                </p>
+                {/* Progress dots */}
+                <div className="flex justify-center gap-1.5 mt-3">
+                  {ANALYSIS_STEPS.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-full transition-all duration-300 ${
+                        i === stepIdx
+                          ? "w-4 h-1.5 bg-primary"
+                          : i < stepIdx
+                          ? "w-1.5 h-1.5 bg-primary/40"
+                          : "w-1.5 h-1.5 bg-border"
+                      }`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           )}
