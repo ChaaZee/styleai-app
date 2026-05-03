@@ -402,28 +402,6 @@ export default function DiscoverPage() {
 
   const likedCount = Object.values(likes).filter(Boolean).length;
 
-  if (loadingFeed) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4" style={{ height: "calc(100svh - 48px - 64px)" }}>
-        <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        <p className="text-sm text-muted-foreground">Loading outfits…</p>
-      </div>
-    );
-  }
-
-  if (cards.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 px-8 text-center" style={{ height: "calc(100svh - 48px - 64px)" }}>
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/40">
-          <rect x="3" y="3" width="18" height="18" rx="3"/>
-          <path d="M3 9h18M9 21V9"/>
-        </svg>
-        <p className="text-sm font-medium text-foreground">No outfits yet</p>
-        <p className="text-xs text-muted-foreground">The discover feed is being populated. Check back soon.</p>
-      </div>
-    );
-  }
-
   return (
     <>
       {/* Keyframe animations */}
@@ -466,6 +444,32 @@ export default function DiscoverPage() {
                 <span className="text-xs">Swipe</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Loading state — inline so NavBar stays usable */}
+        {loadingFeed && (
+          <div
+            className="w-full flex-shrink-0 flex flex-col items-center justify-center gap-4 bg-background"
+            style={{ scrollSnapAlign: "start", height: "calc(100svh - 48px - 64px)" }}
+          >
+            <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            <p className="text-sm text-muted-foreground">Loading outfits…</p>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loadingFeed && cards.length === 0 && (
+          <div
+            className="w-full flex-shrink-0 flex flex-col items-center justify-center gap-3 px-8 text-center bg-background"
+            style={{ scrollSnapAlign: "start", height: "calc(100svh - 48px - 64px)" }}
+          >
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground/40">
+              <rect x="3" y="3" width="18" height="18" rx="3"/>
+              <path d="M3 9h18M9 21V9"/>
+            </svg>
+            <p className="text-sm font-medium text-foreground">No outfits yet</p>
+            <p className="text-xs text-muted-foreground">The discover feed is being populated. Check back soon.</p>
           </div>
         )}
 
