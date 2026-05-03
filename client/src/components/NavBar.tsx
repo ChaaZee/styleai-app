@@ -53,7 +53,7 @@ export default function NavBar() {
       <Link href="/scan">
         <button
           data-testid="nav-scan"
-          className="relative -top-5 w-14 h-14 rounded-full bg-foreground flex items-center justify-center shadow-lg hover:bg-foreground/90 transition-all active:scale-95"
+          className="relative -top-5 w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg hover:bg-primary/90 transition-all active:scale-95"
           aria-label="Scan outfit"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
