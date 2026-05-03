@@ -90,7 +90,7 @@ function HeartBurst({ visible }: { visible: boolean }) {
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
       <svg
         width="90" height="90" viewBox="0 0 24 24"
-        fill="#C8956A" stroke="#C8956A" strokeWidth="1"
+        fill="#E8405A" stroke="#E8405A" strokeWidth="1"
         style={{ animation: "heartPop 0.55s ease forwards" }}
       >
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -110,15 +110,15 @@ function HeartButton({ liked, onToggle }: { liked: boolean; onToggle: () => void
     <button
       onClick={handle}
       aria-label={liked ? "Unlike" : "Like"}
-      className="relative flex items-center justify-center w-10 h-10 rounded-full transition-transform active:scale-90"
+      className="relative flex items-center justify-center w-10 h-10 rounded-full transition-transform active:scale-90 bg-black/30 backdrop-blur-sm"
       style={{ WebkitTapHighlightColor: "transparent" }}
     >
       {burst && (
-        <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: "rgba(200,149,106,0.3)", animationDuration: "0.5s" }} />
+        <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: "rgba(232,64,90,0.3)", animationDuration: "0.5s" }} />
       )}
       <svg width="24" height="24" viewBox="0 0 24 24"
-        fill={liked ? "#C8956A" : "none"}
-        stroke={liked ? "#C8956A" : "currentColor"}
+        fill={liked ? "#E8405A" : "none"}
+        stroke={liked ? "#E8405A" : "currentColor"}
         strokeWidth="1.75" strokeLinecap="round"
         style={{ transition: "fill 0.2s ease, transform 0.15s ease", transform: burst ? "scale(1.3)" : "scale(1)", color: "hsl(var(--muted-foreground))" }}
       >
@@ -210,14 +210,10 @@ function DiscoverCard({
           </div>
         )}
 
-        {/* Like indicator — bottom-right */}
-        {liked && (
-          <div className="absolute bottom-3 right-3">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="#C8956A" stroke="#C8956A" strokeWidth="1">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-            </svg>
-          </div>
-        )}
+        {/* Heart button — bottom-right of image */}
+        <div className="absolute bottom-3 right-3 z-10">
+          <HeartButton liked={liked} onToggle={() => onToggleLike(card)} />
+        </div>
 
         {/* Double-tap hint — fades after 2s on first render */}
         <DoubleTapHint />
@@ -226,17 +222,11 @@ function DiscoverCard({
       {/* Info panel — takes remaining ~40%, internally scrollable */}
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5" style={{ minHeight: 0 }}>
 
-        {/* Palette + like row */}
-        <div className="flex items-center justify-between">
-          <div className="flex gap-1.5 items-center">
-            {card.palette.slice(0, 5).map((hex, i) => (
-              <div key={i} className="w-5 h-5 rounded-full border border-border/60 shadow-sm flex-shrink-0" style={{ backgroundColor: hex }} />
-            ))}
-          </div>
-          <div className="flex items-center gap-1">
-            {liked && <span className="text-xs font-semibold text-primary">Liked</span>}
-            <HeartButton liked={liked} onToggle={() => onToggleLike(card)} />
-          </div>
+        {/* Palette row */}
+        <div className="flex gap-1.5 items-center">
+          {card.palette.slice(0, 5).map((hex, i) => (
+            <div key={i} className="w-5 h-5 rounded-full border border-border/60 shadow-sm flex-shrink-0" style={{ backgroundColor: hex }} />
+          ))}
         </div>
 
         {/* Key pieces — shop row */}
