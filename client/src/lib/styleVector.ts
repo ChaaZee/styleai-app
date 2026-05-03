@@ -58,6 +58,8 @@ export function loadVector(): StyleVector {
 
 function saveVector(v: StyleVector): void {
   localStorage.setItem(VECTOR_KEY, JSON.stringify(v));
+  // Notify any listeners (e.g. home feed) to re-rank
+  window.dispatchEvent(new CustomEvent("stitch_vector_updated"));
 }
 
 // ── Initialisation from quiz ───────────────────────────────────────────────

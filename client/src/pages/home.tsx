@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { rankByVector, getTopAesthetics } from "@/lib/styleVector";
 
 // ── Clothing SVG illustrations (same set as discover) ───────────────────────
@@ -150,8 +150,15 @@ const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Tre
 export default function HomePage() {
   const [, setLocation] = useLocation();
 
-  // Rank feed items by style vector affinity on mount
-  const [feedItems] = useState<FeedItem[]>(() => rankByVector(FEED_ITEMS));
+  // Rank feed items by style vector — re-ranks whenever the vector changes
+  const rerank = useCallback(() => rankByVector(FEED_ITEMS), []);
+  const [feedItems, setFeedItems] = useState<FeedItem[]>(rerank);
+
+  useEffect(() => {
+    const handler = () => setFeedItems(rerank());
+    window.addEventListener("stitch_vector_updated", handler);
+    return () => window.removeEventListener("stitch_vector_updated", handler);
+  }, [rerank]);
 
   // Personalised greeting
   const [topAesthetic] = useState<string | null>(() => {
