@@ -80,12 +80,69 @@ interface FeedItem {
 }
 
 const FEED_ITEMS: FeedItem[] = [
-  { id: 1, label: "Linen Blazer Dress",     icon: "dress",     query: "linen blazer dress minimalist",       aesthetic: "Minimalist", tag: "Match" },
-  { id: 2, label: "Structured Tote",         icon: "bag",       query: "structured tote bag neutral",         aesthetic: "Clean Girl" },
-  { id: 3, label: "Cashmere Crew Neck",      icon: "shirt",     query: "cashmere crew neck sweater neutral",  aesthetic: "Old Money", tag: "-30%" },
-  { id: 4, label: "Wide Leg Trousers",       icon: "pants",     query: "wide leg trousers minimal beige",     aesthetic: "Minimalist" },
-  { id: 5, label: "990v6 Sneaker",           icon: "shoes",     query: "new balance 990 sneakers",            aesthetic: "Streetwear", tag: "Match" },
-  { id: 6, label: "Silk Wrap Dress",         icon: "dress",     query: "silk wrap dress elegant",             aesthetic: "Romantic" },
+  // Minimalist
+  { id: 1,  label: "Linen Blazer Dress",        icon: "dress",     query: "linen blazer dress minimalist",           aesthetic: "Minimalist",       tag: "Match" },
+  { id: 2,  label: "Wide Leg Trousers",          icon: "pants",     query: "wide leg trousers minimal beige",         aesthetic: "Minimalist" },
+  { id: 3,  label: "Oversized White Tee",        icon: "shirt",     query: "oversized white t-shirt minimalist",      aesthetic: "Minimalist" },
+  // Streetwear
+  { id: 4,  label: "990v6 Sneaker",              icon: "shoes",     query: "new balance 990 sneakers",                aesthetic: "Streetwear",       tag: "Match" },
+  { id: 5,  label: "Graphic Hoodie",             icon: "shirt",     query: "graphic hoodie streetwear oversized",     aesthetic: "Streetwear" },
+  { id: 6,  label: "Cargo Pants",                icon: "pants",     query: "cargo pants streetwear baggy",            aesthetic: "Streetwear" },
+  { id: 7,  label: "Puffer Jacket",              icon: "jacket",    query: "puffer jacket streetwear",                aesthetic: "Streetwear" },
+  // Old Money
+  { id: 8,  label: "Cashmere Crew Neck",         icon: "shirt",     query: "cashmere crew neck sweater neutral",      aesthetic: "Old Money",        tag: "-30%" },
+  { id: 9,  label: "Pleated Wool Trousers",      icon: "pants",     query: "pleated wool trousers old money",         aesthetic: "Old Money" },
+  { id: 10, label: "Leather Loafers",            icon: "shoes",     query: "leather loafers penny old money",         aesthetic: "Old Money" },
+  { id: 11, label: "Trench Coat",                icon: "jacket",    query: "trench coat classic camel",               aesthetic: "Old Money" },
+  // Clean Girl
+  { id: 12, label: "Structured Tote",            icon: "bag",       query: "structured tote bag neutral",             aesthetic: "Clean Girl" },
+  { id: 13, label: "Ribbed Tank Top",            icon: "shirt",     query: "ribbed tank top clean girl neutral",      aesthetic: "Clean Girl" },
+  { id: 14, label: "High Waist Leggings",        icon: "pants",     query: "high waist leggings clean girl",          aesthetic: "Clean Girl" },
+  // Dark Academia
+  { id: 15, label: "Plaid Blazer",               icon: "jacket",    query: "plaid blazer dark academia",              aesthetic: "Dark Academia" },
+  { id: 16, label: "Oxford Brogues",             icon: "shoes",     query: "oxford brogues dark academia leather",    aesthetic: "Dark Academia" },
+  { id: 17, label: "Turtleneck Knit",            icon: "shirt",     query: "turtleneck knit dark academia brown",     aesthetic: "Dark Academia" },
+  { id: 18, label: "Plaid Mini Skirt",           icon: "skirt",     query: "plaid mini skirt dark academia",          aesthetic: "Dark Academia" },
+  // Cottagecore
+  { id: 19, label: "Floral Midi Dress",          icon: "dress",     query: "floral midi dress cottagecore",           aesthetic: "Cottagecore" },
+  { id: 20, label: "Puff Sleeve Blouse",         icon: "shirt",     query: "puff sleeve blouse cottagecore",          aesthetic: "Cottagecore" },
+  { id: 21, label: "Lace-Trim Skirt",            icon: "skirt",     query: "lace trim skirt cottagecore",             aesthetic: "Cottagecore" },
+  // Y2K
+  { id: 22, label: "Low Rise Jeans",             icon: "pants",     query: "low rise jeans y2k 2000s",                aesthetic: "Y2K" },
+  { id: 23, label: "Butterfly Top",             icon: "shirt",     query: "butterfly print top y2k crop",            aesthetic: "Y2K" },
+  { id: 24, label: "Platform Sandals",           icon: "shoes",     query: "platform sandals y2k 2000s",              aesthetic: "Y2K" },
+  { id: 25, label: "Mini Skirt & Tube Top",      icon: "skirt",     query: "tube top mini skirt y2k",                 aesthetic: "Y2K",              tag: "Match" },
+  // Boho
+  { id: 26, label: "Crochet Vest",               icon: "shirt",     query: "crochet vest boho festival",              aesthetic: "Boho" },
+  { id: 27, label: "Maxi Wrap Skirt",            icon: "skirt",     query: "maxi wrap skirt boho print",              aesthetic: "Boho" },
+  { id: 28, label: "Fringe Bag",                 icon: "bag",       query: "fringe crossbody bag boho",               aesthetic: "Boho" },
+  // Romantic
+  { id: 29, label: "Silk Wrap Dress",            icon: "dress",     query: "silk wrap dress elegant",                 aesthetic: "Romantic" },
+  { id: 30, label: "Pearl Drop Earrings",        icon: "accessory", query: "pearl drop earrings romantic",            aesthetic: "Romantic" },
+  { id: 31, label: "Ruffle Midi Dress",          icon: "dress",     query: "ruffle midi dress romantic feminine",     aesthetic: "Romantic" },
+  // Grunge
+  { id: 32, label: "Band Tee",                   icon: "shirt",     query: "vintage band tee grunge oversized",       aesthetic: "Grunge" },
+  { id: 33, label: "Distressed Jeans",           icon: "pants",     query: "distressed ripped jeans grunge",          aesthetic: "Grunge" },
+  { id: 34, label: "Combat Boots",               icon: "shoes",     query: "combat boots black lace up grunge",       aesthetic: "Grunge" },
+  { id: 35, label: "Leather Moto Jacket",        icon: "jacket",    query: "leather moto jacket grunge black",        aesthetic: "Grunge",           tag: "Match" },
+  // Business Casual
+  { id: 36, label: "Tailored Blazer",            icon: "jacket",    query: "tailored blazer business casual neutral", aesthetic: "Business Casual" },
+  { id: 37, label: "Straight Leg Trousers",      icon: "pants",     query: "straight leg trousers business casual",   aesthetic: "Business Casual" },
+  { id: 38, label: "Block Heel Mules",           icon: "shoes",     query: "block heel mules business casual",        aesthetic: "Business Casual" },
+  // Athleisure
+  { id: 39, label: "Seamless Sports Set",        icon: "shirt",     query: "seamless sports set matching athleisure", aesthetic: "Athleisure" },
+  { id: 40, label: "Oversized Track Jacket",     icon: "jacket",    query: "track jacket oversized athleisure",       aesthetic: "Athleisure" },
+  { id: 41, label: "Sporty Sneakers",            icon: "shoes",     query: "sporty sneakers white athleisure",        aesthetic: "Athleisure" },
+  // Hypebeast
+  { id: 42, label: "Jordan 1 High",              icon: "shoes",     query: "jordan 1 high sneakers hypebeast",        aesthetic: "Hypebeast" },
+  { id: 43, label: "Logo Hoodie",                icon: "shirt",     query: "supreme off-white logo hoodie hype",      aesthetic: "Hypebeast" },
+  { id: 44, label: "Techwear Pants",             icon: "pants",     query: "techwear cargo pants hypebeast",          aesthetic: "Hypebeast" },
+  // Coastal
+  { id: 45, label: "Linen Shirt Dress",          icon: "dress",     query: "linen shirt dress coastal summer",        aesthetic: "Coastal" },
+  { id: 46, label: "Wicker Tote",                icon: "bag",       query: "wicker basket tote coastal summer",       aesthetic: "Coastal" },
+  { id: 47, label: "Espadrille Sandals",         icon: "shoes",     query: "espadrille sandals coastal",              aesthetic: "Coastal" },
+  // Indie / Preppy
+  { id: 48, label: "Corduroy Jacket",            icon: "jacket",    query: "corduroy jacket indie vintage",           aesthetic: "Indie" },
 ];
 
 const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Trending"];
@@ -99,14 +156,22 @@ export default function HomePage() {
   // Personalised greeting
   const [topAesthetic] = useState<string | null>(() => {
     const tops = getTopAesthetics(1);
-    // Only show if vector has been seeded (i.e. quiz done)
     if (!localStorage.getItem("stitch_quiz_done")) return null;
     return tops[0] ?? null;
   });
 
+  // User's name from profile
+  const userName = (() => {
+    try {
+      const profile = JSON.parse(localStorage.getItem("stitch_profile") || "{}");
+      return profile.name as string | undefined;
+    } catch { return undefined; }
+  })();
+
   // Time-based greeting
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greetingLine = userName ? `${greeting}, ${userName}` : greeting;
 
   // Dynamic chips — put user's top aesthetic first if available
   const chips = topAesthetic
@@ -118,9 +183,8 @@ export default function HomePage() {
       {/* Greeting + chips — contained */}
       <div className="max-w-4xl mx-auto">
         <div className="px-5 sm:px-8 pt-5 sm:pt-7 pb-3">
-          <p className="text-xs text-muted-foreground">{greeting}</p>
           <h1 className="font-display text-2xl sm:text-3xl text-foreground leading-tight">
-            {topAesthetic ? `Your ${topAesthetic} Feed` : "Your Feed"}
+            {greetingLine}
           </h1>
         </div>
 
