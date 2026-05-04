@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { rankByVector, getTopAesthetics } from "@/lib/styleVector";
 
 // ── Clothing SVG illustrations (same set as discover) ───────────────────────
@@ -173,11 +173,31 @@ const FEED_ITEMS: FeedItem[] = [
 
 const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Trending"];
 
+// Map chip label → aesthetic value(s) in FEED_ITEMS
+const CHIP_AESTHETIC_MAP: Record<string, string[]> = {
+  "Minimal":    ["Minimalist"],
+  "Coastal":    ["Coastal"],
+  "Dark Acad.": ["Dark Academia"],
+  "Streetwear": ["Streetwear"],
+  "Old Money":  ["Old Money"],
+  "Y2K":        ["Y2K"],
+  "Boho":       ["Boho"],
+  "Grunge":     ["Grunge"],
+  "Clean Girl": ["Clean Girl"],
+  "Romantic":   ["Romantic"],
+  "Hypebeast":  ["Hypebeast"],
+  "Athleisure": ["Athleisure"],
+  "Business Casual": ["Business Casual"],
+  "Preppy":     ["Preppy"],
+  "Indie":      ["Indie"],
+  "Cottagecore":["Cottagecore"],
+};
+
 export default function HomePage() {
   const [, setLocation] = useLocation();
+  const [activeChip, setActiveChip] = useState("For You");
 
   // Gender-filter + vector-rank
-  // Reads gender fresh from localStorage every time (profile page unmounts home, so events don't work)
   const rerank = useCallback(() => {
     const genderPref = getGenderPref();
     const filtered = genderPref === "both"
@@ -186,19 +206,34 @@ export default function HomePage() {
     return rankByVector(filtered);
   }, []);
 
-  const [feedItems, setFeedItems] = useState<FeedItem[]>(rerank);
+  const [rankedItems, setRankedItems] = useState<FeedItem[]>(rerank);
 
-  // Re-rank on mount (catches returning from profile page where gender may have changed)
+  // Re-rank on mount
   useEffect(() => {
-    setFeedItems(rerank());
+    setRankedItems(rerank());
   }, [rerank]);
 
-  // Also re-rank when vector changes (like/unlike signals while on home)
+  // Re-rank on vector updates
   useEffect(() => {
-    const handler = () => setFeedItems(rerank());
+    const handler = () => setRankedItems(rerank());
     window.addEventListener("stitch_vector_updated", handler);
     return () => window.removeEventListener("stitch_vector_updated", handler);
   }, [rerank]);
+
+  // Derive visible feed from active chip
+  const feedItems = useMemo(() => {
+    if (activeChip === "For You") return rankedItems;
+    if (activeChip === "Trending") {
+      // Match-tagged items first, then top-scored items, capped at 20
+      const matches = rankedItems.filter(i => i.tag === "Match");
+      const rest = rankedItems.filter(i => i.tag !== "Match");
+      return [...matches, ...rest].slice(0, 20);
+    }
+    const aesthetics = CHIP_AESTHETIC_MAP[activeChip] ?? [activeChip];
+    const filtered = rankedItems.filter(i => aesthetics.includes(i.aesthetic));
+    // Fall back to full list if nothing matches
+    return filtered.length > 0 ? filtered : rankedItems;
+  }, [activeChip, rankedItems]);
 
   // Personalised greeting
   const [topAesthetic] = useState<string | null>(() => {
@@ -225,6 +260,11 @@ export default function HomePage() {
     ? ["For You", topAesthetic, ...CHIPS.filter(c => c !== "For You" && c !== topAesthetic).slice(0, 4)]
     : CHIPS;
 
+  // Section label under chips
+  const sectionLabel = activeChip === "For You" ? "For You"
+    : activeChip === "Trending" ? "Trending Now"
+    : activeChip;
+
   return (
     <div className="fade-up">
       {/* Greeting + chips — contained */}
@@ -237,13 +277,14 @@ export default function HomePage() {
 
         {/* Aesthetic chips */}
         <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 sm:px-8 pb-3">
-          {chips.map((c, i) => (
+          {chips.map((c) => (
             <button
               key={c}
-              className={`px-3.5 py-1.5 rounded-full flex-shrink-0 transition-all font-ui ${
-                i === 0
-                  ? "bg-foreground text-background text-[10px] tracking-widest uppercase"
-                  : "bg-muted text-muted-foreground border border-border hover:text-foreground text-[10px] tracking-widest uppercase"
+              onClick={() => setActiveChip(c)}
+              className={`px-3.5 py-1.5 rounded-full flex-shrink-0 transition-all font-ui text-[10px] tracking-widest uppercase ${
+                activeChip === c
+                  ? "bg-foreground text-background"
+                  : "bg-muted text-muted-foreground border border-border hover:text-foreground"
               }`}
             >
               {c}
@@ -251,10 +292,15 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* For You header */}
+        {/* Section label */}
         <div className="px-5 sm:px-8 flex items-center justify-between mb-0 pb-3">
-          <span className="font-label text-[10px] text-foreground">For You</span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">↑ 24 new</span>
+          <span className="font-label text-[10px] text-foreground">{sectionLabel}</span>
+          {activeChip === "For You" && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">↑ 24 new</span>
+          )}
+          {activeChip !== "For You" && feedItems.length > 0 && (
+            <span className="text-[10px] text-muted-foreground">{feedItems.length} item{feedItems.length !== 1 ? "s" : ""}</span>
+          )}
         </div>
       </div>
 
