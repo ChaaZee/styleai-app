@@ -185,7 +185,7 @@ function MeasurementRow({
     <div className="rounded-xl border border-border bg-card overflow-hidden transition-all duration-200">
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="flex-1">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
+          <p className="font-label text-[9px] text-muted-foreground mb-1">{label}</p>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -282,7 +282,7 @@ function StyleDNASection() {
   return (
     <div className="rounded-xl border border-border bg-card p-4 mb-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your Style DNA</p>
+        <p className="font-label text-[9px] text-muted-foreground">Your Style DNA</p>
         <button
           onClick={retakeQuiz}
           className="text-xs text-primary hover:text-primary/80 transition-colors"
@@ -355,7 +355,7 @@ export default function ProfilePage() {
       {/* Name + gender + units */}
       <div className="rounded-xl border border-border bg-card p-4 mb-4 space-y-4">
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Name</p>
+          <p className="font-label text-[9px] text-muted-foreground mb-1.5">Name</p>
           <input
             type="text"
             placeholder="Your name"
@@ -365,7 +365,7 @@ export default function ProfilePage() {
           />
         </div>
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">I shop for</p>
+          <p className="font-label text-[9px] text-muted-foreground mb-2">I shop for</p>
           <div className="flex gap-2">
             {["male", "female", "both"].map(g => (
               <button
@@ -379,7 +379,7 @@ export default function ProfilePage() {
           </div>
         </div>
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Units</p>
+          <p className="font-label text-[9px] text-muted-foreground mb-2">Units</p>
           <div className="flex gap-2">
             {(["in", "cm"] as const).map(u => (
               <button
@@ -399,7 +399,7 @@ export default function ProfilePage() {
 
       {/* Measurements */}
       <div className="space-y-2 mb-4">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Upper Body</p>
+        <p className="font-label text-[9px] text-muted-foreground mb-2">Upper Body</p>
         <MeasurementRow id="height"    label="Height"          value={profile.height}    unit={unit}              onChange={set("height")} />
         <MeasurementRow id="chest"     label={showBust ? "Chest / Bust" : "Chest"} value={profile.chest} unit={unit} onChange={set("chest")} />
         {showBust && (
@@ -408,15 +408,15 @@ export default function ProfilePage() {
         <MeasurementRow id="shoulders" label="Shoulder Width"  value={profile.shoulders} unit={unit}              onChange={set("shoulders")} />
         <MeasurementRow id="sleeve"    label="Sleeve Length"   value={profile.sleeve}    unit={unit}              onChange={set("sleeve")} />
 
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-4 mb-2">Core</p>
+        <p className="font-label text-[9px] text-muted-foreground mt-4 mb-2">Core</p>
         <MeasurementRow id="waist"     label="Waist"           value={profile.waist}     unit={unit}              onChange={set("waist")} />
         <MeasurementRow id="hips"      label="Hips"            value={profile.hips}      unit={unit}              onChange={set("hips")} />
 
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-4 mb-2">Lower Body</p>
+        <p className="font-label text-[9px] text-muted-foreground mt-4 mb-2">Lower Body</p>
         <MeasurementRow id="inseam"    label="Inseam"          value={profile.inseam}    unit={unit}              onChange={set("inseam")} />
         <MeasurementRow id="thigh"     label="Thigh"           value={profile.thigh}     unit={unit}              onChange={set("thigh")} />
 
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-4 mb-2">General</p>
+        <p className="font-label text-[9px] text-muted-foreground mt-4 mb-2">General</p>
         <MeasurementRow id="weight"    label="Weight"          value={profile.weight}    unit={unit === "in" ? "lbs" : "kg"} onChange={set("weight")} />
       </div>
 

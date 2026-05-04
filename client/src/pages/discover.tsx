@@ -92,7 +92,7 @@ function DiscoverCard({ card, liked, onToggleLike }: {
         <HeartBurst visible={burstHeart}/>
         {imgLoaded && !imgError && (
           <div className="absolute bottom-3 left-3">
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: "rgba(0,0,0,0.45)" }}>
+            <span className="px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: "rgba(0,0,0,0.45)", fontFamily: "'Jost', sans-serif", fontWeight: 300, fontSize: "10px", letterSpacing: "0.14em", textTransform: "uppercase" }}>
               {card.aesthetic}
             </span>
           </div>
@@ -123,7 +123,7 @@ function DiscoverCard({ card, liked, onToggleLike }: {
         {card.keyPieces.length > 0 && (
           <div className="rounded-xl border border-border bg-card p-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Shop the Look</p>
+              <p className="font-label text-[9px] text-muted-foreground">Shop the Look</p>
               <div className="flex items-center gap-1">
                 <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FF2300" }}>
                   <span className="text-white font-bold" style={{ fontSize: "8px" }}>d</span>
@@ -280,7 +280,7 @@ export default function DiscoverPage() {
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E8405A" strokeWidth="1.5" strokeLinecap="round">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
         </svg>
-        <p className="font-display text-xl text-foreground">You're all caught up</p>
+        <p className="font-display text-2xl text-foreground">You're all caught up</p>
         <p className="text-sm text-muted-foreground">{likedCount} outfit{likedCount !== 1 ? "s" : ""} liked</p>
         <button onClick={() => setIdx(0)} className="mt-2 text-xs text-primary underline">Start over</button>
       </div>

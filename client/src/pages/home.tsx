@@ -230,7 +230,7 @@ export default function HomePage() {
       {/* Greeting + chips — contained */}
       <div className="max-w-4xl mx-auto">
         <div className="px-5 sm:px-8 pt-5 sm:pt-7 pb-3">
-          <h1 className="font-display text-2xl sm:text-3xl text-foreground leading-tight">
+          <h1 className="font-display text-3xl sm:text-4xl text-foreground leading-tight">
             {greetingLine}
           </h1>
         </div>
@@ -240,10 +240,10 @@ export default function HomePage() {
           {chips.map((c, i) => (
             <button
               key={c}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${
+              className={`px-3.5 py-1.5 rounded-full flex-shrink-0 transition-all font-ui ${
                 i === 0
-                  ? "bg-foreground text-background"
-                  : "bg-muted text-muted-foreground border border-border hover:text-foreground"
+                  ? "bg-foreground text-background text-[10px] tracking-widest uppercase"
+                  : "bg-muted text-muted-foreground border border-border hover:text-foreground text-[10px] tracking-widest uppercase"
               }`}
             >
               {c}
@@ -253,7 +253,7 @@ export default function HomePage() {
 
         {/* For You header */}
         <div className="px-5 sm:px-8 flex items-center justify-between mb-0 pb-3">
-          <span className="text-sm font-semibold text-foreground">For You</span>
+          <span className="font-label text-[10px] text-foreground">For You</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">↑ 24 new</span>
         </div>
       </div>
@@ -280,7 +280,7 @@ export default function HomePage() {
             </div>
             {/* Info */}
             <div className="px-3 pb-4">
-              <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">{item.aesthetic}</p>
+              <p className="font-label text-[9px] text-muted-foreground mb-0.5" style={{ letterSpacing: '0.14em' }}>{item.aesthetic}</p>
               <p className="text-xs text-foreground font-medium leading-snug mb-2">{item.label}</p>
               <div className="flex items-center justify-between">
                 <DepopBadge />

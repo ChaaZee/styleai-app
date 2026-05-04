@@ -195,7 +195,7 @@ export default function StyleQuizPage() {
           className="transition-opacity duration-200"
           style={{ opacity: leaving ? 0 : 1 }}
         >
-          <p className="text-xs font-medium text-primary uppercase tracking-widest mb-1">
+          <p className="font-label text-[9px] text-primary mb-1">
             {step + 1} of {QUESTIONS.length}
           </p>
           <h1 className="font-display text-2xl sm:text-3xl text-foreground mb-1 leading-tight">

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Jost:ital,wght@0,200;0,300;0,400;0,500;1,200;1,300;1,400&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -84,6 +84,20 @@
 @layer utilities {
   .font-display {
     font-family: 'Cormorant Garamond', Georgia, serif;
+  }
+
+  /* Jost label — uppercase, wide tracking, ExtraLight */
+  .font-label {
+    font-family: 'Jost', sans-serif;
+    font-weight: 200;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  /* Jost UI — section headers, nav, chips, medium weight */
+  .font-ui {
+    font-family: 'Jost', sans-serif;
+    font-weight: 400;
   }
 
   /* Stitch blue gradient text */
@@ -184,15 +198,17 @@
     padding: clamp(0.75rem, 2vw, 1.25rem);
   }
 
-  /* Pill tag */
+  /* Pill tag — Jost label style */
   .tag {
     display: inline-flex;
     align-items: center;
     padding: 3px 10px;
     border-radius: 9999px;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.02em;
+    font-family: 'Jost', sans-serif;
+    font-size: 10px;
+    font-weight: 300;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     background: hsl(var(--muted));
     color: hsl(var(--muted-foreground));
     border: 1px solid hsl(var(--border));

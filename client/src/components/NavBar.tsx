@@ -30,7 +30,7 @@ export default function NavBar() {
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
             <polyline points="9 22 9 12 15 12 15 22"/>
           </svg>
-          <span className="text-[10px] font-medium tracking-wide">Home</span>
+          <span style={{ fontFamily: "'Jost', sans-serif", fontWeight: 300, fontSize: "9px", letterSpacing: "0.14em", textTransform: "uppercase" }}>Home</span>
         </button>
       </Link>
 
@@ -45,7 +45,7 @@ export default function NavBar() {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isWardrobe ? 2.2 : 1.75} strokeLinecap="round">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
-          <span className="text-[10px] font-medium tracking-wide">Wardrobe</span>
+          <span style={{ fontFamily: "'Jost', sans-serif", fontWeight: 300, fontSize: "9px", letterSpacing: "0.14em", textTransform: "uppercase" }}>Wardrobe</span>
         </button>
       </Link>
 
@@ -75,7 +75,7 @@ export default function NavBar() {
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12 6 12 12 16 14"/>
           </svg>
-          <span className="text-[10px] font-medium tracking-wide">History</span>
+          <span style={{ fontFamily: "'Jost', sans-serif", fontWeight: 300, fontSize: "9px", letterSpacing: "0.14em", textTransform: "uppercase" }}>History</span>
         </button>
       </Link>
 
@@ -90,7 +90,7 @@ export default function NavBar() {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isDiscover ? 2.2 : 1.75} strokeLinecap="round">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
-          <span className="text-[10px] font-medium tracking-wide">Discover</span>
+          <span style={{ fontFamily: "'Jost', sans-serif", fontWeight: 300, fontSize: "9px", letterSpacing: "0.14em", textTransform: "uppercase" }}>Discover</span>
         </button>
       </Link>
       </div>

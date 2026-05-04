@@ -115,7 +115,7 @@ export default function ScanPage() {
 
               {/* Step card — cycles through ANALYSIS_STEPS */}
               <div className="bg-background/95 border border-border rounded-2xl px-5 py-4 text-center shadow-lg min-w-[220px]">
-                <p className="text-[10px] text-primary uppercase tracking-widest font-semibold mb-1">
+                <p className="font-label text-[9px] text-primary mb-1">
                   Step {stepIdx + 1} of {ANALYSIS_STEPS.length}
                 </p>
                 <p className="font-display text-xl text-foreground leading-tight transition-all">
@@ -184,7 +184,7 @@ export default function ScanPage() {
 
       {/* Header */}
       <div className="mb-10 text-center">
-        <p className="text-xs font-medium tracking-[0.12em] uppercase text-primary mb-3">Visual Style Recognition</p>
+        <p className="font-label text-[9px] text-primary mb-3">Visual Style Recognition</p>
         <h1 className="font-display text-5xl sm:text-6xl text-foreground mb-4 leading-[1.05]">
           Discover your<br /><em>aesthetic</em>
         </h1>
@@ -240,7 +240,7 @@ export default function ScanPage() {
           { title: "Any source", desc: "Pinterest, Instagram, camera roll" },
         ].map((tip) => (
           <div key={tip.title} className="rounded-xl border border-border bg-card p-4 text-center">
-            <p className="text-xs font-semibold text-foreground mb-1 tracking-wide uppercase">{tip.title}</p>
+            <p className="font-label text-[9px] text-foreground mb-1">{tip.title}</p>
             <p className="text-xs text-muted-foreground leading-snug">{tip.desc}</p>
           </div>
         ))}
