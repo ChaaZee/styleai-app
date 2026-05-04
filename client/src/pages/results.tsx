@@ -1,10 +1,10 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { X, ShoppingBag, ExternalLink } from "lucide-react";
+import { X, ExternalLink, Loader2 } from "lucide-react";
 import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 import { useState, useEffect, useRef } from "react";
 import type { Scan } from "@shared/schema";
-import { onResultViewed, onResultSaved, onLike, onUnlike } from "@/lib/styleVector";
+import { onResultViewed, onResultSaved, onUnlike } from "@/lib/styleVector";
 
 // ── Clothing SVG illustrations ────────────────────────────────────────────────
 const ClothingIcons: Record<string, JSX.Element> = {
@@ -185,6 +185,10 @@ export default function ResultsPage() {
   const [activeBudget, setActiveBudget] = useState("All");
   const [depopMode, setDepopMode] = useState(false);
   const [likedPieces, setLikedPieces] = useState<Record<string, boolean>>({});
+  const [depopListings, setDepopListings] = useState<any[]>([]);
+  const [depopLoading, setDepopLoading] = useState(false);
+  const [depopError, setDepopError] = useState<string | null>(null);
+  const depopFetchedRef = useRef(false);
 
   const { data: scan, isLoading, isError } = useQuery<Scan>({
     queryKey: ["/api/scans", Number(id)],
@@ -210,6 +214,26 @@ export default function ResultsPage() {
     }, 2000);
     return () => clearTimeout(timer);
   }, [scan]);
+
+  // Fetch real Depop listings when depopMode is first enabled
+  useEffect(() => {
+    if (!depopMode || !scan || depopFetchedRef.current) return;
+    depopFetchedRef.current = true;
+    const keyPiecesArr: string[] = JSON.parse(scan.keyPieces || "[]");
+    const query = keyPiecesArr.length > 0
+      ? `${scan.aesthetic} ${keyPiecesArr[0]}`.toLowerCase()
+      : scan.aesthetic.toLowerCase();
+    setDepopLoading(true);
+    setDepopError(null);
+    fetch(`/api/depop-search?q=${encodeURIComponent(query)}&limit=12`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.listings) setDepopListings(data.listings);
+        else setDepopError(data.error || "No results");
+      })
+      .catch(() => setDepopError("Could not load Depop listings"))
+      .finally(() => setDepopLoading(false));
+  }, [depopMode, scan]);
 
   if (isLoading) {
     return (
@@ -446,30 +470,63 @@ export default function ResultsPage() {
 
       {/* Product sections */}
       {depopMode ? (
-        // Depop mode — illustration + name list
-        <div className="px-5 sm:px-8 flex flex-col gap-2 pb-4">
-          {filteredProducts.map((product) => (
-            <a
-              key={product.id}
-              href={depopUrl(scan.aesthetic, [product.name])}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-3 py-3 rounded-xl border border-border bg-card hover:border-primary/40 transition-colors group"
-            >
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 text-foreground/40 group-hover:text-primary transition-colors">
-                {ClothingIcons[iconForProduct(product.name)]}
+        // Depop mode — real listings from Apify
+        <div className="px-5 sm:px-8 pb-4">
+          {depopLoading && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Loader2 size={22} className="text-primary animate-spin" />
+              <p className="text-xs text-muted-foreground">Finding secondhand pieces on Depop…</p>
+            </div>
+          )}
+          {depopError && !depopLoading && (
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <p className="text-xs text-muted-foreground">{depopError}</p>
+              <a
+                href={depopUrl(scan.aesthetic, keyPieces)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary underline underline-offset-2"
+              >
+                Search Depop directly
+              </a>
+            </div>
+          )}
+          {!depopLoading && depopListings.length > 0 && (
+            <>
+              <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
+                {depopListings.map((item) => (
+                  <a
+                    key={item.id}
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 transition-colors group cursor-pointer"
+                  >
+                    <div
+                      className="aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                      style={{ backgroundImage: `url('${item.image}')` }}
+                    />
+                    <div className="p-2">
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium truncate">
+                        {item.brand || "Depop"}
+                        {item.size ? ` · ${item.size}` : ""}
+                      </p>
+                      <p className="text-xs font-semibold text-foreground leading-tight line-clamp-2 mb-0.5">{item.title}</p>
+                      <p className="text-xs text-primary font-semibold">${item.price.toFixed(0)}</p>
+                    </div>
+                  </a>
+                ))}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-foreground leading-tight">{product.name}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{product.retailer} · Search on Depop</p>
-              </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15 3 21 3 21 9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-            </a>
-          ))}
+              <a
+                href={depopUrl(scan.aesthetic, keyPieces)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                See more on Depop <ExternalLink size={11} />
+              </a>
+            </>
+          )}
         </div>
       ) : hasSplit ? (
         // Split mode — Get the Look + Complete the Look

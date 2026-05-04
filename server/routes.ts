@@ -1264,6 +1264,53 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // GET /api/depop-search?q=<keyword>&limit=<n> — fetch real Depop listings via Apify
+  app.get("/api/depop-search", async (req, res) => {
+    const q = String(req.query.q || "").trim();
+    const limit = Math.min(parseInt(String(req.query.limit || "12"), 10) || 12, 24);
+    if (!q) return res.status(400).json({ error: "Missing query" });
+
+    const token = process.env.APIFY_TOKEN;
+    if (!token) return res.status(503).json({ error: "Depop search not configured" });
+
+    try {
+      const apifyRes = await fetch(
+        `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/run-sync-get-dataset-items?token=${token}&timeout=55`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ searchQueries: [q], maxItems: limit }),
+          signal: AbortSignal.timeout(60_000),
+        }
+      );
+      if (!apifyRes.ok) {
+        const txt = await apifyRes.text();
+        console.error("[depop-search] Apify error:", apifyRes.status, txt.slice(0, 200));
+        return res.status(502).json({ error: "Depop search failed" });
+      }
+      const items: any[] = await apifyRes.json();
+      // Normalise to a consistent shape
+      const listings = items
+        .filter(i => i.image_url && i.product_link)
+        .map((i, idx) => ({
+          id: idx,
+          title: i.title || "",
+          brand: i.brand || "",
+          price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
+          currency: i.currency || "USD",
+          size: i.size || "",
+          image: Array.isArray(i.image_url) ? i.image_url[0] : i.image_url,
+          url: i.product_link.startsWith("http")
+            ? i.product_link
+            : `https://www.depop.com${i.product_link}`,
+        }));
+      res.json({ listings });
+    } catch (err: any) {
+      console.error("[depop-search] Error:", err.message);
+      res.status(500).json({ error: "Depop search failed" });
+    }
+  });
+
   // POST /api/discover/refresh — pull HOT posts + prune stale zero-liked cards
   app.post("/api/discover/refresh", async (_req, res) => {
     try {
