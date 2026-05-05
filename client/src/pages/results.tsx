@@ -187,6 +187,7 @@ export default function ResultsPage() {
   const [likedPieces, setLikedPieces] = useState<Record<string, boolean>>({});
   // depopGroups: { piece: string, listings: any[] }[]
   const [depopGroups, setDepopGroups] = useState<{ piece: string; listings: any[] }[]>([]);
+  const [depopPieces, setDepopPieces] = useState<string[]>([]);
   const [depopLoading, setDepopLoading] = useState(false);
   const [depopError, setDepopError] = useState<string | null>(null);
   const depopFetchedRef = useRef(false);
@@ -229,6 +230,7 @@ export default function ResultsPage() {
     setDepopLoading(true);
     setDepopError(null);
     setDepopGroups([]);
+    setDepopPieces(pieces);
 
     let cancelled = false;
     const MAX_POLLS = 25;
@@ -529,9 +531,34 @@ export default function ResultsPage() {
         // Depop mode — real listings from Apify
         <div className="px-5 sm:px-8 pb-4">
           {depopLoading && (
-            <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Loader2 size={22} className="text-primary animate-spin" />
-              <p className="text-xs text-muted-foreground">Finding secondhand pieces on Depop…</p>
+            <div className="flex flex-col gap-6">
+              {depopPieces.map((piece) => (
+                <div key={piece}>
+                  {/* Tappable label — live immediately */}
+                  <a
+                    href={`https://www.depop.com/search/?q=${encodeURIComponent(`${scan.aesthetic} ${piece}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mb-2.5 group/label"
+                  >
+                    <p className="font-label text-[10px] text-foreground tracking-widest group-hover/label:text-primary transition-colors">{piece}</p>
+                    <ExternalLink size={9} className="text-muted-foreground group-hover/label:text-primary transition-colors mt-px" />
+                  </a>
+                  {/* Skeleton card row */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[0,1,2,3].map(i => (
+                      <div key={i} className="rounded-xl border border-border bg-card overflow-hidden">
+                        <div className="aspect-[3/4] bg-muted animate-pulse" />
+                        <div className="p-1.5 flex flex-col gap-1">
+                          <div className="h-2 w-2/3 bg-muted animate-pulse rounded" />
+                          <div className="h-2.5 w-full bg-muted animate-pulse rounded" />
+                          <div className="h-2 w-1/3 bg-muted animate-pulse rounded" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
           {depopError && !depopLoading && (
