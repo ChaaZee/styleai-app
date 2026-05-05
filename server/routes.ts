@@ -1329,25 +1329,45 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       );
       if (!dataRes.ok) return res.status(502).json({ error: "Could not fetch results" });
       const items: any[] = await dataRes.json();
-      // Build a Depop search URL from the run's search query for reliable linking
+
+      // Log raw shape of first item so we can see field names
+      if (items.length > 0) {
+        console.log("[depop-poll] sample item keys:", Object.keys(items[0]));
+        console.log("[depop-poll] sample item:", JSON.stringify(items[0]).slice(0, 500));
+      } else {
+        console.log("[depop-poll] dataset returned 0 items");
+      }
+
       const searchQuery = encodeURIComponent(q);
       const listings = items
-        .filter(i => i.image_url)
         .map((i, idx) => {
-          // Take the first image URL from media-photos.depop.com
-          const rawImg = Array.isArray(i.image_url) ? i.image_url[0] : i.image_url;
+          // image_url may be an array or a string — grab the first non-empty value
+          let image = "";
+          if (Array.isArray(i.image_url)) {
+            image = i.image_url.find((u: string) => u && u.length > 0) || "";
+          } else if (typeof i.image_url === "string" && i.image_url.length > 0) {
+            image = i.image_url;
+          } else if (i.imageUrl) {
+            image = Array.isArray(i.imageUrl) ? i.imageUrl[0] : i.imageUrl;
+          } else if (i.images && Array.isArray(i.images)) {
+            image = i.images[0]?.url || i.images[0] || "";
+          } else if (i.picture) {
+            image = i.picture;
+          }
           return {
             id: idx,
-            title: i.title || "",
+            title: i.title || i.description || "",
             brand: i.brand || "",
             price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
             currency: i.currency || "USD",
-            size: i.size || "",
-            image: rawImg,
-            // All cards link to a Depop search rather than individual (potentially deleted) listings
+            size: i.size || i.sizeLabel || "",
+            image,
             url: `https://www.depop.com/search/?q=${searchQuery}`,
           };
-        });
+        })
+        .filter(i => i.image); // only keep cards that have an image
+
+      console.log(`[depop-poll] ${items.length} raw items → ${listings.length} listings with images`);
       res.json({ status: "done", listings });
     } catch (err: any) {
       console.error("[depop-poll] Error:", err.message);
