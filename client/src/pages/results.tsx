@@ -242,14 +242,15 @@ export default function ResultsPage() {
           body: JSON.stringify({ queries, limitPerQuery: 4 }),
         });
         const startData = await startRes.json();
-        if (!startRes.ok || !startData.runId) {
+        console.log("[depop] start response:", JSON.stringify(startData).slice(0, 300));
+        if (!startRes.ok) {
           setDepopError(startData.error || "Could not start Depop search");
           setDepopLoading(false);
           return;
         }
         const runs: { query: string; runId: string; datasetId: string }[] = startData.runs;
         if (!runs?.length) {
-          setDepopError("Could not start Depop search");
+          setDepopError(startData.error || "Could not start Depop search");
           setDepopLoading(false);
           return;
         }

@@ -1277,19 +1277,28 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     if (!token) return res.status(503).json({ error: "Depop search not configured" });
     try {
       // Fire all runs simultaneously — parallel cold-starts, not sequential
-      const startPromises = queries.map(q =>
-        fetch(`https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ searchQueries: [q], maxItems: limitPerQuery }),
-          signal: AbortSignal.timeout(15_000),
-        }).then(r => r.json()).then(d => ({
-          query: q,
-          runId: d.data?.id as string,
-          datasetId: d.data?.defaultDatasetId as string,
-        }))
-      );
-      const runs = (await Promise.all(startPromises)).filter(r => r.runId);
+      const startPromises = queries.map(async q => {
+        try {
+          const r = await fetch(
+            `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ searchQueries: [q], maxItems: limitPerQuery }),
+              signal: AbortSignal.timeout(15_000),
+            }
+          );
+          const d = await r.json();
+          console.log(`[depop-start] q="${q}" status=${r.status} runId=${d.data?.id}`);
+          return { query: q, runId: d.data?.id as string, datasetId: d.data?.defaultDatasetId as string };
+        } catch (e: any) {
+          console.error(`[depop-start] q="${q}" failed:`, e.message);
+          return null;
+        }
+      });
+      const results = await Promise.all(startPromises);
+      const runs = results.filter((r): r is { query: string; runId: string; datasetId: string } => !!r?.runId);
+      console.log(`[depop-start] ${runs.length}/${queries.length} runs started`);
       if (!runs.length) return res.status(502).json({ error: "Could not start any Depop runs" });
       res.json({ runs });
     } catch (err: any) {
