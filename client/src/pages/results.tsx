@@ -544,8 +544,16 @@ export default function ResultsPage() {
             <div className="flex flex-col gap-6">
               {depopGroups.map((group) => (
                 <div key={group.piece}>
-                  {/* Section label per piece */}
-                  <p className="font-label text-[9px] text-muted-foreground mb-2">{group.piece}</p>
+                  {/* Section label — tappable, links to Depop search for this piece */}
+                  <a
+                    href={`https://www.depop.com/search/?q=${encodeURIComponent(group.piece)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mb-2.5 group/label"
+                  >
+                    <p className="font-label text-[10px] text-foreground tracking-widest group-hover/label:text-primary transition-colors">{group.piece}</p>
+                    <ExternalLink size={9} className="text-muted-foreground group-hover/label:text-primary transition-colors mt-px" />
+                  </a>
                   <div className="grid grid-cols-4 gap-2">
                     {group.listings.map((item) => (
                       <a
