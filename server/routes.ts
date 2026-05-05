@@ -1300,9 +1300,9 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/depop-poll?runId=<id>&datasetId=<id>&limit=<n> — check status + fetch results if done
+  // GET /api/depop-poll?runId=<id>&datasetId=<id>&q=<query>&limit=<n> — check status + fetch results if done
   app.get("/api/depop-poll", async (req, res) => {
-    const { runId, datasetId, limit = "12" } = req.query as Record<string, string>;
+    const { runId, datasetId, q = "", limit = "12" } = req.query as Record<string, string>;
     if (!runId || !datasetId) return res.status(400).json({ error: "Missing runId or datasetId" });
     const token = process.env.APIFY_TOKEN;
     if (!token) return res.status(503).json({ error: "Depop search not configured" });
@@ -1329,20 +1329,25 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       );
       if (!dataRes.ok) return res.status(502).json({ error: "Could not fetch results" });
       const items: any[] = await dataRes.json();
+      // Build a Depop search URL from the run's search query for reliable linking
+      const searchQuery = encodeURIComponent(q);
       const listings = items
-        .filter(i => i.image_url && i.product_link)
-        .map((i, idx) => ({
-          id: idx,
-          title: i.title || "",
-          brand: i.brand || "",
-          price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
-          currency: i.currency || "USD",
-          size: i.size || "",
-          image: Array.isArray(i.image_url) ? i.image_url[0] : i.image_url,
-          url: i.product_link.startsWith("http")
-            ? i.product_link
-            : `https://www.depop.com${i.product_link}`,
-        }));
+        .filter(i => i.image_url)
+        .map((i, idx) => {
+          // Take the first image URL from media-photos.depop.com
+          const rawImg = Array.isArray(i.image_url) ? i.image_url[0] : i.image_url;
+          return {
+            id: idx,
+            title: i.title || "",
+            brand: i.brand || "",
+            price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
+            currency: i.currency || "USD",
+            size: i.size || "",
+            image: rawImg,
+            // All cards link to a Depop search rather than individual (potentially deleted) listings
+            url: `https://www.depop.com/search/?q=${searchQuery}`,
+          };
+        });
       res.json({ status: "done", listings });
     } catch (err: any) {
       console.error("[depop-poll] Error:", err.message);

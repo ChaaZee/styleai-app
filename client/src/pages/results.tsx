@@ -254,7 +254,7 @@ export default function ResultsPage() {
           if (cancelled) return;
 
           const pollRes = await fetch(
-            `/api/depop-poll?runId=${runId}&datasetId=${datasetId}&limit=12`
+            `/api/depop-poll?runId=${runId}&datasetId=${datasetId}&q=${encodeURIComponent(query)}&limit=12`
           );
           const pollData = await pollRes.json();
 
@@ -567,7 +567,9 @@ export default function ResultsPage() {
                 ))}
               </div>
               <a
-                href={depopUrl(scan.aesthetic, keyPieces)}
+                href={`https://www.depop.com/search/?q=${encodeURIComponent(
+                  (() => { try { const kp: string[] = JSON.parse(scan.keyPieces || "[]"); return kp.length > 0 ? `${scan.aesthetic} ${kp[0]}` : scan.aesthetic; } catch { return scan.aesthetic; } })()
+                )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-primary transition-colors"
