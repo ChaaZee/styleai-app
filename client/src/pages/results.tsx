@@ -185,7 +185,8 @@ export default function ResultsPage() {
   const [activeBudget, setActiveBudget] = useState("All");
   const [depopMode, setDepopMode] = useState(false);
   const [likedPieces, setLikedPieces] = useState<Record<string, boolean>>({});
-  const [depopListings, setDepopListings] = useState<any[]>([]);
+  // depopGroups: { piece: string, listings: any[] }[]
+  const [depopGroups, setDepopGroups] = useState<{ piece: string; listings: any[] }[]>([]);
   const [depopLoading, setDepopLoading] = useState(false);
   const [depopError, setDepopError] = useState<string | null>(null);
   const depopFetchedRef = useRef(false);
@@ -215,63 +216,62 @@ export default function ResultsPage() {
     return () => clearTimeout(timer);
   }, [scan]);
 
-  // Fetch real Depop listings when depopMode is first enabled (start + poll pattern)
+  // Fetch Depop listings for every key piece in parallel when depopMode is first enabled
   useEffect(() => {
     if (!depopMode || !scan || depopFetchedRef.current) return;
     depopFetchedRef.current = true;
 
     const keyPiecesArr: string[] = JSON.parse(scan.keyPieces || "[]");
-    const query = keyPiecesArr.length > 0
-      ? `${scan.aesthetic} ${keyPiecesArr[0]}`.toLowerCase()
-      : scan.aesthetic.toLowerCase();
+    // Build one query per piece (up to 4), fallback to aesthetic only
+    const pieces = keyPiecesArr.slice(0, 4).length > 0
+      ? keyPiecesArr.slice(0, 4)
+      : [scan.aesthetic];
 
     setDepopLoading(true);
     setDepopError(null);
+    setDepopGroups([]);
 
     let cancelled = false;
-    const MAX_POLLS = 25; // 25 × 4s = 100s max
+    const MAX_POLLS = 25;
+
+    // Poll a single run until done, return listings
+    async function pollRun(runId: string, datasetId: string, q: string): Promise<any[]> {
+      for (let i = 0; i < MAX_POLLS; i++) {
+        if (cancelled) return [];
+        await new Promise(r => setTimeout(r, 4000));
+        if (cancelled) return [];
+        const pollRes = await fetch(
+          `/api/depop-poll?runId=${runId}&datasetId=${datasetId}&q=${encodeURIComponent(q)}&limit=4`
+        );
+        const pollData = await pollRes.json();
+        if (pollData.status === "done") return pollData.listings || [];
+        if (pollData.status === "failed") return [];
+      }
+      return [];
+    }
+
+    // Start a run for a single piece query, then poll it
+    async function fetchPiece(piece: string): Promise<{ piece: string; listings: any[] }> {
+      const q = `${piece}`.toLowerCase();
+      const startRes = await fetch("/api/depop-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q, limit: 4 }),
+      });
+      const startData = await startRes.json();
+      if (!startRes.ok || !startData.runId) return { piece, listings: [] };
+      const listings = await pollRun(startData.runId, startData.datasetId, q);
+      return { piece, listings };
+    }
 
     (async () => {
       try {
-        // Step 1: kick off the run
-        const startRes = await fetch("/api/depop-start", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ q: query, limit: 12 }),
-        });
-        const startData = await startRes.json();
-        if (!startRes.ok || !startData.runId) {
-          setDepopError(startData.error || "Could not start Depop search");
-          setDepopLoading(false);
-          return;
-        }
-        const { runId, datasetId } = startData;
-
-        // Step 2: poll every 4s until done
-        for (let i = 0; i < MAX_POLLS; i++) {
-          if (cancelled) return;
-          await new Promise(r => setTimeout(r, 4000));
-          if (cancelled) return;
-
-          const pollRes = await fetch(
-            `/api/depop-poll?runId=${runId}&datasetId=${datasetId}&q=${encodeURIComponent(query)}&limit=12`
-          );
-          const pollData = await pollRes.json();
-
-          if (pollData.status === "done") {
-            setDepopListings(pollData.listings || []);
-            if (!pollData.listings?.length) setDepopError("No matching items found on Depop");
-            setDepopLoading(false);
-            return;
-          }
-          if (pollData.status === "failed") {
-            setDepopError("Depop search failed");
-            setDepopLoading(false);
-            return;
-          }
-          // status === "running" — keep polling
-        }
-        setDepopError("Depop search timed out");
+        // Fire all pieces in parallel
+        const results = await Promise.all(pieces.map(fetchPiece));
+        if (cancelled) return;
+        const groups = results.filter(g => g.listings.length > 0);
+        setDepopGroups(groups);
+        if (groups.length === 0) setDepopError("No matching items found on Depop");
         setDepopLoading(false);
       } catch {
         if (!cancelled) {
@@ -540,43 +540,46 @@ export default function ResultsPage() {
               </a>
             </div>
           )}
-          {!depopLoading && depopListings.length > 0 && (
-            <>
-              <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
-                {depopListings.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 transition-colors group cursor-pointer"
-                  >
-                    <div
-                      className="aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
-                      style={{ backgroundImage: `url('${item.image}')` }}
-                    />
-                    <div className="p-2">
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium truncate">
-                        {item.brand || "Depop"}
-                        {item.size ? ` · ${item.size}` : ""}
-                      </p>
-                      <p className="text-xs font-semibold text-foreground leading-tight line-clamp-2 mb-0.5">{item.title}</p>
-                      <p className="text-xs text-primary font-semibold">${item.price.toFixed(0)}</p>
-                    </div>
-                  </a>
-                ))}
-              </div>
+          {!depopLoading && depopGroups.length > 0 && (
+            <div className="flex flex-col gap-6">
+              {depopGroups.map((group) => (
+                <div key={group.piece}>
+                  {/* Section label per piece */}
+                  <p className="font-label text-[9px] text-muted-foreground mb-2">{group.piece}</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {group.listings.map((item) => (
+                      <a
+                        key={item.id}
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 transition-colors group cursor-pointer"
+                      >
+                        <div
+                          className="aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                          style={{ backgroundImage: `url('${item.image}')` }}
+                        />
+                        <div className="p-1.5">
+                          <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium truncate">
+                            {item.brand || "Depop"}{item.size ? ` · ${item.size}` : ""}
+                          </p>
+                          <p className="text-[10px] font-semibold text-foreground leading-tight line-clamp-2 mb-0.5">{item.title}</p>
+                          <p className="text-[10px] text-primary font-semibold">${item.price.toFixed(0)}</p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
               <a
-                href={`https://www.depop.com/search/?q=${encodeURIComponent(
-                  (() => { try { const kp: string[] = JSON.parse(scan.keyPieces || "[]"); return kp.length > 0 ? `${scan.aesthetic} ${kp[0]}` : scan.aesthetic; } catch { return scan.aesthetic; } })()
-                )}`}
+                href={`https://www.depop.com/search/?q=${encodeURIComponent(scan.aesthetic)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-1.5 mt-4 text-xs text-muted-foreground hover:text-primary transition-colors"
+                className="flex items-center justify-center gap-1.5 mt-2 text-xs text-muted-foreground hover:text-primary transition-colors"
               >
                 See more on Depop <ExternalLink size={11} />
               </a>
-            </>
+            </div>
           )}
         </div>
       ) : hasSplit ? (

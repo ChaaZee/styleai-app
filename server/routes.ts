@@ -1354,6 +1354,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           } else if (i.picture) {
             image = i.picture;
           }
+          // Upgrade thumbnail (P10) to full-size (P0) for crisp images
+          image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
           return {
             id: idx,
             title: i.title || i.description || "",
