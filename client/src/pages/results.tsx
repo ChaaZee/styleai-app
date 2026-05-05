@@ -252,7 +252,7 @@ export default function ResultsPage() {
 
     // Start a run for a single piece query, then poll it
     async function fetchPiece(piece: string): Promise<{ piece: string; listings: any[] }> {
-      const q = `${piece}`.toLowerCase();
+      const q = `${scan.aesthetic} ${piece}`.toLowerCase();
       const startRes = await fetch("/api/depop-start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -546,7 +546,7 @@ export default function ResultsPage() {
                 <div key={group.piece}>
                   {/* Section label — tappable, links to Depop search for this piece */}
                   <a
-                    href={`https://www.depop.com/search/?q=${encodeURIComponent(group.piece)}`}
+                    href={`https://www.depop.com/search/?q=${encodeURIComponent(`${scan.aesthetic} ${group.piece}`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 mb-2.5 group/label"
