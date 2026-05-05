@@ -215,24 +215,73 @@ export default function ResultsPage() {
     return () => clearTimeout(timer);
   }, [scan]);
 
-  // Fetch real Depop listings when depopMode is first enabled
+  // Fetch real Depop listings when depopMode is first enabled (start + poll pattern)
   useEffect(() => {
     if (!depopMode || !scan || depopFetchedRef.current) return;
     depopFetchedRef.current = true;
+
     const keyPiecesArr: string[] = JSON.parse(scan.keyPieces || "[]");
     const query = keyPiecesArr.length > 0
       ? `${scan.aesthetic} ${keyPiecesArr[0]}`.toLowerCase()
       : scan.aesthetic.toLowerCase();
+
     setDepopLoading(true);
     setDepopError(null);
-    fetch(`/api/depop-search?q=${encodeURIComponent(query)}&limit=12`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.listings) setDepopListings(data.listings);
-        else setDepopError(data.error || "No results");
-      })
-      .catch(() => setDepopError("Could not load Depop listings"))
-      .finally(() => setDepopLoading(false));
+
+    let cancelled = false;
+    const MAX_POLLS = 25; // 25 × 4s = 100s max
+
+    (async () => {
+      try {
+        // Step 1: kick off the run
+        const startRes = await fetch("/api/depop-start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ q: query, limit: 12 }),
+        });
+        const startData = await startRes.json();
+        if (!startRes.ok || !startData.runId) {
+          setDepopError(startData.error || "Could not start Depop search");
+          setDepopLoading(false);
+          return;
+        }
+        const { runId, datasetId } = startData;
+
+        // Step 2: poll every 4s until done
+        for (let i = 0; i < MAX_POLLS; i++) {
+          if (cancelled) return;
+          await new Promise(r => setTimeout(r, 4000));
+          if (cancelled) return;
+
+          const pollRes = await fetch(
+            `/api/depop-poll?runId=${runId}&datasetId=${datasetId}&limit=12`
+          );
+          const pollData = await pollRes.json();
+
+          if (pollData.status === "done") {
+            setDepopListings(pollData.listings || []);
+            if (!pollData.listings?.length) setDepopError("No matching items found on Depop");
+            setDepopLoading(false);
+            return;
+          }
+          if (pollData.status === "failed") {
+            setDepopError("Depop search failed");
+            setDepopLoading(false);
+            return;
+          }
+          // status === "running" — keep polling
+        }
+        setDepopError("Depop search timed out");
+        setDepopLoading(false);
+      } catch {
+        if (!cancelled) {
+          setDepopError("Could not load Depop listings");
+          setDepopLoading(false);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [depopMode, scan]);
 
   if (isLoading) {

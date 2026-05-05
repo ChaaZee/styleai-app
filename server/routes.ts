@@ -1268,32 +1268,67 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/depop-search?q=<keyword>&limit=<n> — fetch real Depop listings via Apify
-  app.get("/api/depop-search", async (req, res) => {
-    const q = String(req.query.q || "").trim();
-    const limit = Math.min(parseInt(String(req.query.limit || "12"), 10) || 12, 24);
+  // POST /api/depop-start — kick off Apify run, return runId + datasetId immediately
+  app.post("/api/depop-start", async (req, res) => {
+    const { q, limit = 12 } = req.body as { q: string; limit?: number };
     if (!q) return res.status(400).json({ error: "Missing query" });
-
     const token = process.env.APIFY_TOKEN;
     if (!token) return res.status(503).json({ error: "Depop search not configured" });
-
     try {
-      const apifyRes = await fetch(
-        `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/run-sync-get-dataset-items?token=${token}&timeout=55`,
+      const runRes = await fetch(
+        `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ searchQueries: [q], maxItems: limit }),
-          signal: AbortSignal.timeout(60_000),
+          body: JSON.stringify({ searchQueries: [q], maxItems: Math.min(limit, 24) }),
+          signal: AbortSignal.timeout(15_000),
         }
       );
-      if (!apifyRes.ok) {
-        const txt = await apifyRes.text();
-        console.error("[depop-search] Apify error:", apifyRes.status, txt.slice(0, 200));
-        return res.status(502).json({ error: "Depop search failed" });
+      if (!runRes.ok) {
+        const txt = await runRes.text();
+        console.error("[depop-start] error:", runRes.status, txt.slice(0, 200));
+        return res.status(502).json({ error: "Could not start Depop search" });
       }
-      const items: any[] = await apifyRes.json();
-      // Normalise to a consistent shape
+      const runData = await runRes.json();
+      const runId: string = runData.data?.id;
+      const datasetId: string = runData.data?.defaultDatasetId;
+      if (!runId) return res.status(502).json({ error: "No run ID from Apify" });
+      res.json({ runId, datasetId });
+    } catch (err: any) {
+      console.error("[depop-start] Error:", err.message);
+      res.status(500).json({ error: "Failed to start search" });
+    }
+  });
+
+  // GET /api/depop-poll?runId=<id>&datasetId=<id>&limit=<n> — check status + fetch results if done
+  app.get("/api/depop-poll", async (req, res) => {
+    const { runId, datasetId, limit = "12" } = req.query as Record<string, string>;
+    if (!runId || !datasetId) return res.status(400).json({ error: "Missing runId or datasetId" });
+    const token = process.env.APIFY_TOKEN;
+    if (!token) return res.status(503).json({ error: "Depop search not configured" });
+    try {
+      const statusRes = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}?token=${token}`,
+        { signal: AbortSignal.timeout(8_000) }
+      );
+      if (!statusRes.ok) return res.status(502).json({ error: "Could not check run status" });
+      const statusData = await statusRes.json();
+      const status: string = statusData.data?.status;
+
+      if (status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") {
+        return res.json({ status: "failed" });
+      }
+      if (status !== "SUCCEEDED") {
+        return res.json({ status: "running" });
+      }
+
+      // SUCCEEDED — fetch results
+      const dataRes = await fetch(
+        `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&limit=${limit}`,
+        { signal: AbortSignal.timeout(10_000) }
+      );
+      if (!dataRes.ok) return res.status(502).json({ error: "Could not fetch results" });
+      const items: any[] = await dataRes.json();
       const listings = items
         .filter(i => i.image_url && i.product_link)
         .map((i, idx) => ({
@@ -1308,10 +1343,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
             ? i.product_link
             : `https://www.depop.com${i.product_link}`,
         }));
-      res.json({ listings });
+      res.json({ status: "done", listings });
     } catch (err: any) {
-      console.error("[depop-search] Error:", err.message);
-      res.status(500).json({ error: "Depop search failed" });
+      console.error("[depop-poll] Error:", err.message);
+      res.status(500).json({ error: "Poll failed" });
     }
   });
 
