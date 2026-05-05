@@ -247,18 +247,21 @@ export default function ResultsPage() {
           setDepopLoading(false);
           return;
         }
-        const { runId, datasetId } = startData;
-        const encodedQueries = encodeURIComponent(JSON.stringify(queries));
+        const runs: { query: string; runId: string; datasetId: string }[] = startData.runs;
+        if (!runs?.length) {
+          setDepopError("Could not start Depop search");
+          setDepopLoading(false);
+          return;
+        }
+        const encodedRuns = encodeURIComponent(JSON.stringify(runs));
 
-        // Step 2: poll every 4s until done
+        // Step 2: poll every 4s until all runs done
         for (let i = 0; i < MAX_POLLS; i++) {
           if (cancelled) return;
           await new Promise(r => setTimeout(r, 4000));
           if (cancelled) return;
 
-          const pollRes = await fetch(
-            `/api/depop-poll?runId=${runId}&datasetId=${datasetId}&queries=${encodedQueries}&limitPerQuery=4`
-          );
+          const pollRes = await fetch(`/api/depop-poll?runs=${encodedRuns}`);
           const pollData = await pollRes.json();
 
           if (pollData.status === "done") {
