@@ -1268,19 +1268,21 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/depop-start — kick off Apify run, return runId + datasetId immediately
+  // POST /api/depop-start — kick off ONE Apify run with all queries, return runId + datasetId
+  // Body: { queries: string[], limitPerQuery: number }
   app.post("/api/depop-start", async (req, res) => {
-    const { q, limit = 12 } = req.body as { q: string; limit?: number };
-    if (!q) return res.status(400).json({ error: "Missing query" });
+    const { queries, limitPerQuery = 4 } = req.body as { queries: string[]; limitPerQuery?: number };
+    if (!queries?.length) return res.status(400).json({ error: "Missing queries" });
     const token = process.env.APIFY_TOKEN;
     if (!token) return res.status(503).json({ error: "Depop search not configured" });
     try {
+      const maxItems = Math.min(queries.length * limitPerQuery, 24);
       const runRes = await fetch(
         `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ searchQueries: [q], maxItems: Math.min(limit, 24) }),
+          body: JSON.stringify({ searchQueries: queries, maxItems }),
           signal: AbortSignal.timeout(15_000),
         }
       );
@@ -1300,9 +1302,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/depop-poll?runId=<id>&datasetId=<id>&q=<query>&limit=<n> — check status + fetch results if done
+  // GET /api/depop-poll?runId=<id>&datasetId=<id>&queries=<json>&limitPerQuery=<n>
+  // queries is a JSON array of strings matching what was passed to depop-start
   app.get("/api/depop-poll", async (req, res) => {
-    const { runId, datasetId, q = "", limit = "12" } = req.query as Record<string, string>;
+    const { runId, datasetId, queries: queriesRaw = "[]", limitPerQuery = "4" } = req.query as Record<string, string>;
+    const queries: string[] = JSON.parse(queriesRaw);
+    const perQ = parseInt(limitPerQuery, 10) || 4;
     if (!runId || !datasetId) return res.status(400).json({ error: "Missing runId or datasetId" });
     const token = process.env.APIFY_TOKEN;
     if (!token) return res.status(503).json({ error: "Depop search not configured" });
@@ -1322,55 +1327,63 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         return res.json({ status: "running" });
       }
 
-      // SUCCEEDED — fetch results
+      // SUCCEEDED — fetch all items
+      const totalLimit = queries.length * perQ || 24;
       const dataRes = await fetch(
-        `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&limit=${limit}`,
+        `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&limit=${totalLimit}`,
         { signal: AbortSignal.timeout(10_000) }
       );
       if (!dataRes.ok) return res.status(502).json({ error: "Could not fetch results" });
       const items: any[] = await dataRes.json();
 
-      // Log raw shape of first item so we can see field names
       if (items.length > 0) {
-        console.log("[depop-poll] sample item keys:", Object.keys(items[0]));
-        console.log("[depop-poll] sample item:", JSON.stringify(items[0]).slice(0, 500));
+        console.log("[depop-poll] sample keys:", Object.keys(items[0]));
+        console.log("[depop-poll] sample:", JSON.stringify(items[0]).slice(0, 400));
       } else {
-        console.log("[depop-poll] dataset returned 0 items");
+        console.log("[depop-poll] 0 items returned");
       }
 
-      const searchQuery = encodeURIComponent(q);
-      const listings = items
-        .map((i, idx) => {
-          // image_url may be an array or a string — grab the first non-empty value
-          let image = "";
-          if (Array.isArray(i.image_url)) {
-            image = i.image_url.find((u: string) => u && u.length > 0) || "";
-          } else if (typeof i.image_url === "string" && i.image_url.length > 0) {
-            image = i.image_url;
-          } else if (i.imageUrl) {
-            image = Array.isArray(i.imageUrl) ? i.imageUrl[0] : i.imageUrl;
-          } else if (i.images && Array.isArray(i.images)) {
-            image = i.images[0]?.url || i.images[0] || "";
-          } else if (i.picture) {
-            image = i.picture;
-          }
-          // Upgrade thumbnail (P10) to full-size (P0) for crisp images
-          image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
-          return {
-            id: idx,
-            title: i.title || i.description || "",
-            brand: i.brand || "",
-            price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
-            currency: i.currency || "USD",
-            size: i.size || i.sizeLabel || "",
-            image,
-            url: `https://www.depop.com/search/?q=${searchQuery}`,
-          };
-        })
-        .filter(i => i.image); // only keep cards that have an image
+      function normaliseItem(i: any, idx: number, searchQ: string) {
+        let image = "";
+        if (Array.isArray(i.image_url)) image = i.image_url.find((u: string) => u?.length) || "";
+        else if (typeof i.image_url === "string" && i.image_url.length) image = i.image_url;
+        else if (i.imageUrl) image = Array.isArray(i.imageUrl) ? i.imageUrl[0] : i.imageUrl;
+        else if (i.images?.length) image = i.images[0]?.url || i.images[0] || "";
+        else if (i.picture) image = i.picture;
+        // Upgrade thumbnail to full-res
+        image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
+        return {
+          id: idx,
+          title: i.title || i.description || "",
+          brand: i.brand || "",
+          price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
+          currency: i.currency || "USD",
+          size: i.size || i.sizeLabel || "",
+          image,
+          url: `https://www.depop.com/search/?q=${encodeURIComponent(searchQ)}`,
+        };
+      }
 
-      console.log(`[depop-poll] ${items.length} raw items → ${listings.length} listings with images`);
-      res.json({ status: "done", listings });
+      // Group items by query — Apify returns them interleaved per searchQuery order
+      // Distribute evenly: first perQ items → queries[0], next perQ → queries[1], etc.
+      let groups: { piece: string; listings: any[] }[];
+      if (queries.length > 0) {
+        groups = queries.map((q, qi) => {
+          const slice = items.slice(qi * perQ, qi * perQ + perQ);
+          const listings = slice
+            .map((item, idx) => normaliseItem(item, qi * perQ + idx, q))
+            .filter(l => l.image);
+          // Use just the piece name (strip aesthetic prefix) for the label
+          const pieceName = q.includes(" ") ? q.split(" ").slice(1).join(" ") : q;
+          return { piece: pieceName, listings };
+        }).filter(g => g.listings.length > 0);
+      } else {
+        const listings = items.map((i, idx) => normaliseItem(i, idx, "")).filter(l => l.image);
+        groups = listings.length ? [{ piece: "Results", listings }] : [];
+      }
+
+      console.log(`[depop-poll] ${items.length} items → ${groups.length} groups`);
+      res.json({ status: "done", groups });
     } catch (err: any) {
       console.error("[depop-poll] Error:", err.message);
       res.status(500).json({ error: "Poll failed" });

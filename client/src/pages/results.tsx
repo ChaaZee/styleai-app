@@ -216,16 +216,15 @@ export default function ResultsPage() {
     return () => clearTimeout(timer);
   }, [scan]);
 
-  // Fetch Depop listings for every key piece in parallel when depopMode is first enabled
+  // Fetch Depop listings — one run for all pieces, poll until done
   useEffect(() => {
     if (!depopMode || !scan || depopFetchedRef.current) return;
     depopFetchedRef.current = true;
 
     const keyPiecesArr: string[] = JSON.parse(scan.keyPieces || "[]");
-    // Build one query per piece (up to 4), fallback to aesthetic only
-    const pieces = keyPiecesArr.slice(0, 4).length > 0
-      ? keyPiecesArr.slice(0, 4)
-      : [scan.aesthetic];
+    const pieces = keyPiecesArr.slice(0, 4).length > 0 ? keyPiecesArr.slice(0, 4) : [scan.aesthetic];
+    // One query per piece with aesthetic prefix for better results
+    const queries = pieces.map(p => `${scan.aesthetic} ${p}`.toLowerCase());
 
     setDepopLoading(true);
     setDepopError(null);
@@ -234,44 +233,48 @@ export default function ResultsPage() {
     let cancelled = false;
     const MAX_POLLS = 25;
 
-    // Poll a single run until done, return listings
-    async function pollRun(runId: string, datasetId: string, q: string): Promise<any[]> {
-      for (let i = 0; i < MAX_POLLS; i++) {
-        if (cancelled) return [];
-        await new Promise(r => setTimeout(r, 4000));
-        if (cancelled) return [];
-        const pollRes = await fetch(
-          `/api/depop-poll?runId=${runId}&datasetId=${datasetId}&q=${encodeURIComponent(q)}&limit=4`
-        );
-        const pollData = await pollRes.json();
-        if (pollData.status === "done") return pollData.listings || [];
-        if (pollData.status === "failed") return [];
-      }
-      return [];
-    }
-
-    // Start a run for a single piece query, then poll it
-    async function fetchPiece(piece: string): Promise<{ piece: string; listings: any[] }> {
-      const q = `${scan.aesthetic} ${piece}`.toLowerCase();
-      const startRes = await fetch("/api/depop-start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ q, limit: 4 }),
-      });
-      const startData = await startRes.json();
-      if (!startRes.ok || !startData.runId) return { piece, listings: [] };
-      const listings = await pollRun(startData.runId, startData.datasetId, q);
-      return { piece, listings };
-    }
-
     (async () => {
       try {
-        // Fire all pieces in parallel
-        const results = await Promise.all(pieces.map(fetchPiece));
-        if (cancelled) return;
-        const groups = results.filter(g => g.listings.length > 0);
-        setDepopGroups(groups);
-        if (groups.length === 0) setDepopError("No matching items found on Depop");
+        // Step 1: fire ONE run with all queries
+        const startRes = await fetch("/api/depop-start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ queries, limitPerQuery: 4 }),
+        });
+        const startData = await startRes.json();
+        if (!startRes.ok || !startData.runId) {
+          setDepopError(startData.error || "Could not start Depop search");
+          setDepopLoading(false);
+          return;
+        }
+        const { runId, datasetId } = startData;
+        const encodedQueries = encodeURIComponent(JSON.stringify(queries));
+
+        // Step 2: poll every 4s until done
+        for (let i = 0; i < MAX_POLLS; i++) {
+          if (cancelled) return;
+          await new Promise(r => setTimeout(r, 4000));
+          if (cancelled) return;
+
+          const pollRes = await fetch(
+            `/api/depop-poll?runId=${runId}&datasetId=${datasetId}&queries=${encodedQueries}&limitPerQuery=4`
+          );
+          const pollData = await pollRes.json();
+
+          if (pollData.status === "done") {
+            const groups = pollData.groups || [];
+            setDepopGroups(groups);
+            if (!groups.length) setDepopError("No matching items found on Depop");
+            setDepopLoading(false);
+            return;
+          }
+          if (pollData.status === "failed") {
+            setDepopError("Depop search failed");
+            setDepopLoading(false);
+            return;
+          }
+        }
+        setDepopError("Depop search timed out");
         setDepopLoading(false);
       } catch {
         if (!cancelled) {
