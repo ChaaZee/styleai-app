@@ -64,7 +64,9 @@ function buildImageKeywords(name: string): string {
   for (const [terms, photoId] of map) {
     if (terms.some(t => n.includes(t))) return `https://images.unsplash.com/${photoId}?w=400&q=80`;
   }
-  return "";  // no placeholder — frontend shows clothing illustration instead
+  // Generic fashion keyword fallback — dynamic Unsplash image by clothing keyword
+  const keyword = encodeURIComponent(`${n} fashion outfit clothing`);
+  return `https://source.unsplash.com/featured/400x533/?${keyword}`;
 }
 
 // Generates an Amazon affiliate search URL for a product
@@ -437,12 +439,14 @@ function generateMockResults(aesthetic: string) {
 
   };
 
-  return aestheticProducts[aesthetic] ?? [
+  const products = aestheticProducts[aesthetic] ?? [
     { id: 1, name: "Classic White Shirt", brand: "COS", price: 79, image: "", match: 88, retailer: "COS", url: "https://www.amazon.com/s?k=COS+Classic+White+Shirt&tag=styleaiapp-20" },
     { id: 2, name: "Slim Fit Jeans", brand: "Levi's", price: 89, image: "", match: 85, retailer: "Levi's", url: "https://www.amazon.com/s?k=Levi's+Slim+Fit+Jeans&tag=styleaiapp-20" },
     { id: 3, name: "Leather Derby Shoes", brand: "Thursday Boot Co", price: 149, image: "", match: 82, retailer: "Thursday", url: "https://www.amazon.com/s?k=Thursday+Boot+Co+Leather+Derby+Shoes&tag=styleaiapp-20" },
     { id: 4, name: "Canvas Tote", brand: "Baggu", price: 38, image: "", match: 79, retailer: "Baggu", url: "https://www.amazon.com/s?k=Baggu+Canvas+Tote&tag=styleaiapp-20" },
   ];
+  // Backfill images for any product that doesn't have one yet
+  return products.map(p => ({ ...p, image: p.image || buildImageKeywords(p.name) }));
 }
 
 // ─── Gemini response schema (structured output — no regex parsing needed) ───
@@ -1088,7 +1092,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           name: rec.name,
           brand: rec.brand,
           price: rec.price,
-          image: "",  // no placeholder — frontend shows clothing illustration
+          image: buildImageKeywords(rec.name),
           match: Math.max(75, 97 - i * 4),
           retailer: "Amazon",
           url: amazonUrl(rec.name, rec.brand),
@@ -1106,7 +1110,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         name: rec.name,
         brand: rec.brand,
         price: rec.price,
-        image: "",  // no placeholder — frontend shows clothing illustration
+        image: buildImageKeywords(rec.name),
         match: Math.max(75, 97 - i * 4),
         retailer: "Amazon",
         url: amazonUrl(rec.name, rec.brand),
