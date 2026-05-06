@@ -121,7 +121,10 @@ export async function getDepopCache(query: string): Promise<any[] | null> {
     LIMIT 1
   `;
   if (!rows.length) return null;
-  return rows[0].listings as any[];
+  const listings = rows[0].listings as any[];
+  // Treat stale entries with no titles as a cache miss so they get re-fetched
+  if (listings.every((l: any) => !l.title)) return null;
+  return listings;
 }
 
 export async function setDepopCache(query: string, listings: any[], aesthetic?: string): Promise<void> {
