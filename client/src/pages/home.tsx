@@ -1,3 +1,4 @@
+import React from "react";
 import { useLocation } from "wouter";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { rankByVector, getTopAesthetics } from "@/lib/styleVector";
@@ -207,6 +208,7 @@ export default function HomePage() {
   }, []);
 
   const [rankedItems, setRankedItems] = useState<FeedItem[]>(rerank);
+  const [depopCards, setDepopCards] = useState<any[]>([]);
 
   // Re-rank on mount
   useEffect(() => {
@@ -219,6 +221,16 @@ export default function HomePage() {
     window.addEventListener("stitch_vector_updated", handler);
     return () => window.removeEventListener("stitch_vector_updated", handler);
   }, [rerank]);
+
+  // Fetch cached Depop cards for home feed
+  useEffect(() => {
+    const tops = getTopAesthetics(3);
+    if (!tops.length) return;
+    fetch(`/api/depop-feed?aesthetics=${encodeURIComponent(JSON.stringify(tops))}`)
+      .then(r => r.json())
+      .then(data => { if (data.listings?.length) setDepopCards(data.listings); })
+      .catch(() => {});
+  }, []);
 
   // Derive visible feed from active chip
   const feedItems = useMemo(() => {
@@ -306,39 +318,67 @@ export default function HomePage() {
 
       {/* Grid — full bleed, hairline dividers, seamless with page background */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: "hsl(var(--border))" }}>
-        {feedItems.map((item) => (
-          <a
-            key={item.id}
-            href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="relative bg-background hover:bg-muted/40 transition-colors cursor-pointer block group"
-          >
-            {item.tag === "Match" && (
-              <div className="absolute top-2.5 left-2.5 z-10 text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-medium">Match</div>
-            )}
-            {item.tag && item.tag !== "Match" && (
-              <div className="absolute top-2.5 left-2.5 z-10 text-[10px] px-2 py-0.5 rounded-full bg-foreground text-background font-medium">{item.tag}</div>
-            )}
-            {/* Illustration */}
-            <div className="w-full flex items-center justify-center py-10 text-foreground/30 group-hover:text-primary transition-colors">
-              {Icons[item.icon]}
-            </div>
-            {/* Info */}
-            <div className="px-3 pb-4">
-              <p className="font-label text-[9px] text-muted-foreground mb-0.5" style={{ letterSpacing: '0.14em' }}>{item.aesthetic}</p>
-              <p className="text-xs text-foreground font-medium leading-snug mb-2">{item.label}</p>
-              <div className="flex items-center justify-between">
-                <DepopBadge />
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/50 group-hover:text-primary transition-colors flex-shrink-0">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                  <polyline points="15 3 21 3 21 9"/>
-                  <line x1="10" y1="14" x2="21" y2="3"/>
-                </svg>
-              </div>
-            </div>
-          </a>
-        ))}
+        {feedItems.map((item, idx) => {
+          // Inject a real Depop product card every 4 outfit cards
+          const depopCard = depopCards.length > 0 && idx > 0 && idx % 4 === 0
+            ? depopCards[Math.floor(idx / 4) % depopCards.length]
+            : null;
+          return (
+            <React.Fragment key={item.id}>
+              {depopCard && (
+                <a
+                  key={`depop-${idx}`}
+                  href={depopCard.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative bg-background hover:bg-muted/40 transition-colors cursor-pointer block group overflow-hidden"
+                >
+                  <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Shop</div>
+                  <div
+                    className="w-full aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                    style={{ backgroundImage: `url('${depopCard.image}')` }}
+                  />
+                  <div className="px-3 pb-3 pt-2">
+                    <p className="font-label text-[9px] text-muted-foreground mb-0.5" style={{ letterSpacing: '0.14em' }}>{depopCard.brand || "Depop"}</p>
+                    <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">{depopCard.title}</p>
+                    <p className="text-xs text-primary font-semibold">${depopCard.price?.toFixed(0)}</p>
+                  </div>
+                </a>
+              )}
+              <a
+                key={item.id}
+                href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative bg-background hover:bg-muted/40 transition-colors cursor-pointer block group"
+              >
+                {item.tag === "Match" && (
+                  <div className="absolute top-2.5 left-2.5 z-10 text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-medium">Match</div>
+                )}
+                {item.tag && item.tag !== "Match" && (
+                  <div className="absolute top-2.5 left-2.5 z-10 text-[10px] px-2 py-0.5 rounded-full bg-foreground text-background font-medium">{item.tag}</div>
+                )}
+                {/* Illustration */}
+                <div className="w-full flex items-center justify-center py-10 text-foreground/30 group-hover:text-primary transition-colors">
+                  {Icons[item.icon]}
+                </div>
+                {/* Info */}
+                <div className="px-3 pb-4">
+                  <p className="font-label text-[9px] text-muted-foreground mb-0.5" style={{ letterSpacing: '0.14em' }}>{item.aesthetic}</p>
+                  <p className="text-xs text-foreground font-medium leading-snug mb-2">{item.label}</p>
+                  <div className="flex items-center justify-between">
+                    <DepopBadge />
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/50 group-hover:text-primary transition-colors flex-shrink-0">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </div>
+                </div>
+              </a>
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );

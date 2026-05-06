@@ -79,6 +79,17 @@ export async function initDB() {
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS post_url TEXT`;
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0`;
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS subreddit TEXT`;
+
+  // Depop search result cache — keyed by query string, TTL 24h
+  await client`
+    CREATE TABLE IF NOT EXISTS depop_cache (
+      id SERIAL PRIMARY KEY,
+      query TEXT NOT NULL UNIQUE,
+      listings JSONB NOT NULL,
+      aesthetic TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
 }
 
 export interface IStorage {
@@ -97,6 +108,48 @@ export interface IStorage {
   incrementCardLikes(id: number): Promise<void>;
   pruneStaleCards(olderThanDays: number): Promise<number>;
   getTrendingCards(limit: number): Promise<DiscoverCard[]>;
+}
+
+// ── Depop cache helpers (raw SQL, bypasses Drizzle schema) ──────────────────
+const DEPOP_TTL_HOURS = 24;
+
+export async function getDepopCache(query: string): Promise<any[] | null> {
+  const rows = await client`
+    SELECT listings FROM depop_cache
+    WHERE query = ${query}
+      AND created_at > NOW() - INTERVAL '24 hours'
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  return rows[0].listings as any[];
+}
+
+export async function setDepopCache(query: string, listings: any[], aesthetic?: string): Promise<void> {
+  await client`
+    INSERT INTO depop_cache (query, listings, aesthetic, created_at)
+    VALUES (${query}, ${JSON.stringify(listings)}, ${aesthetic ?? null}, NOW())
+    ON CONFLICT (query) DO UPDATE
+      SET listings = EXCLUDED.listings,
+          aesthetic = EXCLUDED.aesthetic,
+          created_at = NOW()
+  `;
+}
+
+export async function getDepopCacheByAesthetic(aesthetic: string, limit = 12): Promise<any[]> {
+  const rows = await client`
+    SELECT listings FROM depop_cache
+    WHERE aesthetic = ${aesthetic}
+      AND created_at > NOW() - INTERVAL '24 hours'
+    ORDER BY created_at DESC
+    LIMIT 10
+  `;
+  // Flatten all cached listings for this aesthetic, shuffle, return limit
+  const all: any[] = rows.flatMap((r: any) => r.listings as any[]);
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [all[i], all[j]] = [all[j], all[i]];
+  }
+  return all.slice(0, limit);
 }
 
 export const storage: IStorage = {

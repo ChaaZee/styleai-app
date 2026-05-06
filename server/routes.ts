@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB } from "./storage";
+import { storage, initDB, getDepopCache, setDepopCache, getDepopCacheByAesthetic } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -67,6 +67,96 @@ function buildImageKeywords(name: string): string {
   // Generic fashion keyword fallback — dynamic Unsplash image by clothing keyword
   const keyword = encodeURIComponent(`${n} fashion outfit clothing`);
   return `https://source.unsplash.com/featured/400x533/?${keyword}`;
+}
+
+// ── Depop helpers ───────────────────────────────────────────────────
+function normaliseDepopItem(i: any, idx: number, searchQ: string) {
+  let image = "";
+  if (Array.isArray(i.image_url)) image = i.image_url.find((u: string) => u?.length) || "";
+  else if (typeof i.image_url === "string" && i.image_url.length) image = i.image_url;
+  else if (i.imageUrl) image = Array.isArray(i.imageUrl) ? i.imageUrl[0] : i.imageUrl;
+  else if (i.images?.length) image = i.images[0]?.url || i.images[0] || "";
+  else if (i.picture) image = i.picture;
+  image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
+  return {
+    id: idx,
+    title: i.title || i.description || "",
+    brand: i.brand || "",
+    price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
+    currency: i.currency || "USD",
+    size: i.size || i.sizeLabel || "",
+    image,
+    url: `https://www.depop.com/search/?q=${encodeURIComponent(searchQ)}`,
+  };
+}
+
+// Run a single Depop search: check cache first, else hit Apify + store result
+async function fetchDepopListings(
+  query: string,
+  aesthetic: string,
+  limit = 4
+): Promise<any[]> {
+  // 1. Cache hit — return instantly
+  const cached = await getDepopCache(query);
+  if (cached) {
+    console.log(`[depop] cache hit for "${query}"`);
+    return cached;
+  }
+
+  const token = process.env.APIFY_TOKEN;
+  if (!token) return [];
+
+  try {
+    // 2. Start Apify run
+    const runRes = await fetch(
+      `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ searchQueries: [query], maxItems: limit }),
+        signal: AbortSignal.timeout(15_000),
+      }
+    );
+    if (!runRes.ok) return [];
+    const runData = await runRes.json();
+    const runId: string = runData.data?.id;
+    const datasetId: string = runData.data?.defaultDatasetId;
+    if (!runId) return [];
+
+    // 3. Poll until done (max 90s)
+    const start = Date.now();
+    while (Date.now() - start < 90_000) {
+      await new Promise(r => setTimeout(r, 4_000));
+      const s = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`,
+        { signal: AbortSignal.timeout(8_000) });
+      if (!s.ok) continue;
+      const sd = await s.json();
+      const status: string = sd.data?.status;
+      if (status === "SUCCEEDED") break;
+      if (["FAILED", "ABORTED", "TIMED-OUT"].includes(status)) return [];
+    }
+
+    // 4. Fetch dataset
+    const dataRes = await fetch(
+      `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&limit=${limit}`,
+      { signal: AbortSignal.timeout(10_000) }
+    );
+    if (!dataRes.ok) return [];
+    const items: any[] = await dataRes.json();
+    const listings = items.map((i, idx) => normaliseDepopItem(i, idx, query)).filter(l => l.image);
+
+    // 5. Store in cache
+    if (listings.length) {
+      await setDepopCache(query, listings, aesthetic).catch(e =>
+        console.error("[depop] cache write failed:", e.message)
+      );
+    }
+    console.log(`[depop] fetched ${listings.length} listings for "${query}"`);
+    return listings;
+  } catch (e: any) {
+    console.error(`[depop] fetchDepopListings error for "${query}":`, e.message);
+    return [];
+  }
 }
 
 // Generates an Amazon affiliate search URL for a product
@@ -1142,6 +1232,15 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       });
 
       res.json({ scanId: scan.id });
+
+      // Pre-warm Depop cache in background — don't await, runs after response is sent
+      if (process.env.APIFY_TOKEN && analysis.keyPieces?.length) {
+        const pieces: string[] = analysis.keyPieces.slice(0, 4);
+        const queries = pieces.map((p: string) => `${analysis.aesthetic} ${p}`.toLowerCase());
+        Promise.all(queries.map(q => fetchDepopListings(q, analysis.aesthetic, 4)))
+          .then(results => console.log(`[depop] pre-warmed ${results.filter(r => r.length).length}/${queries.length} queries`))
+          .catch(e => console.error("[depop] pre-warm error:", e.message));
+      }
     } catch (err: any) {
       console.error("Analyze error:", err);
       res.status(500).json({ error: process.env.NODE_ENV === "production" ? "Analysis failed. Please try again." : err.message || "Analysis failed" });
@@ -1268,76 +1367,103 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/depop-start — kick off one Apify run per query in parallel, return run info array
-  // Body: { queries: string[], limitPerQuery: number }
-  app.post("/api/depop-start", async (req, res) => {
-    const { queries, limitPerQuery = 4 } = req.body as { queries: string[]; limitPerQuery?: number };
+  // POST /api/depop-search — check cache first, kick off Apify runs if needed
+  // Body: { queries: string[], aesthetic: string }
+  // Returns immediately with { cached: true, groups } OR { cached: false, runs: [{query,runId,datasetId}] }
+  app.post("/api/depop-search", async (req, res) => {
+    const { queries, aesthetic = "" } = req.body as { queries: string[]; aesthetic?: string };
     if (!queries?.length) return res.status(400).json({ error: "Missing queries" });
     const token = process.env.APIFY_TOKEN;
     if (!token) return res.status(503).json({ error: "Depop search not configured" });
+
     try {
-      // Fire all runs simultaneously — parallel cold-starts, not sequential
-      const startPromises = queries.map(async q => {
+      // Check cache for all queries in parallel
+      const cacheResults = await Promise.all(queries.map(async q => ({
+        query: q,
+        listings: await getDepopCache(q),
+      })));
+
+      const allCached = cacheResults.every(r => r.listings !== null);
+
+      if (allCached) {
+        // Full cache hit — return instantly
+        const groups = cacheResults
+          .map(r => ({
+            piece: r.query.includes(" ") ? r.query.split(" ").slice(1).join(" ") : r.query,
+            listings: r.listings!,
+          }))
+          .filter(g => g.listings.length > 0);
+        console.log(`[depop] full cache hit for ${queries.length} queries`);
+        return res.json({ cached: true, groups });
+      }
+
+      // Partial or no cache — start Apify runs only for uncached queries
+      const uncached = cacheResults.filter(r => !r.listings);
+      const runPromises = uncached.map(async ({ query: q }) => {
         try {
           const r = await fetch(
             `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ searchQueries: [q], maxItems: limitPerQuery }),
+              body: JSON.stringify({ searchQueries: [q], maxItems: 4 }),
               signal: AbortSignal.timeout(15_000),
             }
           );
           const d = await r.json();
-          console.log(`[depop-start] q="${q}" status=${r.status} runId=${d.data?.id}`);
+          console.log(`[depop] started run for "${q}" runId=${d.data?.id}`);
           return { query: q, runId: d.data?.id as string, datasetId: d.data?.defaultDatasetId as string };
         } catch (e: any) {
-          console.error(`[depop-start] q="${q}" failed:`, e.message);
+          console.error(`[depop] start failed for "${q}":`, e.message);
           return null;
         }
       });
-      const results = await Promise.all(startPromises);
-      const runs = results.filter((r): r is { query: string; runId: string; datasetId: string } => !!r?.runId);
-      console.log(`[depop-start] ${runs.length}/${queries.length} runs started`);
-      if (!runs.length) return res.status(502).json({ error: "Could not start any Depop runs" });
-      res.json({ runs });
+      const runs = (await Promise.all(runPromises))
+        .filter((r): r is { query: string; runId: string; datasetId: string } => !!r?.runId);
+
+      // Return cached groups we already have + runs to poll for the rest
+      const cachedGroups = cacheResults
+        .filter(r => r.listings)
+        .map(r => ({
+          piece: r.query.includes(" ") ? r.query.split(" ").slice(1).join(" ") : r.query,
+          listings: r.listings!,
+        }))
+        .filter(g => g.listings.length > 0);
+
+      res.json({ cached: false, cachedGroups, runs, aesthetic });
     } catch (err: any) {
-      console.error("[depop-start] Error:", err.message);
-      res.status(500).json({ error: "Failed to start search" });
+      console.error("[depop-search] Error:", err.message);
+      res.status(500).json({ error: "Search failed" });
     }
   });
 
-  // GET /api/depop-poll?runs=<json> — poll all runs, return groups once all SUCCEED
-  // runs is a JSON array of { query, runId, datasetId }
+  // GET /api/depop-feed?aesthetics=<json array> — return cached Depop cards for home feed
+  app.get("/api/depop-feed", async (req, res) => {
+    const { aesthetics: aestheticsRaw = "[]" } = req.query as Record<string, string>;
+    let aesthetics: string[] = [];
+    try { aesthetics = JSON.parse(aestheticsRaw); } catch { aesthetics = []; }
+    if (!aesthetics.length) return res.json({ listings: [] });
+    try {
+      // Pull cached listings for top aesthetics, up to 4 per aesthetic
+      const results = await Promise.all(
+        aesthetics.slice(0, 3).map(a => getDepopCacheByAesthetic(a, 4))
+      );
+      const listings = results.flat();
+      res.json({ listings });
+    } catch (err: any) {
+      console.error("[depop-feed] error:", err.message);
+      res.json({ listings: [] });
+    }
+  });
+
+  // GET /api/depop-poll?runs=<json>&aesthetic=<str> — poll runs, cache + return on success
   app.get("/api/depop-poll", async (req, res) => {
-    const { runs: runsRaw = "[]" } = req.query as Record<string, string>;
+    const { runs: runsRaw = "[]", aesthetic = "" } = req.query as Record<string, string>;
     const runs: { query: string; runId: string; datasetId: string }[] = JSON.parse(runsRaw);
     if (!runs.length) return res.status(400).json({ error: "Missing runs" });
     const token = process.env.APIFY_TOKEN;
     if (!token) return res.status(503).json({ error: "Depop search not configured" });
-
-    function normaliseItem(i: any, idx: number, searchQ: string) {
-      let image = "";
-      if (Array.isArray(i.image_url)) image = i.image_url.find((u: string) => u?.length) || "";
-      else if (typeof i.image_url === "string" && i.image_url.length) image = i.image_url;
-      else if (i.imageUrl) image = Array.isArray(i.imageUrl) ? i.imageUrl[0] : i.imageUrl;
-      else if (i.images?.length) image = i.images[0]?.url || i.images[0] || "";
-      else if (i.picture) image = i.picture;
-      image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
-      return {
-        id: idx,
-        title: i.title || i.description || "",
-        brand: i.brand || "",
-        price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
-        currency: i.currency || "USD",
-        size: i.size || i.sizeLabel || "",
-        image,
-        url: `https://www.depop.com/search/?q=${encodeURIComponent(searchQ)}`,
-      };
-    }
-
     try {
-      // Check status of all runs in parallel
       const statusResults = await Promise.all(runs.map(async run => {
         const r = await fetch(`https://api.apify.com/v2/actor-runs/${run.runId}?token=${token}`,
           { signal: AbortSignal.timeout(8_000) });
@@ -1346,28 +1472,28 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         return { ...run, status: d.data?.status as string };
       }));
 
-      const anyFailed = statusResults.some(r => ["FAILED","ABORTED","TIMED-OUT"].includes(r.status));
       const allDone = statusResults.every(r => r.status === "SUCCEEDED");
-
+      const anyFailed = statusResults.some(r => ["FAILED","ABORTED","TIMED-OUT"].includes(r.status));
       if (anyFailed && !allDone) return res.json({ status: "failed" });
       if (!allDone) return res.json({ status: "running" });
 
-      // All succeeded — fetch each dataset independently
-      const groups = (await Promise.all(statusResults.map(async (run, ri) => {
+      // All done — fetch datasets + cache results
+      const groups = (await Promise.all(statusResults.map(async run => {
         const dataRes = await fetch(
           `https://api.apify.com/v2/datasets/${run.datasetId}/items?token=${token}&limit=4`,
           { signal: AbortSignal.timeout(10_000) }
         );
         if (!dataRes.ok) return null;
         const items: any[] = await dataRes.json();
-        if (ri === 0) console.log("[depop-poll] sample keys:", items[0] ? Object.keys(items[0]) : "empty");
-        const listings = items.map((item, idx) => normaliseItem(item, idx, run.query)).filter(l => l.image);
-        // Strip the aesthetic prefix from query to use as section label
+        const listings = items.map((item, idx) => normaliseDepopItem(item, idx, run.query)).filter(l => l.image);
+        if (listings.length) {
+          await setDepopCache(run.query, listings, aesthetic).catch(() => {});
+        }
         const pieceName = run.query.includes(" ") ? run.query.split(" ").slice(1).join(" ") : run.query;
         return listings.length ? { piece: pieceName, listings } : null;
       }))).filter(Boolean) as { piece: string; listings: any[] }[];
 
-      console.log(`[depop-poll] ${groups.length} groups returned`);
+      console.log(`[depop-poll] done: ${groups.length} groups`);
       res.json({ status: "done", groups });
     } catch (err: any) {
       console.error("[depop-poll] Error:", err.message);
