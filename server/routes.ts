@@ -1104,6 +1104,27 @@ export async function triggerSeedIfEmpty() {
 export async function registerRoutes(httpServer: Server, app: Express) {
   await initDB();
 
+  // Temp: test Apify token + actor from server
+  app.get("/api/debug-apify", async (req, res) => {
+    const token = process.env.APIFY_TOKEN;
+    if (!token) return res.json({ error: "No APIFY_TOKEN env var" });
+    try {
+      const r = await fetch(
+        `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ searchQueries: ["minimalist white sneakers"], maxItems: 2 }),
+          signal: AbortSignal.timeout(15_000),
+        }
+      );
+      const text = await r.text();
+      res.json({ status: r.status, body: text.slice(0, 1000) });
+    } catch (e: any) {
+      res.json({ error: e.message });
+    }
+  });
+
   // Analyze outfit image with Gemini Flash
   app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res) => {
     try {
