@@ -321,13 +321,32 @@ export default function HomePage() {
   }, [rerank]);
 
   // Fetch cached Depop cards for home feed
+  // Passes top aesthetics if available; server falls back to defaults for new users
   useEffect(() => {
     const tops = getTopAesthetics(3);
-    if (!tops.length) return;
-    fetch(`/api/depop-feed?aesthetics=${encodeURIComponent(JSON.stringify(tops))}`)
-      .then(r => r.json())
-      .then(data => { if (data.listings?.length) setDepopCards(data.listings); })
-      .catch(() => {});
+    // Always call — server handles empty aesthetics with defaults
+    const url = tops.length
+      ? `/api/depop-feed?aesthetics=${encodeURIComponent(JSON.stringify(tops))}`
+      : `/api/depop-feed`;
+
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    const fetchCards = (attempt = 0) => {
+      fetch(url)
+        .then(r => r.json())
+        .then(data => {
+          if (data.listings?.length) {
+            setDepopCards(data.listings);
+          } else if (data.seeding && attempt < 4) {
+            // Cache is being seeded in background — retry after delay (20s, 40s, 60s, 80s)
+            retryTimer = setTimeout(() => fetchCards(attempt + 1), 20_000);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchCards();
+    return () => clearTimeout(retryTimer);
   }, []);
 
   // Derive visible feed from active chip

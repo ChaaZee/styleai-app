@@ -1437,19 +1437,43 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // Default aesthetics used when the user has no style vector yet
+  const DEFAULT_FEED_AESTHETICS = ["Streetwear", "Minimalist", "Y2K"];
+  const DEFAULT_FEED_QUERIES: { query: string; aesthetic: string }[] = [
+    { query: "streetwear oversized hoodie", aesthetic: "Streetwear" },
+    { query: "streetwear cargo pants", aesthetic: "Streetwear" },
+    { query: "streetwear graphic tee", aesthetic: "Streetwear" },
+    { query: "minimalist linen shirt", aesthetic: "Minimalist" },
+    { query: "minimalist wide leg trousers", aesthetic: "Minimalist" },
+    { query: "minimalist white sneakers", aesthetic: "Minimalist" },
+    { query: "y2k butterfly top", aesthetic: "Y2K" },
+    { query: "y2k low rise jeans", aesthetic: "Y2K" },
+    { query: "y2k baby tee", aesthetic: "Y2K" },
+  ];
+
   // GET /api/depop-feed?aesthetics=<json array> — return cached Depop cards for home feed
   app.get("/api/depop-feed", async (req, res) => {
     const { aesthetics: aestheticsRaw = "[]" } = req.query as Record<string, string>;
     let aesthetics: string[] = [];
     try { aesthetics = JSON.parse(aestheticsRaw); } catch { aesthetics = []; }
-    if (!aesthetics.length) return res.json({ listings: [] });
+    // Fall back to defaults for new users with no style vector
+    const targetAesthetics = aesthetics.length ? aesthetics.slice(0, 3) : DEFAULT_FEED_AESTHETICS;
     try {
-      // Pull cached listings for top aesthetics, up to 4 per aesthetic
+      // Pull cached listings for top aesthetics, up to 5 per aesthetic
       const results = await Promise.all(
-        aesthetics.slice(0, 3).map(a => getDepopCacheByAesthetic(a, 4))
+        targetAesthetics.map(a => getDepopCacheByAesthetic(a, 5))
       );
       const listings = results.flat();
-      res.json({ listings });
+      // If nothing cached yet, fire background seed and return empty (client will retry)
+      if (!listings.length) {
+        Promise.all(
+          DEFAULT_FEED_QUERIES.map(({ query, aesthetic }) =>
+            fetchDepopListings(query, aesthetic, 6).catch(() => [])
+          )
+        ).then(r => console.log(`[depop-feed] seeded ${r.filter(a => a.length).length}/${DEFAULT_FEED_QUERIES.length} default queries`))
+          .catch(() => {});
+      }
+      res.json({ listings, seeding: !listings.length });
     } catch (err: any) {
       console.error("[depop-feed] error:", err.message);
       res.json({ listings: [] });
