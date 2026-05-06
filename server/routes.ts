@@ -75,18 +75,36 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
   if (Array.isArray(i.image_url)) image = i.image_url.find((u: string) => u?.length) || "";
   else if (typeof i.image_url === "string" && i.image_url.length) image = i.image_url;
   else if (i.imageUrl) image = Array.isArray(i.imageUrl) ? i.imageUrl[0] : i.imageUrl;
-  else if (i.images?.length) image = i.images[0]?.url || i.images[0] || "";
+  else if (Array.isArray(i.images) && i.images.length) image = i.images[0]?.url || (typeof i.images[0] === 'string' ? i.images[0] : '') || "";
   else if (i.picture) image = i.picture;
   image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
+
+  // Derive title: use explicit title/description, else humanise the slug
+  // slug example: "956thriftfindz-blue-polo-assn-polo-shirt" → remove leading username segment
+  let title = i.title || i.description || i.name || "";
+  if (!title && i.slug) {
+    const parts = (i.slug as string).split("-");
+    // First segment is typically the seller username — drop it if it looks alphanumeric-only
+    const dropFirst = /^[a-z0-9]+$/.test(parts[0]);
+    const words = dropFirst ? parts.slice(1) : parts;
+    title = words.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  }
+  if (!title) title = searchQ.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
+  // Use real product URL if available, otherwise fall back to search
+  const url = (typeof i.url === "string" && i.url.startsWith("https://www.depop.com/products/"))
+    ? i.url
+    : `https://www.depop.com/search/?q=${encodeURIComponent(searchQ)}`;
+
   return {
     id: idx,
-    title: i.title || i.description || "",
+    title,
     brand: i.brand || "",
     price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
     currency: i.currency || "USD",
     size: i.size || i.sizeLabel || "",
     image,
-    url: `https://www.depop.com/search/?q=${encodeURIComponent(searchQ)}`,
+    url,
   };
 }
 
