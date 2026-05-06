@@ -335,10 +335,12 @@ export default function HomePage() {
       fetch(url)
         .then(r => r.json())
         .then(data => {
-          if (data.listings?.length) {
-            setDepopCards(data.listings);
-          } else if (data.seeding && attempt < 4) {
-            // Cache is being seeded in background — retry after delay (20s, 40s, 60s, 80s)
+          const listings: any[] = data.listings || [];
+          const hasRealData = listings.some((l: any) => l.image && l.title);
+          if (hasRealData) {
+            setDepopCards(listings);
+          } else if (attempt < 6) {
+            // Either seeding or stale cache — retry every 20s (up to 2 minutes)
             retryTimer = setTimeout(() => fetchCards(attempt + 1), 20_000);
           }
         })
@@ -433,67 +435,56 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Grid — full bleed, hairline dividers, seamless with page background */}
+      {/* Grid — every slot is a real Depop product card */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: "hsl(var(--border))" }}>
         {feedItems.map((item, idx) => {
-          // Inject a real Depop product card every 4 outfit cards
-          const depopCard = depopCards.length > 0 && idx > 0 && idx % 4 === 0
-            ? depopCards[Math.floor(idx / 4) % depopCards.length]
+          const card = depopCards.length > 0
+            ? depopCards[idx % depopCards.length]
             : null;
+
+          // While cards are loading, show a skeleton placeholder
+          if (!card) {
+            return (
+              <div key={item.id} className="bg-background animate-pulse">
+                <div className="w-full aspect-[3/4] bg-muted" />
+                <div className="px-3 pb-3 pt-2 space-y-1.5">
+                  <div className="h-2 w-12 bg-muted rounded" />
+                  <div className="h-3 w-3/4 bg-muted rounded" />
+                  <div className="h-3 w-1/3 bg-muted rounded" />
+                </div>
+              </div>
+            );
+          }
+
           return (
-            <React.Fragment key={item.id}>
-              {depopCard && (
-                <a
-                  key={`depop-${idx}`}
-                  href={depopCard.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="relative bg-background hover:bg-muted/40 transition-colors cursor-pointer block group overflow-hidden"
-                >
-                  <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Shop</div>
-                  <div
-                    className="w-full aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
-                    style={{ backgroundImage: `url('${depopCard.image}')` }}
-                  />
-                  <div className="px-3 pb-3 pt-2">
-                    <p className="font-label text-[9px] text-muted-foreground mb-0.5" style={{ letterSpacing: '0.14em' }}>{depopCard.brand || "Depop"}</p>
-                    <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">{depopCard.title}</p>
-                    <p className="text-xs text-primary font-semibold">${depopCard.price?.toFixed(0)}</p>
-                  </div>
-                </a>
-              )}
-              <a
-                key={item.id}
-                href={`https://www.depop.com/search/?q=${encodeURIComponent(item.query)}&sort=relevance`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="relative bg-background hover:bg-muted/40 transition-colors cursor-pointer block group"
-              >
-                {item.tag === "Match" && (
-                  <div className="absolute top-2.5 left-2.5 z-10 text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-medium">Match</div>
-                )}
-                {item.tag && item.tag !== "Match" && (
-                  <div className="absolute top-2.5 left-2.5 z-10 text-[10px] px-2 py-0.5 rounded-full bg-foreground text-background font-medium">{item.tag}</div>
-                )}
-                {/* Illustration */}
-                <div className="w-full flex items-center justify-center py-10 text-foreground/30 group-hover:text-primary transition-colors">
-                  {Icons[item.icon]}
+            <a
+              key={item.id}
+              href={card.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative bg-background hover:bg-muted/30 transition-colors cursor-pointer block group overflow-hidden"
+            >
+              {/* Shop badge */}
+              <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Shop</div>
+              {/* Product image */}
+              <div
+                className="w-full aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                style={{ backgroundImage: `url('${card.image}')` }}
+              />
+              {/* Info */}
+              <div className="px-3 pb-3 pt-2">
+                <p className="font-label text-[9px] text-muted-foreground mb-0.5" style={{ letterSpacing: '0.14em' }}>{card.brand || item.aesthetic}</p>
+                <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">{card.title || item.label}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-primary font-semibold">${card.price?.toFixed(0)}</p>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                  </svg>
                 </div>
-                {/* Info */}
-                <div className="px-3 pb-4">
-                  <p className="font-label text-[9px] text-muted-foreground mb-0.5" style={{ letterSpacing: '0.14em' }}>{item.aesthetic}</p>
-                  <p className="text-xs text-foreground font-medium leading-snug mb-2">{item.label}</p>
-                  <div className="flex items-center justify-between">
-                    <DepopBadge />
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/50 group-hover:text-primary transition-colors flex-shrink-0">
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                      <polyline points="15 3 21 3 21 9"/>
-                      <line x1="10" y1="14" x2="21" y2="3"/>
-                    </svg>
-                  </div>
-                </div>
-              </a>
-            </React.Fragment>
+              </div>
+            </a>
           );
         })}
       </div>

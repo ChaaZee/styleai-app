@@ -1476,8 +1476,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Default aesthetics used when the user has no style vector yet
-  const DEFAULT_FEED_AESTHETICS = ["Streetwear", "Minimalist", "Y2K"];
+  // All 16 aesthetics + broad queries — seeds ~288 listings (48 queries × 6 items)
+  const DEFAULT_FEED_AESTHETICS = ["Streetwear", "Minimalist", "Y2K", "Preppy", "Dark Academia", "Cottagecore", "Techwear", "Vintage", "Boho", "Grunge", "Old Money", "E-Girl", "Soft Girl", "Skater", "Coastal Grandmother", "Coquette"];
   const DEFAULT_FEED_QUERIES: { query: string; aesthetic: string }[] = [
     { query: "streetwear oversized hoodie", aesthetic: "Streetwear" },
     { query: "streetwear cargo pants", aesthetic: "Streetwear" },
@@ -1488,6 +1488,45 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     { query: "y2k butterfly top", aesthetic: "Y2K" },
     { query: "y2k low rise jeans", aesthetic: "Y2K" },
     { query: "y2k baby tee", aesthetic: "Y2K" },
+    { query: "preppy polo shirt", aesthetic: "Preppy" },
+    { query: "preppy plaid skirt", aesthetic: "Preppy" },
+    { query: "preppy cable knit sweater", aesthetic: "Preppy" },
+    { query: "dark academia blazer", aesthetic: "Dark Academia" },
+    { query: "dark academia turtleneck", aesthetic: "Dark Academia" },
+    { query: "dark academia plaid trousers", aesthetic: "Dark Academia" },
+    { query: "cottagecore floral dress", aesthetic: "Cottagecore" },
+    { query: "cottagecore linen blouse", aesthetic: "Cottagecore" },
+    { query: "cottagecore prairie skirt", aesthetic: "Cottagecore" },
+    { query: "techwear joggers", aesthetic: "Techwear" },
+    { query: "techwear windbreaker", aesthetic: "Techwear" },
+    { query: "techwear utility vest", aesthetic: "Techwear" },
+    { query: "vintage 90s denim jacket", aesthetic: "Vintage" },
+    { query: "vintage band tee", aesthetic: "Vintage" },
+    { query: "vintage corduroy pants", aesthetic: "Vintage" },
+    { query: "boho maxi dress", aesthetic: "Boho" },
+    { query: "boho crochet top", aesthetic: "Boho" },
+    { query: "boho wrap skirt", aesthetic: "Boho" },
+    { query: "grunge flannel shirt", aesthetic: "Grunge" },
+    { query: "grunge ripped jeans", aesthetic: "Grunge" },
+    { query: "grunge combat boots", aesthetic: "Grunge" },
+    { query: "old money cashmere sweater", aesthetic: "Old Money" },
+    { query: "old money tailored trousers", aesthetic: "Old Money" },
+    { query: "old money silk blouse", aesthetic: "Old Money" },
+    { query: "egirl mesh top", aesthetic: "E-Girl" },
+    { query: "egirl plaid mini skirt", aesthetic: "E-Girl" },
+    { query: "egirl platform boots", aesthetic: "E-Girl" },
+    { query: "soft girl cardigan", aesthetic: "Soft Girl" },
+    { query: "soft girl floral set", aesthetic: "Soft Girl" },
+    { query: "soft girl pastel hoodie", aesthetic: "Soft Girl" },
+    { query: "skater baggy jeans", aesthetic: "Skater" },
+    { query: "skater oversized tee", aesthetic: "Skater" },
+    { query: "skater vans sneakers", aesthetic: "Skater" },
+    { query: "coastal grandmother linen pants", aesthetic: "Coastal Grandmother" },
+    { query: "coastal grandmother striped top", aesthetic: "Coastal Grandmother" },
+    { query: "coastal grandmother knit cardigan", aesthetic: "Coastal Grandmother" },
+    { query: "coquette bow dress", aesthetic: "Coquette" },
+    { query: "coquette lace top", aesthetic: "Coquette" },
+    { query: "coquette ballet flats", aesthetic: "Coquette" },
   ];
 
   // GET /api/depop-feed?aesthetics=<json array> — return cached Depop cards for home feed
@@ -1495,22 +1534,31 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const { aesthetics: aestheticsRaw = "[]" } = req.query as Record<string, string>;
     let aesthetics: string[] = [];
     try { aesthetics = JSON.parse(aestheticsRaw); } catch { aesthetics = []; }
-    // Fall back to defaults for new users with no style vector
-    const targetAesthetics = aesthetics.length ? aesthetics.slice(0, 3) : DEFAULT_FEED_AESTHETICS;
+    // Fall back to all defaults for new users with no style vector
+    const targetAesthetics = aesthetics.length ? aesthetics.slice(0, 5) : DEFAULT_FEED_AESTHETICS;
     try {
-      // Pull cached listings for top aesthetics, up to 5 per aesthetic
+      // Pull up to 50 listings per aesthetic so we have enough to fill 135 slots
       const results = await Promise.all(
-        targetAesthetics.map(a => getDepopCacheByAesthetic(a, 5))
+        targetAesthetics.map(a => getDepopCacheByAesthetic(a, 50))
       );
       const listings = results.flat();
-      // If nothing cached yet, fire background seed and return empty (client will retry)
+      // If nothing cached yet, fire background seed for all default queries
       if (!listings.length) {
-        Promise.all(
-          DEFAULT_FEED_QUERIES.map(({ query, aesthetic }) =>
-            fetchDepopListings(query, aesthetic, 6).catch(() => [])
-          )
-        ).then(r => console.log(`[depop-feed] seeded ${r.filter(a => a.length).length}/${DEFAULT_FEED_QUERIES.length} default queries`))
-          .catch(() => {});
+        // Run in batches of 8 to avoid overwhelming Apify free tier
+        const batches: typeof DEFAULT_FEED_QUERIES[] = [];
+        for (let i = 0; i < DEFAULT_FEED_QUERIES.length; i += 8)
+          batches.push(DEFAULT_FEED_QUERIES.slice(i, i + 8));
+        (async () => {
+          let seeded = 0;
+          for (const batch of batches) {
+            const res = await Promise.all(batch.map(({ query, aesthetic }) =>
+              fetchDepopListings(query, aesthetic, 6).catch(() => [])
+            ));
+            seeded += res.filter(a => a.length).length;
+            await new Promise(r => setTimeout(r, 2000)); // small gap between batches
+          }
+          console.log(`[depop-feed] seeded ${seeded}/${DEFAULT_FEED_QUERIES.length} queries`);
+        })().catch(() => {});
       }
       res.json({ listings, seeding: !listings.length });
     } catch (err: any) {
