@@ -1129,19 +1129,29 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       // Re-normalise in place: for each cached row, re-run normaliseDepopItem to fill titles
       const { default: pg } = await import("postgres");
       const client2 = pg(process.env.DATABASE_URL!, { ssl: "require" });
-      const rows = await client2`SELECT id, query, listings FROM depop_cache`;
-      let fixed = 0;
+      const rows = await client2`SELECT id, query, aesthetic, listings FROM depop_cache`;
+      let fixed = 0, deleted = 0;
       for (const row of rows) {
         const listings: any[] = row.listings;
-        const needsFix = listings.every((l: any) => !l.title);
-        if (needsFix) {
-          const updated = listings.map((l: any, idx: number) => normaliseDepopItem(l, idx, row.query));
+        const missingImage = listings.every((l: any) => !l.image);
+        if (missingImage) {
+          // Images got wiped — delete row so it gets re-fetched from Apify
+          await client2`DELETE FROM depop_cache WHERE id = ${row.id}`;
+          deleted++;
+          continue;
+        }
+        const needsTitleFix = listings.every((l: any) => !l.title);
+        if (needsTitleFix) {
+          const updated = listings.map((l: any) => ({
+            ...l,
+            title: row.query.replace(/\b\w/g, (c: string) => c.toUpperCase()),
+          }));
           await client2`UPDATE depop_cache SET listings = ${client2.json(updated)} WHERE id = ${row.id}`;
           fixed++;
         }
       }
       await client2.end();
-      res.json({ fixed, total: rows.length });
+      res.json({ fixed, deleted, total: rows.length });
     } catch (e: any) {
       res.json({ error: e.message });
     }
