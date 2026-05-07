@@ -138,13 +138,15 @@ export async function setDepopCache(query: string, listings: any[], aesthetic?: 
   `;
 }
 
-export async function getDepopCacheByAesthetic(aesthetic: string, limit = 12): Promise<any[]> {
+export async function getDepopCacheByAesthetic(aesthetic: string, limit = 50): Promise<any[]> {
+  // Fetch enough rows to cover the requested limit (each row has ~6 listings)
+  const rowLimit = Math.ceil(limit / 4) + 2;
   const rows = await client`
     SELECT listings FROM depop_cache
     WHERE aesthetic = ${aesthetic}
       AND created_at > NOW() - INTERVAL '24 hours'
     ORDER BY created_at DESC
-    LIMIT 10
+    LIMIT ${rowLimit}
   `;
   // Flatten all cached listings for this aesthetic, shuffle, return limit
   const all: any[] = rows.flatMap((r: any) => r.listings as any[]);

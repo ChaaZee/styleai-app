@@ -1534,10 +1534,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const { aesthetics: aestheticsRaw = "[]" } = req.query as Record<string, string>;
     let aesthetics: string[] = [];
     try { aesthetics = JSON.parse(aestheticsRaw); } catch { aesthetics = []; }
-    // Fall back to all defaults for new users with no style vector
-    const targetAesthetics = aesthetics.length ? aesthetics.slice(0, 5) : DEFAULT_FEED_AESTHETICS;
+    // For home feed, use top 3 user aesthetics or first 3 defaults — 3 × 50 = 150 listings max
+    const topDefaults = DEFAULT_FEED_AESTHETICS.slice(0, 3); // Streetwear, Minimalist, Y2K
+    const targetAesthetics = aesthetics.length ? aesthetics.slice(0, 3) : topDefaults;
     try {
-      // Pull up to 50 listings per aesthetic so we have enough to fill 135 slots
+      // Pull up to 50 listings per aesthetic (150 total — enough for 135-card grid)
       const results = await Promise.all(
         targetAesthetics.map(a => getDepopCacheByAesthetic(a, 50))
       );
