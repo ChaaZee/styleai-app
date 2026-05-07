@@ -89,7 +89,8 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
     const words = dropFirst ? parts.slice(1) : parts;
     title = words.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
-  if (!title) title = searchQ.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  // Final fallback: capitalise the search query (e.g. "y2k low rise jeans" → "Y2K Low Rise Jeans")
+  if (!title) title = searchQ.replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   // Use real product URL if available, otherwise fall back to search
   const url = (typeof i.url === "string" && i.url.startsWith("https://www.depop.com/products/"))
@@ -1121,6 +1122,30 @@ export async function triggerSeedIfEmpty() {
 
 export async function registerRoutes(httpServer: Server, app: Express) {
   await initDB();
+
+  // One-time: delete cached rows with empty titles so they get re-fetched with slug-derived titles
+  app.get("/api/fix-cache-titles", async (req, res) => {
+    try {
+      // Re-normalise in place: for each cached row, re-run normaliseDepopItem to fill titles
+      const { default: pg } = await import("postgres");
+      const client2 = pg(process.env.DATABASE_URL!, { ssl: "require" });
+      const rows = await client2`SELECT id, query, listings FROM depop_cache`;
+      let fixed = 0;
+      for (const row of rows) {
+        const listings: any[] = row.listings;
+        const needsFix = listings.every((l: any) => !l.title);
+        if (needsFix) {
+          const updated = listings.map((l: any, idx: number) => normaliseDepopItem(l, idx, row.query));
+          await client2`UPDATE depop_cache SET listings = ${client2.json(updated)} WHERE id = ${row.id}`;
+          fixed++;
+        }
+      }
+      await client2.end();
+      res.json({ fixed, total: rows.length });
+    } catch (e: any) {
+      res.json({ error: e.message });
+    }
+  });
 
   // Temp: test Apify token + actor from server
   app.get("/api/debug-apify", async (req, res) => {

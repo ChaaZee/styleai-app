@@ -336,7 +336,8 @@ export default function HomePage() {
         .then(r => r.json())
         .then(data => {
           const listings: any[] = data.listings || [];
-          const hasRealData = listings.some((l: any) => l.image && l.title);
+          // Images + price is enough — titles get derived server-side from slug or query
+          const hasRealData = listings.some((l: any) => l.image && l.price > 0);
           if (hasRealData) {
             setDepopCards(listings);
           } else if (attempt < 6) {
