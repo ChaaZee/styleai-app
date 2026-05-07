@@ -348,7 +348,18 @@ export default function HomePage() {
     };
 
     fetchCards();
-    return () => clearTimeout(retryTimer);
+
+    // Re-fetch when a new analysis completes (pre-warm may have added new cards)
+    const onDepopUpdated = () => {
+      clearTimeout(retryTimer);
+      // Wait 90s for pre-warm to finish, then refresh
+      retryTimer = setTimeout(() => fetchCards(0), 90_000);
+    };
+    window.addEventListener("stitch_depop_updated", onDepopUpdated);
+    return () => {
+      clearTimeout(retryTimer);
+      window.removeEventListener("stitch_depop_updated", onDepopUpdated);
+    };
   }, []);
 
   // Derive visible feed from active chip

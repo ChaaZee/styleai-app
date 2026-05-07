@@ -65,6 +65,8 @@ export default function ScanPage() {
       const data = await response.json();
       setUploadState("done");
       queryClient.invalidateQueries({ queryKey: ["/api/scans", getDeviceId()] });
+      // Signal home feed to refresh Depop cards with the new aesthetic
+      window.dispatchEvent(new CustomEvent("stitch_depop_updated"));
       setLocation(`/results/${data.scanId}`);
     } catch (err: any) {
       toast({ title: "Analysis failed", description: err.message, variant: "destructive" });

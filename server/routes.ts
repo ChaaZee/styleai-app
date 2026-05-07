@@ -1274,11 +1274,18 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       // Pre-warm Depop cache in background — don't await, runs after response is sent
       if (process.env.APIFY_TOKEN && analysis.keyPieces?.length) {
-        const pieces: string[] = analysis.keyPieces.slice(0, 4);
+        const pieces: string[] = analysis.keyPieces.slice(0, 5);
         const queries = pieces.map((p: string) => `${analysis.aesthetic} ${p}`.toLowerCase());
-        Promise.all(queries.map(q => fetchDepopListings(q, analysis.aesthetic, 4)))
-          .then(results => console.log(`[depop] pre-warmed ${results.filter(r => r.length).length}/${queries.length} queries`))
-          .catch(e => console.error("[depop] pre-warm error:", e.message));
+        // Run sequentially to avoid hammering Apify, 8 items each so home feed gets real cards
+        (async () => {
+          let warmed = 0;
+          for (const q of queries) {
+            const r = await fetchDepopListings(q, analysis.aesthetic, 8).catch(() => []);
+            if (r.length) warmed++;
+            await new Promise(res => setTimeout(res, 1500));
+          }
+          console.log(`[depop] pre-warmed ${warmed}/${queries.length} queries for aesthetic "${analysis.aesthetic}"`);
+        })();
       }
     } catch (err: any) {
       console.error("Analyze error:", err);
