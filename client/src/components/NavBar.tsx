@@ -13,7 +13,7 @@ export default function NavBar() {
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-[9999] surface-glass border-t border-border"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 12px)" }}
       role="navigation"
       aria-label="Main navigation"
     >
