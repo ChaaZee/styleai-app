@@ -1604,6 +1604,35 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   });
 
   // One-time: delete cached rows with empty titles so they get re-fetched with slug-derived titles
+  // Cache stats — counts rows, listings, breakdown by aesthetic and permanent flag
+  app.get("/api/cache-stats", async (req, res) => {
+    try {
+      const { default: pg } = await import("postgres");
+      const c = pg(process.env.DATABASE_URL!, { ssl: "require" });
+      const rows = await c`
+        SELECT aesthetic, permanent,
+               COUNT(*) as rows,
+               SUM(jsonb_array_length(listings)) as listings
+        FROM depop_cache
+        GROUP BY aesthetic, permanent
+        ORDER BY aesthetic, permanent
+      `;
+      const totals = await c`
+        SELECT COUNT(*) as total_rows,
+               SUM(jsonb_array_length(listings)) as total_listings,
+               COUNT(*) FILTER (WHERE permanent = TRUE) as permanent_rows,
+               SUM(jsonb_array_length(listings)) FILTER (WHERE permanent = TRUE) as permanent_listings,
+               COUNT(*) FILTER (WHERE permanent = FALSE AND created_at > NOW() - INTERVAL '24 hours') as temp_rows,
+               SUM(jsonb_array_length(listings)) FILTER (WHERE permanent = FALSE AND created_at > NOW() - INTERVAL '24 hours') as temp_listings
+        FROM depop_cache
+      `;
+      await c.end();
+      res.json({ totals: totals[0], byAesthetic: rows });
+    } catch (e: any) {
+      res.json({ error: e.message });
+    }
+  });
+
   app.get("/api/fix-cache-titles", async (req, res) => {
     try {
       // Re-normalise in place: for each cached row, re-run normaliseDepopItem to fill titles
