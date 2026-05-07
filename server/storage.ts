@@ -80,16 +80,21 @@ export async function initDB() {
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0`;
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS subreddit TEXT`;
 
-  // Depop search result cache — keyed by query string, TTL 24h
+  // Depop search result cache — keyed by query string, TTL 24h (permanent rows never expire)
   await client`
     CREATE TABLE IF NOT EXISTS depop_cache (
       id SERIAL PRIMARY KEY,
       query TEXT NOT NULL UNIQUE,
       listings JSONB NOT NULL,
       aesthetic TEXT,
+      permanent BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `;
+  // Safe migration: add permanent column if upgrading existing table
+  await client`
+    ALTER TABLE depop_cache ADD COLUMN IF NOT EXISTS permanent BOOLEAN NOT NULL DEFAULT FALSE
+  `.catch(() => {});
 }
 
 export interface IStorage {
@@ -111,29 +116,41 @@ export interface IStorage {
 }
 
 // ── Depop cache helpers (raw SQL, bypasses Drizzle schema) ──────────────────
-const DEPOP_TTL_HOURS = 24;
+
+// Deduplicate listings by URL — keeps first occurrence
+export function dedupeListings(listings: any[]): any[] {
+  const seen = new Set<string>();
+  return listings.filter(l => {
+    const key = l.url || l.product_link || String(l.id);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export async function getDepopCache(query: string): Promise<any[] | null> {
   const rows = await client`
-    SELECT listings FROM depop_cache
+    SELECT listings, permanent FROM depop_cache
     WHERE query = ${query}
-      AND created_at > NOW() - INTERVAL '24 hours'
+      AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
     LIMIT 1
   `;
   if (!rows.length) return null;
   const listings = rows[0].listings as any[];
-  // Treat stale entries with no titles as a cache miss so they get re-fetched
-  if (listings.every((l: any) => !l.title)) return null;
+  // Treat entries with no images as a cache miss so they get re-fetched
+  if (listings.every((l: any) => !l.image)) return null;
   return listings;
 }
 
-export async function setDepopCache(query: string, listings: any[], aesthetic?: string): Promise<void> {
+export async function setDepopCache(query: string, listings: any[], aesthetic?: string, permanent = false): Promise<void> {
+  const deduped = dedupeListings(listings);
   await client`
-    INSERT INTO depop_cache (query, listings, aesthetic, created_at)
-    VALUES (${query}, ${JSON.stringify(listings)}, ${aesthetic ?? null}, NOW())
+    INSERT INTO depop_cache (query, listings, aesthetic, permanent, created_at)
+    VALUES (${query}, ${JSON.stringify(deduped)}, ${aesthetic ?? null}, ${permanent}, NOW())
     ON CONFLICT (query) DO UPDATE
-      SET listings = EXCLUDED.listings,
-          aesthetic = EXCLUDED.aesthetic,
+      SET listings   = EXCLUDED.listings,
+          aesthetic  = COALESCE(EXCLUDED.aesthetic, depop_cache.aesthetic),
+          permanent  = EXCLUDED.permanent OR depop_cache.permanent,
           created_at = NOW()
   `;
 }
@@ -144,7 +161,7 @@ export async function getDepopCacheByAesthetic(aesthetic: string, limit = 50): P
   const rows = await client`
     SELECT listings FROM depop_cache
     WHERE aesthetic = ${aesthetic}
-      AND created_at > NOW() - INTERVAL '24 hours'
+      AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
     ORDER BY created_at DESC
     LIMIT ${rowLimit}
   `;

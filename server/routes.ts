@@ -113,7 +113,8 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
 async function fetchDepopListings(
   query: string,
   aesthetic: string,
-  limit = 4
+  limit = 4,
+  permanent = false
 ): Promise<any[]> {
   // 1. Cache hit — return instantly
   const cached = await getDepopCache(query);
@@ -166,7 +167,7 @@ async function fetchDepopListings(
 
     // 5. Store in cache
     if (listings.length) {
-      await setDepopCache(query, listings, aesthetic).catch(e =>
+      await setDepopCache(query, listings, aesthetic, permanent).catch(e =>
         console.error("[depop] cache write failed:", e.message)
       );
     }
@@ -1122,6 +1123,109 @@ export async function triggerSeedIfEmpty() {
 
 export async function registerRoutes(httpServer: Server, app: Express) {
   await initDB();
+
+  // Auto-seed trending cards on startup (background, non-blocking)
+  if (process.env.APIFY_TOKEN) {
+    setTimeout(() => {
+      fetch(`http://localhost:${process.env.PORT || 5000}/api/seed-trending`)
+        .catch(() => {});
+    }, 10_000); // wait 10s for server to fully start
+  }
+
+  // Seed trending Depop cards from Google Trends fashion searches
+  // GET /api/seed-trending — fires in background, returns immediately
+  // GET /api/seed-trending?wait=1 — waits for completion (use from cron)
+  app.get("/api/seed-trending", async (req, res) => {
+    if (!process.env.APIFY_TOKEN) return res.json({ error: "No APIFY_TOKEN" });
+    const wait = req.query.wait === "1";
+
+    // Google Trends RSS for fashion category (category 185)
+    const TRENDS_URL = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=US&cat=185";
+
+    // Aesthetic keyword map — if a trend contains any keyword, tag it with that aesthetic
+    const AESTHETIC_MAP: Record<string, string> = {
+      "cargo": "Streetwear", "hoodie": "Streetwear", "oversized": "Streetwear", "graphic tee": "Streetwear", "baggy": "Streetwear",
+      "linen": "Minimalist", "wide leg": "Minimalist", "neutral": "Minimalist", "minimal": "Minimalist", "clean": "Minimalist",
+      "y2k": "Y2K", "low rise": "Y2K", "butterfly": "Y2K", "baby tee": "Y2K", "rhinestone": "Y2K",
+      "blazer": "Dark Academia", "turtleneck": "Dark Academia", "plaid": "Dark Academia", "oxford": "Dark Academia",
+      "floral": "Cottagecore", "prairie": "Cottagecore", "lace": "Cottagecore", "cottagecore": "Cottagecore",
+      "trench": "Old Money", "cashmere": "Old Money", "polo": "Old Money", "loafer": "Old Money", "tailored": "Old Money",
+      "vintage": "Vintage", "90s": "Vintage", "retro": "Vintage", "denim jacket": "Vintage",
+      "maxi": "Boho", "crochet": "Boho", "fringe": "Boho", "wrap": "Boho",
+      "platform": "E-Girl", "mesh": "E-Girl", "choker": "E-Girl",
+      "pastel": "Soft Girl", "cardigan": "Soft Girl", "bow": "Coquette", "ballet": "Coquette",
+      "windbreaker": "Techwear", "utility": "Techwear", "jogger": "Techwear",
+      "flannel": "Grunge", "combat boot": "Grunge", "ripped": "Grunge",
+      "skater": "Skater", "vans": "Skater", "beanie": "Skater",
+    };
+
+    const getAesthetic = (term: string): string => {
+      const lower = term.toLowerCase();
+      for (const [kw, aesthetic] of Object.entries(AESTHETIC_MAP)) {
+        if (lower.includes(kw)) return aesthetic;
+      }
+      return "Streetwear"; // default fallback
+    };
+
+    const run = async () => {
+      try {
+        // 1. Fetch Google Trends RSS
+        const rssRes = await fetch(TRENDS_URL, { signal: AbortSignal.timeout(10_000) });
+        const rssText = await rssRes.text();
+
+        // 2. Parse <title> tags from RSS items (skip channel title)
+        const titles: string[] = [];
+        const re = /<item>[\s\S]*?<title><!\[CDATA\[([^\]]+)\]\]><\/title>/g;
+        let m;
+        while ((m = re.exec(rssText)) !== null) titles.push(m[1].trim());
+
+        // 3. Filter to fashion-relevant terms and build queries
+        const fashionTerms = titles
+          .filter(t => Object.keys(AESTHETIC_MAP).some(kw => t.toLowerCase().includes(kw)))
+          .slice(0, 20);
+
+        // Also include a curated base set of trending fashion staples (always seeded permanently)
+        const curatedBase = [
+          { query: "vintage levi jeans", aesthetic: "Vintage" },
+          { query: "y2k cargo pants", aesthetic: "Y2K" },
+          { query: "old money blazer", aesthetic: "Old Money" },
+          { query: "streetwear jordan sneakers", aesthetic: "Streetwear" },
+          { query: "dark academia coat", aesthetic: "Dark Academia" },
+          { query: "cottagecore midi dress", aesthetic: "Cottagecore" },
+          { query: "coquette ballet flats pink", aesthetic: "Coquette" },
+          { query: "boho crochet cardigan", aesthetic: "Boho" },
+          { query: "soft girl pastel sweater", aesthetic: "Soft Girl" },
+          { query: "grunge platform boots", aesthetic: "Grunge" },
+        ];
+
+        const trendQueries = fashionTerms.map(t => ({ query: t.toLowerCase(), aesthetic: getAesthetic(t) }));
+        const allQueries = [...curatedBase, ...trendQueries];
+
+        console.log(`[seed-trending] ${allQueries.length} queries (${fashionTerms.length} from Trends + ${curatedBase.length} curated)`);
+
+        // 4. Run sequentially in batches to avoid Apify rate limits
+        let seeded = 0;
+        for (const { query, aesthetic } of allQueries) {
+          const r = await fetchDepopListings(query, aesthetic, 8, true).catch(() => []);
+          if (r.length) seeded++;
+          await new Promise(r => setTimeout(r, 2_000));
+        }
+        console.log(`[seed-trending] done — seeded ${seeded}/${allQueries.length} queries permanently`);
+        return { seeded, total: allQueries.length, trends: fashionTerms };
+      } catch (e: any) {
+        console.error("[seed-trending] error:", e.message);
+        return { error: e.message };
+      }
+    };
+
+    if (wait) {
+      const result = await run();
+      res.json(result);
+    } else {
+      res.json({ started: true, message: "Seeding trending cards in background" });
+      run();
+    }
+  });
 
   // One-time: delete cached rows with empty titles so they get re-fetched with slug-derived titles
   app.get("/api/fix-cache-titles", async (req, res) => {
