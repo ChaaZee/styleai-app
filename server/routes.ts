@@ -207,7 +207,7 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   const workerSecret = process.env.WORKER_SECRET;
   if (workerUrl) {
     const searchUrl = `https://webapi.depop.com/api/v3/search/products/?` +
-      `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
+      `what=${encodeURIComponent(query)}&sort=relevance&items_per_page=${limit}&country=us&currency=USD&include_like_count=true`;
     try {
       const r = await fetch(`${workerUrl}/fetch`, {
         method: "POST",
@@ -243,11 +243,11 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   if (proxiesToTry.length === 0) throw new Error("No proxy configured (WORKER_URL, PROXY_LIST, or PROXY_URL)");
 
   const searchUrl = `https://webapi.depop.com/api/v3/search/products/?` +
-    `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
+    `what=${encodeURIComponent(query)}&sort=relevance&items_per_page=${limit}&country=us&currency=USD&include_like_count=true`;
 
   const HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    "Accept": "*/*",
     "Accept-Language": "en-US,en;q=0.9",
     "Accept-Encoding": "gzip, deflate, br",
     "Referer": "https://www.depop.com/search/?q=streetwear",
@@ -1887,7 +1887,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
 
     const { ProxyAgent, fetch: undiciFetch } = await import("undici");
-    const searchUrl = `https://webapi.depop.com/api/v3/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=2&offset=0`;
+    const searchUrl = `https://webapi.depop.com/api/v3/search/products/?what=${encodeURIComponent(q)}&sort=relevance&items_per_page=2&country=us&currency=USD&include_like_count=true`;
     const results: Record<string, string> = {};
 
     // Test first 3 proxies from the list
@@ -1926,7 +1926,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const workerUrl = process.env.WORKER_URL;
     const workerSecret = process.env.WORKER_SECRET;
     if (!workerUrl) return res.json({ ok: false, error: "No WORKER_URL env var" });
-    const targetUrl = `https://webapi.depop.com/api/v3/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
+    const targetUrl = `https://webapi.depop.com/api/v3/search/products/?what=${encodeURIComponent(q)}&sort=relevance&items_per_page=3&country=us&currency=USD&include_like_count=true`;
     try {
       const t0 = Date.now();
       const r = await fetch(`${workerUrl}/fetch`, {
@@ -1950,7 +1950,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // Test direct Depop API access (no proxy) — to check if Render can hit it directly
   app.get("/api/debug-depop-direct", async (req, res) => {
     const q = (req.query.q as string) || "hoodie";
-    const url = `https://webapi.depop.com/api/v3/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
+    const url = `https://webapi.depop.com/api/v3/search/products/?what=${encodeURIComponent(q)}&sort=relevance&items_per_page=3&country=us&currency=USD&include_like_count=true`;
     try {
       const r = await fetch(url, {
         headers: {
