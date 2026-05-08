@@ -1762,11 +1762,21 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // Test proxy scraper directly
   app.get("/api/debug-proxy", async (req, res) => {
     const q = (req.query.q as string) || "streetwear cargo pants";
+    const proxyUrl = process.env.PROXY_URL || "(not set)";
+    // Mask credentials for logging
+    const maskedProxy = proxyUrl.replace(/:([^@/]+)@/, ":***@");
     try {
       const listings = await scrapeDepopDirect(q, 3);
-      res.json({ ok: true, count: listings.length, sample: listings[0] });
+      res.json({ ok: true, count: listings.length, proxy: maskedProxy, sample: listings[0] });
     } catch (e: any) {
-      res.json({ ok: false, error: e.message });
+      // Include full error stack for diagnosis
+      const cause = (e.cause as any);
+      res.json({
+        ok: false,
+        error: e.message,
+        cause: cause ? String(cause) : undefined,
+        proxy: maskedProxy,
+      });
     }
   });
 
