@@ -50,6 +50,17 @@ export async function initDB() {
     ALTER TABLE scans ADD COLUMN IF NOT EXISTS depop_queries TEXT
   `;
 
+  // Add garment_type column to depop_cache for smart recommendations
+  await client`
+    ALTER TABLE depop_cache ADD COLUMN IF NOT EXISTS garment_type TEXT
+  `;
+  await client`
+    CREATE INDEX IF NOT EXISTS depop_cache_garment_type_idx ON depop_cache(garment_type)
+  `;
+  await client`
+    CREATE INDEX IF NOT EXISTS depop_cache_aesthetic_garment_idx ON depop_cache(aesthetic, garment_type)
+  `;
+
   await client`
     CREATE TABLE IF NOT EXISTS wardrobe_items (
       id SERIAL PRIMARY KEY,
@@ -163,17 +174,38 @@ export async function getDepopCacheSince(query: string, since: Date): Promise<an
   return listings;
 }
 
-export async function setDepopCache(query: string, listings: any[], aesthetic?: string, permanent = false): Promise<void> {
+export async function setDepopCache(query: string, listings: any[], aesthetic?: string, permanent = false, garmentType?: string): Promise<void> {
   const deduped = dedupeListings(listings);
   await client`
-    INSERT INTO depop_cache (query, listings, aesthetic, permanent, created_at)
-    VALUES (${query}, ${JSON.stringify(deduped)}, ${aesthetic ?? null}, ${permanent}, NOW())
+    INSERT INTO depop_cache (query, listings, aesthetic, permanent, garment_type, created_at)
+    VALUES (${query}, ${JSON.stringify(deduped)}, ${aesthetic ?? null}, ${permanent}, ${garmentType ?? null}, NOW())
     ON CONFLICT (query) DO UPDATE
-      SET listings   = EXCLUDED.listings,
-          aesthetic  = COALESCE(EXCLUDED.aesthetic, depop_cache.aesthetic),
-          permanent  = EXCLUDED.permanent OR depop_cache.permanent,
-          created_at = NOW()
+      SET listings     = EXCLUDED.listings,
+          aesthetic    = COALESCE(EXCLUDED.aesthetic, depop_cache.aesthetic),
+          permanent    = EXCLUDED.permanent OR depop_cache.permanent,
+          garment_type = COALESCE(EXCLUDED.garment_type, depop_cache.garment_type),
+          created_at   = NOW()
   `;
+}
+
+// Fetch cached listings by aesthetic + garment_type for smart post-analysis recommendations
+export async function getDepopCacheByType(aesthetic: string, garmentType: string, limit = 6): Promise<any[]> {
+  const rows = await client`
+    SELECT listings FROM depop_cache
+    WHERE aesthetic = ${aesthetic}
+      AND garment_type = ${garmentType}
+      AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+    ORDER BY created_at DESC
+    LIMIT 5
+  `;
+  const all: any[] = [];
+  for (const row of rows) {
+    for (const item of (row.listings as any[])) {
+      if (all.length >= limit) break;
+      if (!all.find((x: any) => x.id === item.id)) all.push(item);
+    }
+  }
+  return all;
 }
 
 export async function getDepopCacheByAesthetic(aesthetic: string, limit = 50): Promise<any[]> {
