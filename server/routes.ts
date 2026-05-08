@@ -135,36 +135,62 @@ function getProxyList(): string[] {
 }
 
 // Shared normaliser for Depop API response items
+// Handles both v2 (objects[]) and v3 (products[]) response shapes
 function normaliseDepopObject(item: any, idx: number, query: string) {
-  const pics: any[] = item.preview_pictures || item.pictures || [];
-  let image = pics[0]?.url || pics[0]?.src || "";
-  image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
+  // v3: preview is a dict of size->url; v2: preview_pictures or pictures array
+  let image = "";
+  if (item.preview && typeof item.preview === "object" && !Array.isArray(item.preview)) {
+    // v3 shape: pick highest res available
+    image = item.preview["960"] || item.preview["640"] || item.preview["480"]
+      || item.preview["320"] || Object.values(item.preview)[0] as string || "";
+  } else {
+    const pics: any[] = item.preview_pictures || item.pictures || [];
+    image = pics[0]?.url || pics[0]?.src
+      || (typeof pics[0] === "object" ? Object.values(pics[0])[0] as string : "") || "";
+  }
+  // Always prefer P0/highest res
+  image = image.replace(/\/P[2-9]\.jpg$/i, "/P0.jpg").replace(/\/P1[0-9]\.jpg$/i, "/P0.jpg");
 
-  const username = item.seller?.username || item.sellerName || "";
   const slug = item.slug || "";
-  const url = (username && slug)
-    ? `https://www.depop.com/products/${username}-${slug}/`
+  // v3 slug format: "username-product-name-hash" — username is first segment
+  const slugParts = slug.split("-");
+  const username = item.seller?.username || item.sellerName || slugParts[0] || "";
+  const url = slug
+    ? `https://www.depop.com/products/${slug}/`
     : `https://www.depop.com/search/?q=${encodeURIComponent(query)}`;
 
+  // Title: derive from slug (drop username prefix + trailing hash)
   let title = item.description || item.title || "";
   if (!title && slug) {
     const parts = slug.split("-");
-    const dropFirst = /^[a-z0-9]+$/.test(parts[0]);
-    title = (dropFirst ? parts.slice(1) : parts)
-      .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    // Drop first segment (username) and last (4-char hash)
+    const middle = parts.length > 2 ? parts.slice(1, -1) : parts.slice(1);
+    title = middle.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
   if (!title) title = query.replace(/\b\w/g, (c: string) => c.toUpperCase());
 
-  const priceRaw = item.price?.amount ?? item.price ?? 0;
+  // v3 price: pricing.original_price.price_breakdown.price.amount
+  // v2 price: price.amount
+  const priceRaw =
+    item.pricing?.original_price?.price_breakdown?.price?.amount
+    ?? item.pricing?.original_price?.total_price
+    ?? item.price?.amount
+    ?? item.price
+    ?? 0;
   const price = typeof priceRaw === "number" ? priceRaw : parseFloat(priceRaw) || 0;
+  const currency = item.pricing?.currency_name || item.price?.currency || "USD";
+
+  // v3 size: sizes[] array; v2: size.label
+  const size = (item.sizes && item.sizes[0]?.label)
+    || item.size?.label || item.sizeLabel || "";
 
   return {
     id: idx,
     title: title.slice(0, 80),
-    brand: item.brand?.name || item.brandName || "",
+    brand: item.brand_name || item.brand?.name || item.brandName || "",
     price,
-    currency: item.price?.currency ?? "USD",
-    size: item.size?.label || item.sizeLabel || "",
+    currency,
+    size,
     image,
     url,
   };
@@ -179,7 +205,7 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   const workerUrl = process.env.WORKER_URL;
   const workerSecret = process.env.WORKER_SECRET;
   if (workerUrl) {
-    const searchUrl = `https://webapi.depop.com/api/v2/search/products/?` +
+    const searchUrl = `https://webapi.depop.com/api/v3/search/products/?` +
       `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
     try {
       const r = await fetch(`${workerUrl}/fetch`, {
@@ -215,7 +241,7 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
 
   if (proxiesToTry.length === 0) throw new Error("No proxy configured (WORKER_URL, PROXY_LIST, or PROXY_URL)");
 
-  const searchUrl = `https://webapi.depop.com/api/v2/search/products/?` +
+  const searchUrl = `https://webapi.depop.com/api/v3/search/products/?` +
     `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
 
   const HEADERS = {
@@ -1859,7 +1885,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
 
     const { ProxyAgent, fetch: undiciFetch } = await import("undici");
-    const searchUrl = `https://webapi.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=2&offset=0`;
+    const searchUrl = `https://webapi.depop.com/api/v3/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=2&offset=0`;
     const results: Record<string, string> = {};
 
     // Test first 3 proxies from the list
@@ -1898,7 +1924,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const workerUrl = process.env.WORKER_URL;
     const workerSecret = process.env.WORKER_SECRET;
     if (!workerUrl) return res.json({ ok: false, error: "No WORKER_URL env var" });
-    const targetUrl = `https://webapi.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
+    const targetUrl = `https://webapi.depop.com/api/v3/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
     try {
       const t0 = Date.now();
       const r = await fetch(`${workerUrl}/fetch`, {
@@ -1922,7 +1948,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // Test direct Depop API access (no proxy) — to check if Render can hit it directly
   app.get("/api/debug-depop-direct", async (req, res) => {
     const q = (req.query.q as string) || "hoodie";
-    const url = `https://webapi.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
+    const url = `https://webapi.depop.com/api/v3/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
     try {
       const r = await fetch(url, {
         headers: {
