@@ -179,7 +179,7 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   const workerUrl = process.env.WORKER_URL;
   const workerSecret = process.env.WORKER_SECRET;
   if (workerUrl) {
-    const searchUrl = `https://api.depop.com/api/v2/search/products/?` +
+    const searchUrl = `https://webapi.depop.com/api/v2/search/products/?` +
       `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
     try {
       const r = await fetch(`${workerUrl}/fetch`, {
@@ -215,7 +215,7 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
 
   if (proxiesToTry.length === 0) throw new Error("No proxy configured (WORKER_URL, PROXY_LIST, or PROXY_URL)");
 
-  const searchUrl = `https://api.depop.com/api/v2/search/products/?` +
+  const searchUrl = `https://webapi.depop.com/api/v2/search/products/?` +
     `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
 
   const HEADERS = {
@@ -1859,7 +1859,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
 
     const { ProxyAgent, fetch: undiciFetch } = await import("undici");
-    const searchUrl = `https://api.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=2&offset=0`;
+    const searchUrl = `https://webapi.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=2&offset=0`;
     const results: Record<string, string> = {};
 
     // Test first 3 proxies from the list
@@ -1898,7 +1898,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const workerUrl = process.env.WORKER_URL;
     const workerSecret = process.env.WORKER_SECRET;
     if (!workerUrl) return res.json({ ok: false, error: "No WORKER_URL env var" });
-    const targetUrl = `https://api.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
+    const targetUrl = `https://webapi.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
     try {
       const t0 = Date.now();
       const r = await fetch(`${workerUrl}/fetch`, {
@@ -1922,7 +1922,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // Test direct Depop API access (no proxy) — to check if Render can hit it directly
   app.get("/api/debug-depop-direct", async (req, res) => {
     const q = (req.query.q as string) || "hoodie";
-    const url = `https://api.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
+    const url = `https://webapi.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
     try {
       const r = await fetch(url, {
         headers: {
