@@ -11,7 +11,8 @@ export const scans = pgTable("scans", {
   confidence: integer("confidence").notNull(),
   styleBreakdown: text("style_breakdown").notNull(), // JSON string
   occasions: text("occasions").notNull(),             // JSON string
-  keyPieces: text("key_pieces").notNull(),            // JSON string
+  keyPieces: text("key_pieces").notNull(),            // JSON string — display labels
+  depopQueries: text("depop_queries"),                // JSON string — garment search queries for Depop
   colorPalette: text("color_palette").notNull(),      // JSON string
   results: text("results").notNull(),                 // JSON string
   createdAt: timestamp("created_at").defaultNow(),

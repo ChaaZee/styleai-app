@@ -45,6 +45,11 @@ export async function initDB() {
     ALTER TABLE scans ADD COLUMN IF NOT EXISTS device_id TEXT
   `;
 
+  // Add depop_queries column if it doesn't exist
+  await client`
+    ALTER TABLE scans ADD COLUMN IF NOT EXISTS depop_queries TEXT
+  `;
+
   await client`
     CREATE TABLE IF NOT EXISTS wardrobe_items (
       id SERIAL PRIMARY KEY,

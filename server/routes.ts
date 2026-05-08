@@ -2145,7 +2145,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         confidence: analysis.confidence,
         styleBreakdown: JSON.stringify(styleBreakdown),
         occasions: JSON.stringify(analysis.occasions),
-        keyPieces: JSON.stringify(garmentDepopQueries),
+        keyPieces: JSON.stringify(analysis.keyPieces || []),
+        depopQueries: JSON.stringify(garmentDepopQueries),
         colorPalette: JSON.stringify(analysis.colorPalette),
         results: JSON.stringify(finalProducts),
       });
@@ -2594,8 +2595,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const scan = await storage.getScan(scanId);
       if (!scan) return res.status(404).json({ error: "Scan not found" });
 
-      const queries: string[] = JSON.parse(scan.keyPieces || "[]");
-      if (!queries.length) return res.json({ ready: true, groups: [] });
+      // Use depopQueries (garment-specific) — fall back to empty if old scan has none
+      const rawQ = scan.depopQueries || scan.keyPieces || "[]";
+      const queries: string[] = JSON.parse(rawQ);
+      // If no depopQueries stored (old scan), return empty immediately — don't serve aesthetic cache
+      if (!queries.length || !scan.depopQueries) return res.json({ ready: true, groups: [] });
 
       // Check cache for each query
       const cacheResults = await Promise.all(
