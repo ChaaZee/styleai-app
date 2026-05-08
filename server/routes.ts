@@ -1824,6 +1824,30 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     res.json({ ok: false, proxy: maskedProxy, results });
   });
 
+  // Test direct Depop API access (no proxy) — to check if Render can hit it directly
+  app.get("/api/debug-depop-direct", async (req, res) => {
+    const q = (req.query.q as string) || "hoodie";
+    const url = `https://api.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
+    try {
+      const r = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+          "Accept": "application/json",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Referer": "https://www.depop.com/",
+          "Origin": "https://www.depop.com",
+          "depop-client": "web",
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      const text = await r.text();
+      const parsed = text.startsWith("{") ? JSON.parse(text) : null;
+      res.json({ status: r.status, objects: parsed?.objects?.length ?? 0, preview: text.slice(0, 300) });
+    } catch (e: any) {
+      res.json({ error: e.message, cause: e.cause ? String(e.cause) : undefined });
+    }
+  });
+
   // Temp: test Apify token + actor from server
   app.get("/api/debug-apify", async (req, res) => {
     const token = process.env.APIFY_TOKEN;
