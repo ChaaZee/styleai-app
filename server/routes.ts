@@ -109,6 +109,83 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
   };
 }
 
+// ── Direct Depop scraper via residential proxy ──────────────────────────────
+// Hits api.depop.com directly, bypassing Cloudflare via a residential proxy IP.
+// Falls back to Apify if PROXY_URL is not set.
+async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
+  const proxyUrl = process.env.PROXY_URL;
+  if (!proxyUrl) throw new Error("No PROXY_URL set");
+
+  const { HttpsProxyAgent } = await import("https-proxy-agent");
+  const agent = new HttpsProxyAgent(proxyUrl);
+
+  const url = `https://api.depop.com/api/v2/search/products/?` +
+    `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
+
+  const res = await fetch(url, {
+    // @ts-ignore — node-fetch style agent on native fetch via undici
+    dispatcher: undefined,
+    headers: {
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      "Accept": "application/json",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Referer": "https://www.depop.com/",
+      "Origin": "https://www.depop.com",
+    },
+    // Pass proxy agent via undici (Node 18+ native fetch uses undici internally)
+    // @ts-ignore
+    agent,
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Depop API ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  const data = await res.json() as any;
+  const objects: any[] = data.objects || data.products || [];
+
+  return objects.map((item: any, idx: number) => {
+    // Extract image from preview_pictures or pictures array
+    const pics: any[] = item.preview_pictures || item.pictures || [];
+    let image = pics[0]?.url || pics[0]?.src || "";
+    // Upgrade to full resolution
+    image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
+
+    // Build product URL from slug + username
+    const username = item.seller?.username || item.sellerName || "";
+    const slug = item.slug || "";
+    const url = (username && slug)
+      ? `https://www.depop.com/products/${username}-${slug}/`
+      : `https://www.depop.com/search/?q=${encodeURIComponent(query)}`;
+
+    // Title from description or slug
+    let title = item.description || item.title || "";
+    if (!title && slug) {
+      const parts = slug.split("-");
+      const dropFirst = /^[a-z0-9]+$/.test(parts[0]);
+      title = (dropFirst ? parts.slice(1) : parts)
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    }
+    if (!title) title = query.replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+    const priceRaw = item.price?.amount ?? item.price ?? 0;
+    const price = typeof priceRaw === "number" ? priceRaw : parseFloat(priceRaw) || 0;
+
+    return {
+      id: idx,
+      title: title.slice(0, 80),
+      brand: item.brand?.name || item.brandName || "",
+      price,
+      currency: item.price?.currency ?? "USD",
+      size: item.size?.label || item.sizeLabel || "",
+      image,
+      url,
+    };
+  }).filter((l: any) => l.image);
+}
+
 // Run a single Depop search: check cache first, else hit Apify + store result
 async function fetchDepopListings(
   query: string,
@@ -123,49 +200,67 @@ async function fetchDepopListings(
     return cached;
   }
 
+  const proxyUrl = process.env.PROXY_URL;
   const token = process.env.APIFY_TOKEN;
-  if (!token) return [];
+  if (!proxyUrl && !token) return [];
 
   try {
-    // 2. Start Apify run
-    const runRes = await fetch(
-      `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ searchQueries: [query], maxItems: limit }),
-        signal: AbortSignal.timeout(15_000),
-      }
-    );
-    if (!runRes.ok) return [];
-    const runData = await runRes.json();
-    const runId: string = runData.data?.id;
-    const datasetId: string = runData.data?.defaultDatasetId;
-    if (!runId) return [];
+    let listings: any[] = [];
 
-    // 3. Poll until done (max 90s)
-    const start = Date.now();
-    while (Date.now() - start < 90_000) {
-      await new Promise(r => setTimeout(r, 4_000));
-      const s = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`,
-        { signal: AbortSignal.timeout(8_000) });
-      if (!s.ok) continue;
-      const sd = await s.json();
-      const status: string = sd.data?.status;
-      if (status === "SUCCEEDED") break;
-      if (["FAILED", "ABORTED", "TIMED-OUT"].includes(status)) return [];
+    // 2a. Try direct scraper via residential proxy first (fast, ~1-2s)
+    if (proxyUrl) {
+      try {
+        listings = await scrapeDepopDirect(query, limit);
+        console.log(`[depop] proxy scrape got ${listings.length} listings for "${query}"`);
+      } catch (e: any) {
+        console.warn(`[depop] proxy scrape failed for "${query}": ${e.message} — falling back to Apify`);
+      }
     }
 
-    // 4. Fetch dataset
-    const dataRes = await fetch(
-      `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&limit=${limit}`,
-      { signal: AbortSignal.timeout(10_000) }
-    );
-    if (!dataRes.ok) return [];
-    const items: any[] = await dataRes.json();
-    const listings = items.map((i, idx) => normaliseDepopItem(i, idx, query)).filter(l => l.image);
+    // 2b. Fall back to Apify if proxy failed or not set
+    if (!listings.length && token) {
+      const runRes = await fetch(
+        `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ searchQueries: [query], maxItems: limit }),
+          signal: AbortSignal.timeout(15_000),
+        }
+      );
+      if (!runRes.ok) return [];
+      const runData = await runRes.json();
+      if (runData.error) {
+        console.warn(`[depop] Apify error: ${runData.error?.message}`);
+        return [];
+      }
+      const runId: string = runData.data?.id;
+      const datasetId: string = runData.data?.defaultDatasetId;
+      if (!runId) return [];
 
-    // 5. Store in cache
+      // Poll until done (max 90s)
+      const start = Date.now();
+      while (Date.now() - start < 90_000) {
+        await new Promise(r => setTimeout(r, 4_000));
+        const s = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${token}`,
+          { signal: AbortSignal.timeout(8_000) });
+        if (!s.ok) continue;
+        const sd = await s.json();
+        const status: string = sd.data?.status;
+        if (status === "SUCCEEDED") break;
+        if (["FAILED", "ABORTED", "TIMED-OUT"].includes(status)) return [];
+      }
+
+      const dataRes = await fetch(
+        `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}&limit=${limit}`,
+        { signal: AbortSignal.timeout(10_000) }
+      );
+      if (!dataRes.ok) return [];
+      const items: any[] = await dataRes.json();
+      listings = items.map((i, idx) => normaliseDepopItem(i, idx, query)).filter((l: any) => l.image);
+    }
+
+    // 3. Store in cache
     if (listings.length) {
       await setDepopCache(query, listings, aesthetic, permanent).catch(e =>
         console.error("[depop] cache write failed:", e.message)
@@ -1666,6 +1761,17 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // Test proxy scraper directly
+  app.get("/api/debug-proxy", async (req, res) => {
+    const q = (req.query.q as string) || "streetwear cargo pants";
+    try {
+      const listings = await scrapeDepopDirect(q, 3);
+      res.json({ ok: true, count: listings.length, sample: listings[0] });
+    } catch (e: any) {
+      res.json({ ok: false, error: e.message });
+    }
+  });
+
   // Temp: test Apify token + actor from server
   app.get("/api/debug-apify", async (req, res) => {
     const token = process.env.APIFY_TOKEN;
@@ -2000,9 +2106,42 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         return res.json({ cached: true, groups });
       }
 
-      // Partial or no cache — try Apify for uncached queries
+      // Partial or no cache — try proxy scraper first (instant), then Apify
       const uncached = cacheResults.filter(r => !r.listings);
       let runs: { query: string; runId: string; datasetId: string }[] = [];
+
+      // If proxy is available, scrape all uncached queries directly — fast, no polling needed
+      if (process.env.PROXY_URL && uncached.length) {
+        const proxyResults = await Promise.all(
+          uncached.map(async ({ query: q }) => {
+            try {
+              const listings = await scrapeDepopDirect(q, 6);
+              if (listings.length) {
+                await setDepopCache(q, listings, aesthetic).catch(() => {});
+                return {
+                  piece: q.includes(" ") ? q.split(" ").slice(1).join(" ") : q,
+                  listings,
+                };
+              }
+            } catch (e: any) {
+              console.warn(`[depop-search] proxy failed for "${q}": ${e.message}`);
+            }
+            return null;
+          })
+        );
+        const proxyGroups = proxyResults.filter((g): g is { piece: string; listings: any[] } => !!g);
+        if (proxyGroups.length) {
+          const allGroups = [
+            ...cacheResults.filter(r => r.listings).map(r => ({
+              piece: r.query.includes(" ") ? r.query.split(" ").slice(1).join(" ") : r.query,
+              listings: r.listings!,
+            })),
+            ...proxyGroups,
+          ].filter(g => g.listings.length > 0);
+          console.log(`[depop-search] proxy got ${proxyGroups.length}/${uncached.length} groups instantly`);
+          return res.json({ cached: true, groups: allGroups });
+        }
+      }
 
       if (token) {
         const runPromises = uncached.map(async ({ query: q }) => {
