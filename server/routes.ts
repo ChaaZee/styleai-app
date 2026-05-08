@@ -314,19 +314,20 @@ async function fetchDepopListings(
   }
 
   const proxyUrl = process.env.PROXY_URL;
+  const workerUrl = process.env.WORKER_URL;
   const token = process.env.APIFY_TOKEN;
-  if (!proxyUrl && !token) return [];
+  if (!proxyUrl && !workerUrl && !token) return [];
 
   try {
     let listings: any[] = [];
 
-    // 2a. Try direct scraper via residential proxy first (fast, ~1-2s)
-    if (proxyUrl) {
+    // 2a. Try direct scraper via CF Worker or proxy (fast, ~1-2s)
+    if (workerUrl || proxyUrl) {
       try {
         listings = await scrapeDepopDirect(query, limit);
-        console.log(`[depop] proxy scrape got ${listings.length} listings for "${query}"`);
+        console.log(`[depop] scrape got ${listings.length} listings for "${query}"`);
       } catch (e: any) {
-        console.warn(`[depop] proxy scrape failed for "${query}": ${e.message} — falling back to Apify`);
+        console.warn(`[depop] scrape failed for "${query}": ${e.message} — falling back to Apify`);
       }
     }
 
@@ -1344,7 +1345,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // GET /api/seed-trending — fires in background, returns immediately
   // GET /api/seed-trending?wait=1 — waits for completion (use from cron)
   app.get("/api/seed-trending", async (req, res) => {
-    if (!process.env.APIFY_TOKEN) return res.json({ error: "No APIFY_TOKEN" });
+    if (!process.env.WORKER_URL && !process.env.PROXY_URL && !process.env.APIFY_TOKEN) return res.json({ error: "No scraper configured" });
     const wait = req.query.wait === "1";
 
     // Google Trends RSS for fashion category (category 185)
