@@ -47,12 +47,34 @@ export default function ScanPage() {
     if (file) handleFile(file);
   }, [handleFile]);
 
+  // Resize image client-side before upload to cap memory usage on the server.
+  // Draws onto a canvas at max 1024px on the long edge, exports as JPEG at 85% quality.
+  const resizeImage = (file: File): Promise<Blob> =>
+    new Promise((resolve) => {
+      const MAX = 1024;
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(blob => resolve(blob!), "image/jpeg", 0.85);
+      };
+      img.src = url;
+    });
+
   const handleAnalyze = async () => {
     if (!selectedFile) return;
     setUploadState("analyzing");
     try {
+      const resized = await resizeImage(selectedFile);
       const formData = new FormData();
-      formData.append("image", selectedFile);
+      formData.append("image", resized, "photo.jpg");
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "x-device-id": getDeviceId() },

@@ -200,10 +200,25 @@ export const storage: IStorage = {
     return row;
   },
   async getScans(deviceId?: string) {
+    // Exclude image_data from list queries — full images are only needed in getScan(id).
+    // This prevents loading megabytes of base64 into memory on every /api/scans call.
+    const cols = {
+      id: scans.id,
+      deviceId: scans.deviceId,
+      aesthetic: scans.aesthetic,
+      confidence: scans.confidence,
+      styleBreakdown: scans.styleBreakdown,
+      occasions: scans.occasions,
+      keyPieces: scans.keyPieces,
+      depopQueries: scans.depopQueries,
+      colorPalette: scans.colorPalette,
+      results: scans.results,
+      createdAt: scans.createdAt,
+    };
     if (deviceId) {
-      return db.select().from(scans).where(eq(scans.deviceId, deviceId)).orderBy(desc(scans.id));
+      return db.select(cols).from(scans).where(eq(scans.deviceId, deviceId)).orderBy(desc(scans.id));
     }
-    return db.select().from(scans).orderBy(desc(scans.id));
+    return db.select(cols).from(scans).orderBy(desc(scans.id));
   },
   async getScan(id) {
     const [row] = await db.select().from(scans).where(eq(scans.id, id));

@@ -17,7 +17,7 @@ const analyzeLimiter = rateLimit({
 
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const upload = multer({
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB — client resizes to 1024px before upload
   fileFilter: (_req, file, cb) => {
     if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       cb(null, true);
