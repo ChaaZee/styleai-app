@@ -2027,6 +2027,32 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       if (!detectionJson) throw new Error("Could not parse garment detection response");
       const garmentData = JSON.parse(detectionJson[0]);
 
+      // Build specific Depop search queries from Pass 1 garment data
+      // e.g. { item: "Wide-leg trousers", color: "tan", fabric: "corduroy", fit: "wide-leg" }
+      //   → "tan corduroy wide-leg trousers"
+      function buildGarmentQueries(garments: any[]): string[] {
+        // Skip accessories and items unlikely to appear on Depop
+        const skipTypes = /hat|bag|purse|sunglasses|glasses|watch|jewelry|necklace|ring|earring|bracelet|belt|sock|perfume|scarf|glove/i;
+        const usefulGarments = garments
+          .filter((g: any) => !skipTypes.test(g.item))
+          .slice(0, 4); // max 4 garment queries
+
+        return usefulGarments.map((g: any) => {
+          const parts: string[] = [];
+          // Color — always include
+          if (g.color && g.color !== "unknown") parts.push(g.color);
+          // Fabric — only if specific (not "unknown" or generic "fabric")
+          if (g.fabric && g.fabric !== "unknown" && g.fabric !== "fabric") parts.push(g.fabric);
+          // Item name — strip trailing brand/descriptor noise, use as-is
+          parts.push(g.item);
+          const q = parts.join(" ").toLowerCase().trim();
+          return q;
+        });
+      }
+
+      // garmentQueries used after analysis is parsed below
+      const rawGarmentQueries = buildGarmentQueries(garmentData.garments || []);
+
       // Build a structured garment description to ground the aesthetic classification
       const garmentSummary = [
         `Detected garments:`,
@@ -2061,6 +2087,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       if (!jsonMatch) throw new Error("Could not parse Gemini response");
 
       const analysis = JSON.parse(jsonMatch[0]);
+
+      // Final garment-specific Depop queries: use raw garment queries, no aesthetic prefix
+      // These are precise (e.g. "black distressed denim wide-leg jeans") not aesthetic-generic
+      const garmentDepopQueries = rawGarmentQueries.length >= 2
+        ? rawGarmentQueries
+        : (analysis.keyPieces || []).map((p: string) => p.toLowerCase());
 
       // Build products from Gemini's split recommendations
       const mapRecs = (recs: any[], type: string, startId: number) =>
@@ -2113,26 +2145,24 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         confidence: analysis.confidence,
         styleBreakdown: JSON.stringify(styleBreakdown),
         occasions: JSON.stringify(analysis.occasions),
-        keyPieces: JSON.stringify(analysis.keyPieces),
+        keyPieces: JSON.stringify(garmentDepopQueries),
         colorPalette: JSON.stringify(analysis.colorPalette),
         results: JSON.stringify(finalProducts),
       });
 
       res.json({ scanId: scan.id });
 
-      // Pre-warm Depop cache in background — don't await, runs after response is sent
-      if (process.env.APIFY_TOKEN && analysis.keyPieces?.length) {
-        const pieces: string[] = analysis.keyPieces.slice(0, 5);
-        const queries = pieces.map((p: string) => `${analysis.aesthetic} ${p}`.toLowerCase());
-        // Run sequentially to avoid hammering Apify, 8 items each so home feed gets real cards
+      // Pre-warm Depop cache in background using garment-specific queries — no await
+      if ((process.env.WORKER_URL || process.env.APIFY_TOKEN) && garmentDepopQueries.length) {
+        const queries = garmentDepopQueries.slice(0, 4);
         (async () => {
           let warmed = 0;
           for (const q of queries) {
-            const r = await fetchDepopListings(q, analysis.aesthetic, 8).catch(() => []);
+            const r = await fetchDepopListings(q, analysis.aesthetic, 6).catch(() => []);
             if (r.length) warmed++;
-            await new Promise(res => setTimeout(res, 1500));
+            await new Promise(res => setTimeout(res, 800));
           }
-          console.log(`[depop] pre-warmed ${warmed}/${queries.length} queries for aesthetic "${analysis.aesthetic}"`);
+          console.log(`[depop] pre-warmed ${warmed}/${queries.length} garment queries for "${analysis.aesthetic}"`);
         })();
       }
     } catch (err: any) {

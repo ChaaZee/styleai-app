@@ -224,8 +224,8 @@ export default function ResultsPage() {
 
     const keyPiecesArr: string[] = JSON.parse(scan.keyPieces || "[]");
     const pieces = keyPiecesArr.slice(0, 4).length > 0 ? keyPiecesArr.slice(0, 4) : [scan.aesthetic];
-    // One query per piece with aesthetic prefix for better results
-    const queries = pieces.map(p => `${scan.aesthetic} ${p}`.toLowerCase());
+    // Garment queries are already specific (e.g. "black denim wide-leg jeans") — use directly
+    const queries = pieces.map(p => p.toLowerCase());
 
     setDepopLoading(true);
     setDepopError(null);
@@ -554,7 +554,7 @@ export default function ResultsPage() {
                 <div key={piece}>
                   {/* Tappable label — live immediately */}
                   <a
-                    href={`https://www.depop.com/search/?q=${encodeURIComponent(`${scan.aesthetic} ${piece}`)}`}
+                    href={`https://www.depop.com/search/?q=${encodeURIComponent(piece)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 mb-2.5 group/label"
@@ -598,7 +598,7 @@ export default function ResultsPage() {
                 <div key={group.piece}>
                   {/* Section label — tappable, links to Depop search for this piece */}
                   <a
-                    href={`https://www.depop.com/search/?q=${encodeURIComponent(`${scan.aesthetic} ${group.piece}`)}`}
+                    href={`https://www.depop.com/search/?q=${encodeURIComponent(group.piece)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 mb-2.5 group/label"
