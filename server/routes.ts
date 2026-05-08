@@ -1960,11 +1960,24 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // POST /api/depop-search — check cache first, kick off Apify runs if needed
   // Body: { queries: string[], aesthetic: string }
   // Returns immediately with { cached: true, groups } OR { cached: false, runs: [{query,runId,datasetId}] }
+  // Helper: given a piece name + pool of listings, return the best-matching subset
+  // by scoring how many words in the piece appear in the listing title
+  function matchListingsForPiece(piece: string, pool: any[], limit = 6): any[] {
+    const words = piece.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const scored = pool.map(l => {
+      const title = (l.title || "").toLowerCase();
+      const score = words.filter(w => title.includes(w)).length;
+      return { l, score };
+    });
+    // Sort by score desc, shuffle within same score for variety
+    scored.sort((a, b) => b.score - a.score || Math.random() - 0.5);
+    return scored.slice(0, limit).map(s => s.l);
+  }
+
   app.post("/api/depop-search", async (req, res) => {
     const { queries, aesthetic = "" } = req.body as { queries: string[]; aesthetic?: string };
     if (!queries?.length) return res.status(400).json({ error: "Missing queries" });
     const token = process.env.APIFY_TOKEN;
-    if (!token) return res.status(503).json({ error: "Depop search not configured" });
 
     try {
       // Check cache for all queries in parallel
@@ -1987,31 +2000,40 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         return res.json({ cached: true, groups });
       }
 
-      // Partial or no cache — start Apify runs only for uncached queries
+      // Partial or no cache — try Apify for uncached queries
       const uncached = cacheResults.filter(r => !r.listings);
-      const runPromises = uncached.map(async ({ query: q }) => {
-        try {
-          const r = await fetch(
-            `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ searchQueries: [q], maxItems: 4 }),
-              signal: AbortSignal.timeout(15_000),
-            }
-          );
-          const d = await r.json();
-          console.log(`[depop] started run for "${q}" runId=${d.data?.id}`);
-          return { query: q, runId: d.data?.id as string, datasetId: d.data?.defaultDatasetId as string };
-        } catch (e: any) {
-          console.error(`[depop] start failed for "${q}":`, e.message);
-          return null;
-        }
-      });
-      const runs = (await Promise.all(runPromises))
-        .filter((r): r is { query: string; runId: string; datasetId: string } => !!r?.runId);
+      let runs: { query: string; runId: string; datasetId: string }[] = [];
 
-      // Return cached groups we already have + runs to poll for the rest
+      if (token) {
+        const runPromises = uncached.map(async ({ query: q }) => {
+          try {
+            const r = await fetch(
+              `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ searchQueries: [q], maxItems: 6 }),
+                signal: AbortSignal.timeout(15_000),
+              }
+            );
+            const d = await r.json();
+            // Detect quota / auth errors
+            if (d.error) {
+              console.warn(`[depop] Apify error for "${q}": ${d.error?.message || JSON.stringify(d.error)}`);
+              return null;
+            }
+            console.log(`[depop] started run for "${q}" runId=${d.data?.id}`);
+            return { query: q, runId: d.data?.id as string, datasetId: d.data?.defaultDatasetId as string };
+          } catch (e: any) {
+            console.error(`[depop] start failed for "${q}":`, e.message);
+            return null;
+          }
+        });
+        runs = (await Promise.all(runPromises))
+          .filter((r): r is { query: string; runId: string; datasetId: string } => !!r?.runId);
+      }
+
+      // Cached groups from exact query matches
       const cachedGroups = cacheResults
         .filter(r => r.listings)
         .map(r => ({
@@ -2019,6 +2041,27 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           listings: r.listings!,
         }))
         .filter(g => g.listings.length > 0);
+
+      // --- Fallback: if Apify couldn't start runs for some queries, use aesthetic cache ---
+      const queriesNeedingFallback = uncached
+        .filter(r => !runs.find(run => run.query === r.query))
+        .map(r => r.query);
+
+      if (queriesNeedingFallback.length > 0 && aesthetic) {
+        console.log(`[depop] Apify unavailable for ${queriesNeedingFallback.length} queries — using aesthetic cache fallback for "${aesthetic}"`);
+        // Pull a generous pool from the aesthetic permanent cache
+        const pool = await getDepopCacheByAesthetic(aesthetic, 150);
+        if (pool.length > 0) {
+          const fallbackGroups = queriesNeedingFallback.map(q => {
+            const piece = q.includes(" ") ? q.split(" ").slice(1).join(" ") : q;
+            const listings = matchListingsForPiece(piece, pool, 6);
+            return { piece, listings };
+          }).filter(g => g.listings.length > 0);
+          // Merge with any already-cached groups
+          const allGroups = [...cachedGroups, ...fallbackGroups];
+          return res.json({ cached: true, groups: allGroups });
+        }
+      }
 
       res.json({ cached: false, cachedGroups, runs, aesthetic });
     } catch (err: any) {
