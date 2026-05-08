@@ -116,25 +116,23 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   const proxyUrl = process.env.PROXY_URL;
   if (!proxyUrl) throw new Error("No PROXY_URL set");
 
-  const { HttpsProxyAgent } = await import("https-proxy-agent");
-  const agent = new HttpsProxyAgent(proxyUrl);
+  // Use undici ProxyAgent as dispatcher — the correct way to proxy Node 18+ native fetch
+  const { ProxyAgent, fetch: undiciFetch } = await import("undici");
+  const dispatcher = new ProxyAgent(proxyUrl);
 
-  const url = `https://api.depop.com/api/v2/search/products/?` +
+  const searchUrl = `https://api.depop.com/api/v2/search/products/?` +
     `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
 
-  const res = await fetch(url, {
-    // @ts-ignore — node-fetch style agent on native fetch via undici
-    dispatcher: undefined,
+  const res = await (undiciFetch as any)(searchUrl, {
+    dispatcher,
     headers: {
       "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
       "Accept": "application/json",
       "Accept-Language": "en-US,en;q=0.9",
       "Referer": "https://www.depop.com/",
       "Origin": "https://www.depop.com",
+      "depop-client": "web",
     },
-    // Pass proxy agent via undici (Node 18+ native fetch uses undici internally)
-    // @ts-ignore
-    agent,
     signal: AbortSignal.timeout(20_000),
   });
 
