@@ -239,11 +239,7 @@ export default function ResultsPage() {
         if (cancelled) return;
         try {
           const res = await fetch(`/api/depop-ready/${scan.id}`);
-          if (!res.ok) {
-            setDepopError("Could not load Depop listings");
-            setDepopLoading(false);
-            return;
-          }
+          if (!res.ok) continue; // 502 / deploy restart — keep polling
           const data = await res.json();
 
           // Show partial results immediately as each query comes in
