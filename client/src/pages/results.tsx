@@ -217,95 +217,55 @@ export default function ResultsPage() {
     return () => clearTimeout(timer);
   }, [scan]);
 
-  // Fetch Depop listings — one run for all pieces, poll until done
+  // Poll /api/depop-ready/:scanId until all garment queries are cached.
+  // The server populates the cache in the background right after analysis.
   useEffect(() => {
     if (!depopMode || !scan || depopFetchedRef.current) return;
     depopFetchedRef.current = true;
 
-    const keyPiecesArr: string[] = JSON.parse(scan.keyPieces || "[]");
-    const pieces = keyPiecesArr.slice(0, 4).length > 0 ? keyPiecesArr.slice(0, 4) : [scan.aesthetic];
-    // Garment queries are already specific (e.g. "black denim wide-leg jeans") — use directly
-    const queries = pieces.map(p => p.toLowerCase());
-
+    const pieces: string[] = JSON.parse(scan.keyPieces || "[]");
     setDepopLoading(true);
     setDepopError(null);
     setDepopGroups([]);
     setDepopPieces(pieces);
 
     let cancelled = false;
-    const MAX_POLLS = 25;
+    // Poll every 1s, show partial results as they come in, timeout after 30s
+    const POLL_INTERVAL = 1000;
+    const MAX_POLLS = 30;
 
     (async () => {
-      try {
-        // Step 1: check cache + start runs for uncached queries
-        const searchRes = await fetch("/api/depop-search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ queries, aesthetic: scan.aesthetic }),
-        });
-        const searchData = await searchRes.json();
-        if (!searchRes.ok) {
-          setDepopError(searchData.error || "Could not load Depop listings");
-          setDepopLoading(false);
-          return;
-        }
-
-        // Full cache hit — instant
-        if (searchData.cached) {
-          setDepopGroups(searchData.groups || []);
-          if (!searchData.groups?.length) setDepopError("No matching items found on Depop");
-          setDepopLoading(false);
-          return;
-        }
-
-        // Partial cache — show what we have while polling the rest
-        if (searchData.cachedGroups?.length) {
-          setDepopGroups(searchData.cachedGroups);
-        }
-
-        const runs: { query: string; runId: string; datasetId: string }[] = searchData.runs || [];
-        if (!runs.length) {
-          // All were cached (edge case)
-          setDepopGroups(searchData.cachedGroups || []);
-          if (!searchData.cachedGroups?.length) setDepopError("No matching items found on Depop");
-          setDepopLoading(false);
-          return;
-        }
-
-        const encodedRuns = encodeURIComponent(JSON.stringify(runs));
-        const encodedAesthetic = encodeURIComponent(scan.aesthetic);
-
-        // Step 2: poll every 4s for remaining runs
-        for (let i = 0; i < MAX_POLLS; i++) {
-          if (cancelled) return;
-          await new Promise(r => setTimeout(r, 4000));
-          if (cancelled) return;
-
-          const pollRes = await fetch(`/api/depop-poll?runs=${encodedRuns}&aesthetic=${encodedAesthetic}`);
-          const pollData = await pollRes.json();
-
-          if (pollData.status === "done") {
-            // Merge polled groups with any cached groups
-            const allGroups = [...(searchData.cachedGroups || []), ...(pollData.groups || [])];
-            setDepopGroups(allGroups);
-            if (!allGroups.length) setDepopError("No matching items found on Depop");
+      for (let i = 0; i < MAX_POLLS; i++) {
+        if (cancelled) return;
+        try {
+          const res = await fetch(`/api/depop-ready/${scan.id}`);
+          if (!res.ok) {
+            setDepopError("Could not load Depop listings");
             setDepopLoading(false);
             return;
           }
-          if (pollData.status === "failed") {
-            if (!searchData.cachedGroups?.length) setDepopError("Depop search failed");
+          const data = await res.json();
+
+          // Show partial results immediately as each query comes in
+          const groups = data.ready ? data.groups : (data.partialGroups || []);
+          if (groups.length) setDepopGroups(groups);
+
+          if (data.ready) {
+            if (!groups.length) setDepopError("No matching items found on Depop");
             setDepopLoading(false);
             return;
           }
+        } catch {
+          // network blip — keep polling
         }
-        setDepopError("Depop search timed out");
-        setDepopLoading(false);
-      } catch {
-        if (!cancelled) {
-          setDepopError("Could not load Depop listings");
-          setDepopLoading(false);
-        }
+        await new Promise(r => setTimeout(r, POLL_INTERVAL));
       }
+      // Timeout — show whatever we have
+      setDepopLoading(false);
+      setDepopGroups(prev => {
+        if (!prev.length) setDepopError("Depop search timed out");
+        return prev;
+      });
     })();
 
     return () => { cancelled = true; };

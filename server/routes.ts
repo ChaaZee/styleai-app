@@ -2152,17 +2152,26 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       res.json({ scanId: scan.id });
 
-      // Pre-warm Depop cache in background using garment-specific queries — no await
-      if ((process.env.WORKER_URL || process.env.APIFY_TOKEN) && garmentDepopQueries.length) {
+      // Background: scrape Depop for each garment query via the CF Worker, write to cache.
+      // Frontend polls /api/depop-ready/:scanId and renders as queries complete.
+      if (garmentDepopQueries.length) {
+        const aesthetic = analysis.aesthetic;
         const queries = garmentDepopQueries.slice(0, 4);
         (async () => {
-          let warmed = 0;
+          let fetched = 0;
           for (const q of queries) {
-            const r = await fetchDepopListings(q, analysis.aesthetic, 6).catch(() => []);
-            if (r.length) warmed++;
-            await new Promise(res => setTimeout(res, 800));
+            // Skip if already cached from a previous identical analysis
+            const existing = await getDepopCache(q).catch(() => null);
+            if (existing) { fetched++; continue; }
+            const listings = await scrapeDepopDirect(q, 6).catch(() => []);
+            if (listings.length) {
+              await setDepopCache(q, listings, aesthetic).catch(() => {});
+              fetched++;
+            }
+            // Small delay between CF Worker requests to avoid rate limiting
+            await new Promise(r => setTimeout(r, 400));
           }
-          console.log(`[depop] pre-warmed ${warmed}/${queries.length} garment queries for "${analysis.aesthetic}"`);
+          console.log(`[depop] post-analysis: fetched ${fetched}/${queries.length} garment queries for scanId=${scan.id}`);
         })();
       }
     } catch (err: any) {
@@ -2571,6 +2580,48 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     } catch (err: any) {
       console.error("[depop-poll] Error:", err.message);
       res.status(500).json({ error: "Poll failed" });
+    }
+  });
+
+  // GET /api/depop-ready/:scanId
+  // Returns { ready: true, groups } when all garment queries are cached,
+  // or { ready: false, total, done } while still fetching.
+  // Frontend polls this every 1s after analysis finishes.
+  app.get("/api/depop-ready/:scanId", async (req, res) => {
+    const scanId = parseInt(req.params.scanId, 10);
+    if (isNaN(scanId)) return res.status(400).json({ error: "Invalid scanId" });
+    try {
+      const scan = await storage.getScan(scanId);
+      if (!scan) return res.status(404).json({ error: "Scan not found" });
+
+      const queries: string[] = JSON.parse(scan.keyPieces || "[]");
+      if (!queries.length) return res.json({ ready: true, groups: [] });
+
+      // Check cache for each query
+      const cacheResults = await Promise.all(
+        queries.map(async q => ({ query: q, listings: await getDepopCache(q) }))
+      );
+
+      const done = cacheResults.filter(r => r.listings !== null).length;
+      const total = queries.length;
+
+      if (done === total) {
+        // All ready
+        const groups = cacheResults
+          .map(r => ({ piece: r.query, listings: r.listings! }))
+          .filter(g => g.listings.length > 0);
+        return res.json({ ready: true, groups });
+      }
+
+      // Return partial results + progress
+      const partialGroups = cacheResults
+        .filter(r => r.listings !== null)
+        .map(r => ({ piece: r.query, listings: r.listings! }))
+        .filter(g => g.listings.length > 0);
+
+      res.json({ ready: false, done, total, partialGroups });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
