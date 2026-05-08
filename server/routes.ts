@@ -116,76 +116,94 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   const proxyUrl = process.env.PROXY_URL;
   if (!proxyUrl) throw new Error("No PROXY_URL set");
 
-  // Use undici ProxyAgent as dispatcher — the correct way to proxy Node 18+ native fetch
-  // connectTimeout helps on slow residential proxies
+  // Try multiple proxy ports — Render may block port 80 for outbound CONNECT
+  // Webshare supports: 80, 1080, 3128, 9999-29999
   const { ProxyAgent, fetch: undiciFetch } = await import("undici");
-  const dispatcher = new ProxyAgent({
-    uri: proxyUrl,
-    connectTimeout: 30_000,
-  });
+
+  // Build alternate port URLs from the base PROXY_URL
+  const baseUrl = new URL(proxyUrl);
+  const ports = [baseUrl.port || "80", "10000", "3128", "1080"];
+  // Deduplicate
+  const uniquePorts = [...new Set(ports)];
 
   const searchUrl = `https://api.depop.com/api/v2/search/products/?` +
     `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
 
-  const res = await (undiciFetch as any)(searchUrl, {
-    dispatcher,
-    headers: {
-      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-      "Accept": "application/json",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Referer": "https://www.depop.com/",
-      "Origin": "https://www.depop.com",
-      "depop-client": "web",
-    },
-    signal: AbortSignal.timeout(35_000),
-  });
+  const HEADERS = {
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "Accept": "application/json",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.depop.com/",
+    "Origin": "https://www.depop.com",
+    "depop-client": "web",
+  };
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Depop API ${res.status}: ${text.slice(0, 200)}`);
+  let lastError: Error | null = null;
+  for (const port of uniquePorts) {
+    baseUrl.port = port;
+    const portedProxyUrl = baseUrl.toString();
+    try {
+      const dispatcher = new ProxyAgent({
+        uri: portedProxyUrl,
+        connectTimeout: 12_000,
+      });
+      const res = await (undiciFetch as any)(searchUrl, {
+        dispatcher,
+        headers: HEADERS,
+        signal: AbortSignal.timeout(18_000),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Depop API ${res.status} (port ${port}): ${text.slice(0, 200)}`);
+      }
+
+      const data = await res.json() as any;
+      const objects: any[] = data.objects || data.products || [];
+
+      return objects.map((item: any, idx: number) => {
+        const pics: any[] = item.preview_pictures || item.pictures || [];
+        let image = pics[0]?.url || pics[0]?.src || "";
+        image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
+
+        const username = item.seller?.username || item.sellerName || "";
+        const slug = item.slug || "";
+        const url = (username && slug)
+          ? `https://www.depop.com/products/${username}-${slug}/`
+          : `https://www.depop.com/search/?q=${encodeURIComponent(query)}`;
+
+        let title = item.description || item.title || "";
+        if (!title && slug) {
+          const parts = slug.split("-");
+          const dropFirst = /^[a-z0-9]+$/.test(parts[0]);
+          title = (dropFirst ? parts.slice(1) : parts)
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        }
+        if (!title) title = query.replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+        const priceRaw = item.price?.amount ?? item.price ?? 0;
+        const price = typeof priceRaw === "number" ? priceRaw : parseFloat(priceRaw) || 0;
+
+        return {
+          id: idx,
+          title: title.slice(0, 80),
+          brand: item.brand?.name || item.brandName || "",
+          price,
+          currency: item.price?.currency ?? "USD",
+          size: item.size?.label || item.sizeLabel || "",
+          image,
+          url,
+        };
+      }).filter((l: any) => l.image);
+    } catch (e: any) {
+      lastError = e;
+      // Only retry on network/timeout errors, not on HTTP errors from Depop
+      if (e.message?.includes("Depop API")) throw e;
+      console.log(`[proxy] port ${port} failed: ${e.message}, trying next...`);
+    }
   }
 
-  const data = await res.json() as any;
-  const objects: any[] = data.objects || data.products || [];
-
-  return objects.map((item: any, idx: number) => {
-    // Extract image from preview_pictures or pictures array
-    const pics: any[] = item.preview_pictures || item.pictures || [];
-    let image = pics[0]?.url || pics[0]?.src || "";
-    // Upgrade to full resolution
-    image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
-
-    // Build product URL from slug + username
-    const username = item.seller?.username || item.sellerName || "";
-    const slug = item.slug || "";
-    const url = (username && slug)
-      ? `https://www.depop.com/products/${username}-${slug}/`
-      : `https://www.depop.com/search/?q=${encodeURIComponent(query)}`;
-
-    // Title from description or slug
-    let title = item.description || item.title || "";
-    if (!title && slug) {
-      const parts = slug.split("-");
-      const dropFirst = /^[a-z0-9]+$/.test(parts[0]);
-      title = (dropFirst ? parts.slice(1) : parts)
-        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-    }
-    if (!title) title = query.replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-    const priceRaw = item.price?.amount ?? item.price ?? 0;
-    const price = typeof priceRaw === "number" ? priceRaw : parseFloat(priceRaw) || 0;
-
-    return {
-      id: idx,
-      title: title.slice(0, 80),
-      brand: item.brand?.name || item.brandName || "",
-      price,
-      currency: item.price?.currency ?? "USD",
-      size: item.size?.label || item.sizeLabel || "",
-      image,
-      url,
-    };
-  }).filter((l: any) => l.image);
+  throw lastError || new Error("All proxy ports failed");
 }
 
 // Run a single Depop search: check cache first, else hit Apify + store result
