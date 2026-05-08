@@ -1343,6 +1343,30 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }, 10_000); // wait 10s for server to fully start
   }
 
+  // POST /api/seed-wave — seed a custom list of queries with garmentType tags
+  // Body: { queries: [{ query, aesthetic, garmentType }], limit? }
+  // Runs in background like seed-trending, skips already-cached queries
+  app.post("/api/seed-wave", async (req, res) => {
+    const { queries, limit = 8 } = req.body as { queries: { query: string; aesthetic: string; garmentType: string }[]; limit?: number };
+    if (!queries?.length) return res.status(400).json({ error: "queries required" });
+    res.json({ started: true, total: queries.length });
+    // Run in background
+    (async () => {
+      let seeded = 0;
+      for (const { query, aesthetic, garmentType } of queries) {
+        const cached = await getDepopCache(query).catch(() => null);
+        if (cached) { seeded++; continue; }
+        const listings = await scrapeDepopDirect(query, limit).catch(() => []);
+        if (listings.length) {
+          await setDepopCache(query, listings, aesthetic, true, garmentType).catch(() => {});
+          seeded++;
+        }
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      console.log(`[seed-wave] done: ${seeded}/${queries.length} seeded`);
+    })();
+  });
+
   // Seed trending Depop cards from Google Trends fashion searches
   // GET /api/seed-trending — fires in background, returns immediately
   // GET /api/seed-trending?wait=1 — waits for completion (use from cron)
