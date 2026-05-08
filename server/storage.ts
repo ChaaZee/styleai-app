@@ -150,10 +150,11 @@ export async function getDepopCache(query: string): Promise<any[] | null> {
 // Same as getDepopCache but only returns results written AFTER a given timestamp.
 // Used by depop-ready so it only serves fresh scrape results, never old aesthetic cache.
 export async function getDepopCacheSince(query: string, since: Date): Promise<any[] | null> {
+  const sinceIso = since instanceof Date ? since.toISOString() : new Date(since).toISOString();
   const rows = await client`
     SELECT listings FROM depop_cache
     WHERE query = ${query}
-      AND created_at > ${since}
+      AND created_at > ${sinceIso}::timestamptz
     LIMIT 1
   `;
   if (!rows.length) return null;
