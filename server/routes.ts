@@ -180,8 +180,9 @@ function normaliseDepopObject(item: any, idx: number, query: string) {
   const price = typeof priceRaw === "number" ? priceRaw : parseFloat(priceRaw) || 0;
   const currency = item.pricing?.currency_name || item.price?.currency || "USD";
 
-  // v3 size: sizes[] array; v2: size.label
-  const size = (item.sizes && item.sizes[0]?.label)
+  // v3 size: sizes[] is string[] e.g. ['S','M']; v2: size.label or sizes[0].label
+  const rawSize = item.sizes?.[0];
+  const size = (typeof rawSize === "string" ? rawSize : rawSize?.label)
     || item.size?.label || item.sizeLabel || "";
 
   return {
@@ -1940,7 +1941,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const elapsed = Date.now() - t0;
       const text = await r.text();
       const parsed = text.startsWith("{") ? JSON.parse(text) : null;
-      res.json({ ok: r.ok, status: r.status, elapsed, objects: parsed?.objects?.length ?? 0, preview: text.slice(0, 400) });
+      res.json({ ok: r.ok, status: r.status, elapsed, objects: (parsed?.products || parsed?.objects || []).length, preview: text.slice(0, 400) });
     } catch (e: any) {
       res.json({ ok: false, error: e.message, cause: e.cause ? String(e.cause) : undefined });
     }
