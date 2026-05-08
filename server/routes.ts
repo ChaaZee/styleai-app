@@ -174,16 +174,46 @@ function normaliseDepopObject(item: any, idx: number, query: string) {
 let proxyRoundRobin = 0;
 
 async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
-  const { ProxyAgent, fetch: undiciFetch } = await import("undici");
+  // ── Path 1: Cloudflare Worker (preferred) ─────────────────────────────────
+  // Worker runs on CF edge, so CF won't block its requests to api.depop.com
+  const workerUrl = process.env.WORKER_URL;
+  const workerSecret = process.env.WORKER_SECRET;
+  if (workerUrl) {
+    const searchUrl = `https://api.depop.com/api/v2/search/products/?` +
+      `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
+    try {
+      const r = await fetch(`${workerUrl}/fetch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(workerSecret ? { "Authorization": `Bearer ${workerSecret}` } : {}),
+        },
+        body: JSON.stringify({ url: searchUrl }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => "");
+        throw new Error(`Worker/Depop ${r.status}: ${txt.slice(0, 200)}`);
+      }
+      const data = await r.json() as any;
+      const objects: any[] = data.objects || data.products || [];
+      return objects.map((item: any, j: number) => normaliseDepopObject(item, j, query))
+        .filter((l: any) => l.image);
+    } catch (e: any) {
+      console.log(`[worker] failed: ${e.message} — falling back to proxy list`);
+      // Fall through to proxy list below
+    }
+  }
 
-  // Build proxy list: prefer PROXY_LIST (direct IPs), fall back to PROXY_URL
+  // ── Path 2: Direct proxy list (fallback) ──────────────────────────────────
+  const { ProxyAgent, fetch: undiciFetch } = await import("undici");
   const proxyList = getProxyList();
   const fallbackUrl = process.env.PROXY_URL;
   const proxiesToTry: string[] = proxyList.length > 0
     ? proxyList
     : (fallbackUrl ? [fallbackUrl] : []);
 
-  if (proxiesToTry.length === 0) throw new Error("No proxy configured (PROXY_LIST or PROXY_URL)");
+  if (proxiesToTry.length === 0) throw new Error("No proxy configured (WORKER_URL, PROXY_LIST, or PROXY_URL)");
 
   const searchUrl = `https://api.depop.com/api/v2/search/products/?` +
     `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
@@ -1860,6 +1890,33 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
 
     res.json({ ok: false, totalProxies: proxyList.length, results });
+  });
+
+  // Test Cloudflare Worker proxy
+  app.get("/api/debug-worker", async (req, res) => {
+    const q = (req.query.q as string) || "vintage dress";
+    const workerUrl = process.env.WORKER_URL;
+    const workerSecret = process.env.WORKER_SECRET;
+    if (!workerUrl) return res.json({ ok: false, error: "No WORKER_URL env var" });
+    const targetUrl = `https://api.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=3&offset=0`;
+    try {
+      const t0 = Date.now();
+      const r = await fetch(`${workerUrl}/fetch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(workerSecret ? { "Authorization": `Bearer ${workerSecret}` } : {}),
+        },
+        body: JSON.stringify({ url: targetUrl }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const elapsed = Date.now() - t0;
+      const text = await r.text();
+      const parsed = text.startsWith("{") ? JSON.parse(text) : null;
+      res.json({ ok: r.ok, status: r.status, elapsed, objects: parsed?.objects?.length ?? 0, preview: text.slice(0, 400) });
+    } catch (e: any) {
+      res.json({ ok: false, error: e.message, cause: e.cause ? String(e.cause) : undefined });
+    }
   });
 
   // Test direct Depop API access (no proxy) — to check if Render can hit it directly
