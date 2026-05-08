@@ -117,8 +117,12 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   if (!proxyUrl) throw new Error("No PROXY_URL set");
 
   // Use undici ProxyAgent as dispatcher — the correct way to proxy Node 18+ native fetch
+  // connectTimeout helps on slow residential proxies
   const { ProxyAgent, fetch: undiciFetch } = await import("undici");
-  const dispatcher = new ProxyAgent(proxyUrl);
+  const dispatcher = new ProxyAgent({
+    uri: proxyUrl,
+    connectTimeout: 30_000,
+  });
 
   const searchUrl = `https://api.depop.com/api/v2/search/products/?` +
     `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
@@ -133,7 +137,7 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
       "Origin": "https://www.depop.com",
       "depop-client": "web",
     },
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(35_000),
   });
 
   if (!res.ok) {
