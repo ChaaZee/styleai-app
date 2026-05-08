@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB, getDepopCache, setDepopCache, getDepopCacheByAesthetic } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -2601,23 +2601,23 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       // If no depopQueries stored (old scan), return empty immediately — don't serve aesthetic cache
       if (!queries.length || !scan.depopQueries) return res.json({ ready: true, groups: [] });
 
-      // Check cache for each query
+      // Only serve cache entries written AFTER this scan was created.
+      // This prevents old seeded aesthetic rows from being returned as fresh results.
+      const since = scan.createdAt ?? new Date(0);
       const cacheResults = await Promise.all(
-        queries.map(async q => ({ query: q, listings: await getDepopCache(q) }))
+        queries.map(async q => ({ query: q, listings: await getDepopCacheSince(q, since) }))
       );
 
       const done = cacheResults.filter(r => r.listings !== null).length;
       const total = queries.length;
 
       if (done === total) {
-        // All ready
         const groups = cacheResults
           .map(r => ({ piece: r.query, listings: r.listings! }))
           .filter(g => g.listings.length > 0);
         return res.json({ ready: true, groups });
       }
 
-      // Return partial results + progress
       const partialGroups = cacheResults
         .filter(r => r.listings !== null)
         .map(r => ({ piece: r.query, listings: r.listings! }))

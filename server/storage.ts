@@ -147,6 +147,21 @@ export async function getDepopCache(query: string): Promise<any[] | null> {
   return listings;
 }
 
+// Same as getDepopCache but only returns results written AFTER a given timestamp.
+// Used by depop-ready so it only serves fresh scrape results, never old aesthetic cache.
+export async function getDepopCacheSince(query: string, since: Date): Promise<any[] | null> {
+  const rows = await client`
+    SELECT listings FROM depop_cache
+    WHERE query = ${query}
+      AND created_at > ${since}
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  const listings = rows[0].listings as any[];
+  if (listings.every((l: any) => !l.image)) return null;
+  return listings;
+}
+
 export async function setDepopCache(query: string, listings: any[], aesthetic?: string, permanent = false): Promise<void> {
   const deduped = dedupeListings(listings);
   await client`
