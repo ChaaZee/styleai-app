@@ -1784,37 +1784,44 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // Test proxy scraper directly
   app.get("/api/debug-proxy", async (req, res) => {
     const q = (req.query.q as string) || "streetwear cargo pants";
-    const proxyUrl = process.env.PROXY_URL || "(not set)";
-    // Mask credentials for logging
+    const proxyUrl = process.env.PROXY_URL || "";
     const maskedProxy = proxyUrl.replace(/:([^@/]+)@/, ":***@");
-    try {
-      const listings = await scrapeDepopDirect(q, 3);
-      res.json({ ok: true, count: listings.length, proxy: maskedProxy, sample: listings[0] });
-    } catch (e: any) {
-      // Include full error stack for diagnosis
-      const cause = (e.cause as any);
-      // Also parse proxy URL to check credentials are valid
-      let parsedProxy: Record<string, string> = {};
+    if (!proxyUrl) return res.json({ ok: false, error: "No PROXY_URL set" });
+
+    const { ProxyAgent, fetch: undiciFetch } = await import("undici");
+    const baseUrl = new URL(proxyUrl);
+    const portsToTest = ["80", "10000", "3128", "1080"];
+    const searchUrl = `https://api.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=2&offset=0`;
+    const results: Record<string, string> = {};
+
+    for (const port of portsToTest) {
+      baseUrl.port = port;
+      const portedUrl = baseUrl.toString();
+      const t0 = Date.now();
       try {
-        const u = new URL(proxyUrl);
-        parsedProxy = {
-          protocol: u.protocol,
-          host: u.host,
-          usernameLength: String(u.username.length),
-          passwordLength: String(u.password.length),
-          hasCredentials: String(!!(u.username && u.password)),
-        };
-      } catch (pe: any) {
-        parsedProxy = { parseError: pe.message };
+        const dispatcher = new ProxyAgent({ uri: portedUrl, connectTimeout: 10_000 });
+        const r = await (undiciFetch as any)(searchUrl, {
+          dispatcher,
+          headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json", "depop-client": "web" },
+          signal: AbortSignal.timeout(12_000),
+        });
+        const elapsed = Date.now() - t0;
+        if (r.ok) {
+          const data = await r.json() as any;
+          results[port] = `OK ${r.status} (${elapsed}ms) objects=${(data.objects||[]).length}`;
+          return res.json({ ok: true, port, elapsed, proxy: maskedProxy, results });
+        } else {
+          const txt = await r.text().catch(() => "");
+          results[port] = `HTTP ${r.status} (${elapsed}ms): ${txt.slice(0, 100)}`;
+        }
+      } catch (e: any) {
+        const elapsed = Date.now() - t0;
+        const cause = e.cause ? String(e.cause) : "";
+        results[port] = `ERR (${elapsed}ms): ${e.message} ${cause}`.trim();
       }
-      res.json({
-        ok: false,
-        error: e.message,
-        cause: cause ? String(cause) : undefined,
-        proxy: maskedProxy,
-        parsedProxy,
-      });
     }
+
+    res.json({ ok: false, proxy: maskedProxy, results });
   });
 
   // Temp: test Apify token + actor from server
