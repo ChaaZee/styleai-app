@@ -1775,11 +1775,26 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     } catch (e: any) {
       // Include full error stack for diagnosis
       const cause = (e.cause as any);
+      // Also parse proxy URL to check credentials are valid
+      let parsedProxy: Record<string, string> = {};
+      try {
+        const u = new URL(proxyUrl);
+        parsedProxy = {
+          protocol: u.protocol,
+          host: u.host,
+          usernameLength: String(u.username.length),
+          passwordLength: String(u.password.length),
+          hasCredentials: String(!!(u.username && u.password)),
+        };
+      } catch (pe: any) {
+        parsedProxy = { parseError: pe.message };
+      }
       res.json({
         ok: false,
         error: e.message,
         cause: cause ? String(cause) : undefined,
         proxy: maskedProxy,
+        parsedProxy,
       });
     }
   });
