@@ -112,19 +112,78 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
 // ── Direct Depop scraper via residential proxy ──────────────────────────────
 // Hits api.depop.com directly, bypassing Cloudflare via a residential proxy IP.
 // Falls back to Apify if PROXY_URL is not set.
-async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
-  const proxyUrl = process.env.PROXY_URL;
-  if (!proxyUrl) throw new Error("No PROXY_URL set");
+// Parse PROXY_LIST env var — lines or commas of "ip:port:user:pass" or "ip:port"
+function getProxyList(): string[] {
+  const raw = process.env.PROXY_LIST || "";
+  if (!raw) return [];
+  return raw
+    .split(/[\n,]+/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(line => {
+      // Expects: ip:port:username:password  OR  ip:port
+      const parts = line.split(":");
+      if (parts.length >= 4) {
+        const [ip, port, user, pass] = parts;
+        return `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${ip}:${port}`;
+      } else if (parts.length === 2) {
+        return `http://${parts[0]}:${parts[1]}`;
+      }
+      return "";
+    })
+    .filter(Boolean);
+}
 
-  // Try multiple proxy ports — Render may block port 80 for outbound CONNECT
-  // Webshare supports: 80, 1080, 3128, 9999-29999
+// Shared normaliser for Depop API response items
+function normaliseDepopObject(item: any, idx: number, query: string) {
+  const pics: any[] = item.preview_pictures || item.pictures || [];
+  let image = pics[0]?.url || pics[0]?.src || "";
+  image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
+
+  const username = item.seller?.username || item.sellerName || "";
+  const slug = item.slug || "";
+  const url = (username && slug)
+    ? `https://www.depop.com/products/${username}-${slug}/`
+    : `https://www.depop.com/search/?q=${encodeURIComponent(query)}`;
+
+  let title = item.description || item.title || "";
+  if (!title && slug) {
+    const parts = slug.split("-");
+    const dropFirst = /^[a-z0-9]+$/.test(parts[0]);
+    title = (dropFirst ? parts.slice(1) : parts)
+      .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  }
+  if (!title) title = query.replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+  const priceRaw = item.price?.amount ?? item.price ?? 0;
+  const price = typeof priceRaw === "number" ? priceRaw : parseFloat(priceRaw) || 0;
+
+  return {
+    id: idx,
+    title: title.slice(0, 80),
+    brand: item.brand?.name || item.brandName || "",
+    price,
+    currency: item.price?.currency ?? "USD",
+    size: item.size?.label || item.sizeLabel || "",
+    image,
+    url,
+  };
+}
+
+// Simple round-robin counter for proxy selection
+let proxyRoundRobin = 0;
+
+async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   const { ProxyAgent, fetch: undiciFetch } = await import("undici");
 
-  // Build alternate port URLs from the base PROXY_URL
-  const baseUrl = new URL(proxyUrl);
-  const ports = [baseUrl.port || "80", "10000", "3128", "1080"];
-  // Deduplicate
-  const uniquePorts = [...new Set(ports)];
+  // Build proxy list: prefer PROXY_LIST (direct IPs), fall back to PROXY_URL
+  const proxyList = getProxyList();
+  const fallbackUrl = process.env.PROXY_URL;
+  const proxiesToTry: string[] = proxyList.length > 0
+    ? proxyList
+    : (fallbackUrl ? [fallbackUrl] : []);
+
+  if (proxiesToTry.length === 0) throw new Error("No proxy configured (PROXY_LIST or PROXY_URL)");
 
   const searchUrl = `https://api.depop.com/api/v2/search/products/?` +
     `q=${encodeURIComponent(query)}&sort=relevance&limit=${limit}&offset=0`;
@@ -138,15 +197,16 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
     "depop-client": "web",
   };
 
+  // Try proxies starting from the round-robin position, try up to 3
+  const start = proxyRoundRobin % proxiesToTry.length;
+  const attempts = Math.min(3, proxiesToTry.length);
   let lastError: Error | null = null;
-  for (const port of uniquePorts) {
-    baseUrl.port = port;
-    const portedProxyUrl = baseUrl.toString();
+
+  for (let i = 0; i < attempts; i++) {
+    const idx = (start + i) % proxiesToTry.length;
+    const proxyUri = proxiesToTry[idx];
     try {
-      const dispatcher = new ProxyAgent({
-        uri: portedProxyUrl,
-        connectTimeout: 12_000,
-      });
+      const dispatcher = new ProxyAgent({ uri: proxyUri, connectTimeout: 12_000 });
       const res = await (undiciFetch as any)(searchUrl, {
         dispatcher,
         headers: HEADERS,
@@ -155,55 +215,24 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        throw new Error(`Depop API ${res.status} (port ${port}): ${text.slice(0, 200)}`);
+        throw new Error(`Depop API ${res.status}: ${text.slice(0, 200)}`);
       }
+
+      // Advance round-robin on success so next call uses a fresh proxy
+      proxyRoundRobin = (idx + 1) % proxiesToTry.length;
 
       const data = await res.json() as any;
       const objects: any[] = data.objects || data.products || [];
-
-      return objects.map((item: any, idx: number) => {
-        const pics: any[] = item.preview_pictures || item.pictures || [];
-        let image = pics[0]?.url || pics[0]?.src || "";
-        image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
-
-        const username = item.seller?.username || item.sellerName || "";
-        const slug = item.slug || "";
-        const url = (username && slug)
-          ? `https://www.depop.com/products/${username}-${slug}/`
-          : `https://www.depop.com/search/?q=${encodeURIComponent(query)}`;
-
-        let title = item.description || item.title || "";
-        if (!title && slug) {
-          const parts = slug.split("-");
-          const dropFirst = /^[a-z0-9]+$/.test(parts[0]);
-          title = (dropFirst ? parts.slice(1) : parts)
-            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-        }
-        if (!title) title = query.replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-        const priceRaw = item.price?.amount ?? item.price ?? 0;
-        const price = typeof priceRaw === "number" ? priceRaw : parseFloat(priceRaw) || 0;
-
-        return {
-          id: idx,
-          title: title.slice(0, 80),
-          brand: item.brand?.name || item.brandName || "",
-          price,
-          currency: item.price?.currency ?? "USD",
-          size: item.size?.label || item.sizeLabel || "",
-          image,
-          url,
-        };
-      }).filter((l: any) => l.image);
+      return objects.map((item: any, j: number) => normaliseDepopObject(item, j, query))
+        .filter((l: any) => l.image);
     } catch (e: any) {
       lastError = e;
-      // Only retry on network/timeout errors, not on HTTP errors from Depop
-      if (e.message?.includes("Depop API")) throw e;
-      console.log(`[proxy] port ${port} failed: ${e.message}, trying next...`);
+      if (e.message?.includes("Depop API")) throw e; // HTTP error, don't retry
+      console.log(`[proxy] ${proxyUri.replace(/:([^@/]+)@/, ":***@")} failed: ${e.message}`);
     }
   }
 
-  throw lastError || new Error("All proxy ports failed");
+  throw lastError || new Error("All proxies failed");
 }
 
 // Run a single Depop search: check cache first, else hit Apify + store result
@@ -1784,44 +1813,45 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // Test proxy scraper directly
   app.get("/api/debug-proxy", async (req, res) => {
     const q = (req.query.q as string) || "streetwear cargo pants";
-    const proxyUrl = process.env.PROXY_URL || "";
-    const maskedProxy = proxyUrl.replace(/:([^@/]+)@/, ":***@");
-    if (!proxyUrl) return res.json({ ok: false, error: "No PROXY_URL set" });
+    const proxyList = getProxyList();
+    const maskedList = proxyList.map(p => p.replace(/:([^@/]+)@/, ":***@"));
+
+    if (proxyList.length === 0) {
+      return res.json({ ok: false, error: "No proxies found in PROXY_LIST", rawLength: (process.env.PROXY_LIST || "").length });
+    }
 
     const { ProxyAgent, fetch: undiciFetch } = await import("undici");
-    const baseUrl = new URL(proxyUrl);
-    const portsToTest = ["80", "10000", "3128", "1080"];
     const searchUrl = `https://api.depop.com/api/v2/search/products/?q=${encodeURIComponent(q)}&sort=relevance&limit=2&offset=0`;
     const results: Record<string, string> = {};
 
-    for (const port of portsToTest) {
-      baseUrl.port = port;
-      const portedUrl = baseUrl.toString();
+    // Test first 3 proxies from the list
+    for (let i = 0; i < Math.min(3, proxyList.length); i++) {
+      const proxyUri = proxyList[i];
+      const label = maskedList[i];
       const t0 = Date.now();
       try {
-        const dispatcher = new ProxyAgent({ uri: portedUrl, connectTimeout: 10_000 });
+        const dispatcher = new ProxyAgent({ uri: proxyUri, connectTimeout: 12_000 });
         const r = await (undiciFetch as any)(searchUrl, {
           dispatcher,
-          headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json", "depop-client": "web" },
-          signal: AbortSignal.timeout(12_000),
+          headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", "Accept": "application/json", "depop-client": "web", "Referer": "https://www.depop.com/" },
+          signal: AbortSignal.timeout(15_000),
         });
         const elapsed = Date.now() - t0;
         if (r.ok) {
           const data = await r.json() as any;
-          results[port] = `OK ${r.status} (${elapsed}ms) objects=${(data.objects||[]).length}`;
-          return res.json({ ok: true, port, elapsed, proxy: maskedProxy, results });
+          results[label] = `OK ${r.status} (${elapsed}ms) objects=${(data.objects||[]).length}`;
+          return res.json({ ok: true, proxy: label, elapsed, totalProxies: proxyList.length, results });
         } else {
           const txt = await r.text().catch(() => "");
-          results[port] = `HTTP ${r.status} (${elapsed}ms): ${txt.slice(0, 100)}`;
+          results[label] = `HTTP ${r.status} (${elapsed}ms): ${txt.slice(0, 120)}`;
         }
       } catch (e: any) {
         const elapsed = Date.now() - t0;
-        const cause = e.cause ? String(e.cause) : "";
-        results[port] = `ERR (${elapsed}ms): ${e.message} ${cause}`.trim();
+        results[label] = `ERR (${elapsed}ms): ${e.message}`;
       }
     }
 
-    res.json({ ok: false, proxy: maskedProxy, results });
+    res.json({ ok: false, totalProxies: proxyList.length, results });
   });
 
   // Test direct Depop API access (no proxy) — to check if Render can hit it directly
