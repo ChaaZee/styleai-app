@@ -2714,6 +2714,23 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       "Coastal":          "Coastal Grandmother",
       "Beach":            "Boho",
       "Western":          "Boho",
+      // Compound/variant labels Gemini sometimes returns
+      "Grunge / Punk":    "Grunge",
+      "E-Girl / Alt":     "E-Girl",
+      "Skatecore":        "Skater",
+      // Additional taxonomy aesthetics
+      "Athleisure":       "Streetwear",
+      "Sporty":           "Streetwear",
+      "Hip Hop":          "Streetwear",
+      "Tomboy":           "Skater",
+      "Androgynous":      "Minimalist",
+      "Smart Casual":     "Minimalist",
+      "Workwear":         "Old Money",
+      "Dark Romantic":    "Coquette",
+      "Fairycore":        "Cottagecore",
+      "Ethereal":         "Soft Girl",
+      "Kawaii":           "Soft Girl",
+      "Avant Garde":      "Techwear",
     };
 
     try {
