@@ -190,13 +190,14 @@ export async function setDepopCache(query: string, listings: any[], aesthetic?: 
 
 // Fetch cached listings by aesthetic + garment_type for smart post-analysis recommendations
 export async function getDepopCacheByType(aesthetic: string, garmentType: string, limit = 6): Promise<any[]> {
+  const rowLimit = Math.ceil(limit / 4) + 4;
   const rows = await client`
     SELECT listings FROM depop_cache
     WHERE aesthetic = ${aesthetic}
       AND garment_type = ${garmentType}
       AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
-    ORDER BY created_at DESC
-    LIMIT 5
+    ORDER BY RANDOM()
+    LIMIT ${rowLimit}
   `;
   const all: any[] = [];
   for (const row of rows) {
@@ -209,16 +210,16 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
 }
 
 export async function getDepopCacheByAesthetic(aesthetic: string, limit = 50): Promise<any[]> {
-  // Fetch enough rows to cover the requested limit (each row has ~6 listings)
-  const rowLimit = Math.ceil(limit / 4) + 2;
+  // Use RANDOM() so we sample across all 500+ rows, not just the newest ones
+  const rowLimit = Math.ceil(limit / 4) + 4;
   const rows = await client`
     SELECT listings FROM depop_cache
     WHERE aesthetic = ${aesthetic}
       AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
-    ORDER BY created_at DESC
+    ORDER BY RANDOM()
     LIMIT ${rowLimit}
   `;
-  // Flatten all cached listings for this aesthetic, shuffle, return limit
+  // Flatten, shuffle, return limit
   const all: any[] = rows.flatMap((r: any) => r.listings as any[]);
   for (let i = all.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

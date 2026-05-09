@@ -2669,17 +2669,49 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   });
 
   // GET /api/depop-ready/:scanId
-  // Returns { ready: true, groups } when all garment queries are cached,
-  // or { ready: false, total, done } while still fetching.
-  // Frontend polls this every 1s after analysis finishes.
+  // Returns { ready: true, groups } immediately from permanent cache.
   app.get("/api/depop-ready/:scanId", async (req, res) => {
     const scanId = parseInt(req.params.scanId, 10);
     if (isNaN(scanId)) return res.status(400).json({ error: "Invalid scanId" });
+
+    // Map aesthetics Gemini may return → nearest cached aesthetic label
+    const AESTHETIC_FALLBACK: Record<string, string> = {
+      "Clean Fit":        "Minimalist",
+      "Skatecore":        "Skater",
+      "Quiet Luxury":     "Old Money",
+      "Classic":          "Old Money",
+      "Casual":           "Minimalist",
+      "Normcore":         "Minimalist",
+      "Business Casual":  "Old Money",
+      "Rave":             "E-Girl",
+      "Retro-Futurism":   "Techwear",
+      "Glam":             "Coquette",
+      "Party":            "Coquette",
+      "Indie":            "Vintage",
+      "Dark Feminine":    "Coquette",
+      "Mob Wife":         "Old Money",
+      "Biker":            "Grunge",
+      "Punk":             "Grunge",
+      "Academia":         "Dark Academia",
+      "Light Academia":   "Cottagecore",
+      "Barbiecore":       "Coquette",
+      "Balletcore":       "Soft Girl",
+      "Coastal":          "Coastal Grandmother",
+      "Beach":            "Boho",
+      "Western":          "Boho",
+    };
+
     try {
       const scan = await storage.getScan(scanId);
       if (!scan) return res.status(404).json({ error: "Scan not found" });
 
-      const aesthetic = scan.aesthetic || "";
+      const rawAesthetic = scan.aesthetic || "";
+      // Resolve to a cached aesthetic — exact match first, then fallback map, then Minimalist
+      const CACHED_AESTHETICS = ["Boho","Coastal Grandmother","Coquette","Cottagecore","Dark Academia","E-Girl","Grunge","Minimalist","Old Money","Preppy","Skater","Soft Girl","Streetwear","Techwear","Vintage","Y2K"];
+      const aesthetic = CACHED_AESTHETICS.includes(rawAesthetic)
+        ? rawAesthetic
+        : (AESTHETIC_FALLBACK[rawAesthetic] ?? "Minimalist");
+
       const rawQ = scan.depopQueries || "[]";
       // Support both old format (string[]) and new format ({query,garmentType}[])
       const parsed = JSON.parse(rawQ);
@@ -2690,12 +2722,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       if (!garmentEntries.length) return res.json({ ready: true, groups: [] });
 
-      // Pull directly from permanent cache by garmentType + aesthetic — instant, no polling needed.
+      // Pull directly from permanent cache — garmentType+aesthetic first, then aesthetic-only
       const groups = await Promise.all(
         garmentEntries.map(async ({ query, garmentType }) => {
-          let listings = await getDepopCacheByType(aesthetic, garmentType, 8).catch(() => []);
+          let listings = await getDepopCacheByType(aesthetic, garmentType, 10).catch(() => []);
           if (!listings.length) {
-            listings = await getDepopCacheByAesthetic(aesthetic, 8).catch(() => []);
+            listings = await getDepopCacheByAesthetic(aesthetic, 10).catch(() => []);
+          }
+          // Last resort: any aesthetic if still empty (shouldn't happen with 62K rows)
+          if (!listings.length) {
+            listings = await getDepopCacheByAesthetic("Minimalist", 10).catch(() => []);
           }
           return { piece: query, listings };
         })
