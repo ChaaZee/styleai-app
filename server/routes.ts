@@ -2238,22 +2238,25 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       res.json({ scanId: scan.id });
 
-      // Background: scrape Depop for each garment query via the CF Worker, write to cache.
-      // Frontend polls /api/depop-ready/:scanId and renders as queries complete.
+      // Post-analysis: serve Depop recommendations purely from the permanent cache.
+      // No live scraping — pull by garmentType + aesthetic so results are always relevant.
       if (garmentDepopQueries.length) {
         const aesthetic = analysis.aesthetic;
         const queries = garmentDepopQueries.slice(0, 4);
         (async () => {
-          let fetched = 0;
+          let served = 0;
           for (const { query: q, garmentType } of queries) {
-            const listings = await scrapeDepopDirect(q, 8).catch(() => []);
+            // Pull from permanent cache by garment type + aesthetic (falls back to aesthetic-only)
+            let listings = await getDepopCacheByType(aesthetic, garmentType, 8).catch(() => []);
+            if (!listings.length) {
+              listings = await getDepopCacheByAesthetic(aesthetic, 8).catch(() => []);
+            }
             if (listings.length) {
               await setDepopCache(q, listings, aesthetic, false, garmentType).catch(() => {});
-              fetched++;
+              served++;
             }
-            await new Promise(r => setTimeout(r, 400));
           }
-          console.log(`[depop] post-analysis: fetched ${fetched}/${queries.length} garment queries for scanId=${scan.id}`);
+          console.log(`[depop] post-analysis: served ${served}/${queries.length} garment queries from cache for scanId=${scan.id}`);
         })();
       }
     } catch (err: any) {
@@ -2679,14 +2682,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       // Use depopQueries (garment-specific) — fall back to empty if old scan has none
       const rawQ = scan.depopQueries || scan.keyPieces || "[]";
       const queries: string[] = JSON.parse(rawQ);
-      // If no depopQueries stored (old scan), return empty immediately — don't serve aesthetic cache
+      // If no depopQueries stored (old scan), return empty immediately
       if (!queries.length || !scan.depopQueries) return res.json({ ready: true, groups: [] });
 
-      // Only serve cache entries written AFTER this scan was created.
-      // This prevents old seeded aesthetic rows from being returned as fresh results.
-      const since = scan.createdAt ?? new Date(0);
+      // Pull purely from cache — use any cache entry (permanent included) for instant response.
       const cacheResults = await Promise.all(
-        queries.map(async q => ({ query: q, listings: await getDepopCacheSince(q, since) }))
+        queries.map(async q => ({ query: q, listings: await getDepopCache(q) }))
       );
 
       const done = cacheResults.filter(r => r.listings !== null).length;
@@ -2699,6 +2700,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         return res.json({ ready: true, groups });
       }
 
+      // Some queries not yet written by the background job — return what's ready so far.
       const partialGroups = cacheResults
         .filter(r => r.listings !== null)
         .map(r => ({ piece: r.query, listings: r.listings! }))
