@@ -2715,9 +2715,23 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const rawQ = scan.depopQueries || "[]";
       // Support both old format (string[]) and new format ({query,garmentType}[])
       const parsed = JSON.parse(rawQ);
+
+      // Inline garment type inference (mirrors server-side inferGarmentType)
+      function inferType(item: string): string {
+        const i = item.toLowerCase();
+        if (/dress|gown|romper|jumpsuit/.test(i)) return "dresses";
+        if (/skirt/.test(i)) return "bottoms";
+        if (/pant|jean|trouser|shorts|legging|chino|cargo/.test(i)) return "bottoms";
+        if (/jacket|coat|blazer|hoodie|cardigan|vest|puffer|windbreaker|bomber|parka/.test(i)) return "outerwear";
+        if (/sneaker|shoe|boot|loafer|heel|flat|sandal|mule|oxford|espadrille/.test(i)) return "shoes";
+        if (/hat|bag|purse|belt|scarf|necklace|earring|ring|bracelet|glasses|sunglasses|sock|glove/.test(i)) return "accessories";
+        if (/tracksuit|set|co-ord|matching/.test(i)) return "sets";
+        return "tops";
+      }
+
       const garmentEntries: { query: string; garmentType: string }[] =
         parsed.length && typeof parsed[0] === "string"
-          ? parsed.slice(0, 4).map((q: string) => ({ query: q, garmentType: "tops" }))
+          ? parsed.slice(0, 4).map((q: string) => ({ query: q, garmentType: inferType(q) }))
           : (parsed as { query: string; garmentType: string }[]).slice(0, 4);
 
       if (!garmentEntries.length) return res.json({ ready: true, groups: [] });
