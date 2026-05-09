@@ -2231,7 +2231,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         styleBreakdown: JSON.stringify(styleBreakdown),
         occasions: JSON.stringify(analysis.occasions),
         keyPieces: JSON.stringify(analysis.keyPieces || []),
-        depopQueries: JSON.stringify(garmentDepopQueries.map((g: any) => g.query)),
+        depopQueries: JSON.stringify(garmentDepopQueries.slice(0, 4).map((g: any) => ({ query: g.query, garmentType: g.garmentType }))),
         colorPalette: JSON.stringify(analysis.colorPalette),
         results: JSON.stringify(finalProducts),
       });
@@ -2679,34 +2679,29 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const scan = await storage.getScan(scanId);
       if (!scan) return res.status(404).json({ error: "Scan not found" });
 
-      // Use depopQueries (garment-specific) — fall back to empty if old scan has none
-      const rawQ = scan.depopQueries || scan.keyPieces || "[]";
-      const queries: string[] = JSON.parse(rawQ);
-      // If no depopQueries stored (old scan), return empty immediately
-      if (!queries.length || !scan.depopQueries) return res.json({ ready: true, groups: [] });
+      const aesthetic = scan.aesthetic || "";
+      const rawQ = scan.depopQueries || "[]";
+      // Support both old format (string[]) and new format ({query,garmentType}[])
+      const parsed = JSON.parse(rawQ);
+      const garmentEntries: { query: string; garmentType: string }[] =
+        parsed.length && typeof parsed[0] === "string"
+          ? parsed.slice(0, 4).map((q: string) => ({ query: q, garmentType: "tops" }))
+          : (parsed as { query: string; garmentType: string }[]).slice(0, 4);
 
-      // Pull purely from cache — use any cache entry (permanent included) for instant response.
-      const cacheResults = await Promise.all(
-        queries.map(async q => ({ query: q, listings: await getDepopCache(q) }))
+      if (!garmentEntries.length) return res.json({ ready: true, groups: [] });
+
+      // Pull directly from permanent cache by garmentType + aesthetic — instant, no polling needed.
+      const groups = await Promise.all(
+        garmentEntries.map(async ({ query, garmentType }) => {
+          let listings = await getDepopCacheByType(aesthetic, garmentType, 8).catch(() => []);
+          if (!listings.length) {
+            listings = await getDepopCacheByAesthetic(aesthetic, 8).catch(() => []);
+          }
+          return { piece: query, listings };
+        })
       );
 
-      const done = cacheResults.filter(r => r.listings !== null).length;
-      const total = queries.length;
-
-      if (done === total) {
-        const groups = cacheResults
-          .map(r => ({ piece: r.query, listings: r.listings! }))
-          .filter(g => g.listings.length > 0);
-        return res.json({ ready: true, groups });
-      }
-
-      // Some queries not yet written by the background job — return what's ready so far.
-      const partialGroups = cacheResults
-        .filter(r => r.listings !== null)
-        .map(r => ({ piece: r.query, listings: r.listings! }))
-        .filter(g => g.listings.length > 0);
-
-      res.json({ ready: false, done, total, partialGroups });
+      return res.json({ ready: true, groups: groups.filter(g => g.listings.length > 0) });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
