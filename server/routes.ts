@@ -2068,6 +2068,21 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // Debug: check what getDepopCacheByType actually returns
+  app.get("/api/debug-cache-type", async (req, res) => {
+    const aesthetic = (req.query.aesthetic as string) || "Y2K";
+    const garmentType = (req.query.garmentType as string) || "bottoms";
+    const byType = await getDepopCacheByType(aesthetic, garmentType, 10).catch((e: any) => ({ error: e.message }));
+    const byAesthetic = await getDepopCacheByAesthetic(aesthetic, 10).catch((e: any) => ({ error: e.message }));
+    res.json({
+      aesthetic, garmentType,
+      byTypeCount: Array.isArray(byType) ? byType.length : 0,
+      byTypeFirstTitles: Array.isArray(byType) ? byType.slice(0,3).map((l: any) => l.title) : byType,
+      byAestheticCount: Array.isArray(byAesthetic) ? byAesthetic.length : 0,
+      byAestheticFirstTitles: Array.isArray(byAesthetic) ? byAesthetic.slice(0,3).map((l: any) => l.title) : byAesthetic,
+    });
+  });
+
   // Analyze outfit image with Gemini Flash
   app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res) => {
     try {
