@@ -225,14 +225,19 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
     // Step 1: fetch rows whose cache query key contains the color word(s)
     // Also filter by garment sub-term if present (e.g. 'jeans' prevents blue skirts showing for jeans query)
     const colorPattern = `%${colors[0]}%`;
+    // Normalize t-shirt variants in colorHint before keyword matching
+    const normalizedHint = colorHint.toLowerCase()
+      .replace(/\bt-shirt\b|\btshirt\b/g, "tee")
+      .replace(/\bgraphic tee\b/g, "tee")
+      .replace(/\bt-shirts\b/g, "tees");
     const garmentTerms: Record<string, string[]> = {
       bottoms:   ["jeans","pants","trousers","shorts","skirt","legging","cargo","chino","denim","wide leg"],
-      tops:      ["tee","top","shirt","blouse","hoodie","tank","cami","long sleeve","crop","sweater"],
+      tops:      ["tee","top","hoodie","tank","cami","long sleeve","crop","sweater","blouse"],
       outerwear: ["jacket","coat","blazer","vest","cardigan","puffer","bomber"],
       shoes:     ["boot","sneaker","shoe","loafer","heel","sandal","platform"],
       dresses:   ["dress","gown","romper","slip"],
     };
-    const subTerms = (garmentTerms[garmentType] || []).filter(t => colorHint.toLowerCase().includes(t));
+    const subTerms = (garmentTerms[garmentType] || []).filter(t => normalizedHint.includes(t));
     const subPattern = subTerms.length ? `%${subTerms[0]}%` : null;
 
     // Try color + garment subterm first for precision, fall back to color-only if too few results
@@ -274,7 +279,7 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
       shoes:     ["sneaker","boot","loafer","heel","sandal","platform","shoe"],
       dresses:   ["dress","romper","slip","gown"],
     };
-    const hint = colorHint.toLowerCase();
+    const hint = normalizedHint;
     const kwList = garmentKeywords[garmentType] || [];
     const matchedKw = kwList.find(kw => hint.includes(kw));
 
