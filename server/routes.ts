@@ -2170,8 +2170,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       }
 
       function buildGarmentQueries(garments: any[], aesthetic = ""): { query: string; garmentType: string }[] {
-        // Skip accessories for Depop search (poor results)
-        const skipTypes = /hat|bag|purse|sunglasses|glasses|watch|jewelry|necklace|ring|earring|bracelet|belt|sock|perfume|scarf|glove/i;
+        // Skip accessories and non-clothing items for Depop search
+        const skipTypes = /hat|bag|purse|sunglasses|glasses|watch|jewelry|necklace|ring|earring|bracelet|belt|sock|perfume|scarf|glove|ball|volleyball|football|basketball|helmet|phone|bottle|prop/i;
         const usefulGarments = garments
           .filter((g: any) => !skipTypes.test(g.item))
           .slice(0, 4);

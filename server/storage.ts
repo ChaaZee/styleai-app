@@ -222,17 +222,39 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
   }
 
   if (colors.length) {
-    // Step 1: fetch rows whose cache query key contains the color word(s) — these are seeded with that color
-    const colorPattern = `%${colors[0]}%`;  // use primary color for the ILIKE
-    const colorRows = await client`
-      SELECT listings FROM depop_cache
-      WHERE aesthetic = ${aesthetic}
-        AND garment_type = ${garmentType}
-        AND query ILIKE ${colorPattern}
-        AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
-      ORDER BY RANDOM()
-      LIMIT 20
-    `;
+    // Step 1: fetch rows whose cache query key contains the color word(s)
+    // Also filter by garment sub-term if present (e.g. 'jeans' prevents blue skirts showing for jeans query)
+    const colorPattern = `%${colors[0]}%`;
+    const garmentTerms: Record<string, string[]> = {
+      bottoms:   ["jeans","pants","trousers","shorts","skirt","legging","cargo","chino","denim","wide leg"],
+      tops:      ["tee","top","shirt","blouse","hoodie","tank","cami","long sleeve","crop","sweater"],
+      outerwear: ["jacket","coat","blazer","vest","cardigan","puffer","bomber"],
+      shoes:     ["boot","sneaker","shoe","loafer","heel","sandal","platform"],
+      dresses:   ["dress","gown","romper","slip"],
+    };
+    const subTerms = (garmentTerms[garmentType] || []).filter(t => colorHint.toLowerCase().includes(t));
+    const subPattern = subTerms.length ? `%${subTerms[0]}%` : null;
+
+    const colorRows = subPattern
+      ? await client`
+          SELECT listings FROM depop_cache
+          WHERE aesthetic = ${aesthetic}
+            AND garment_type = ${garmentType}
+            AND query ILIKE ${colorPattern}
+            AND query ILIKE ${subPattern}
+            AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+          ORDER BY RANDOM()
+          LIMIT 20
+        `
+      : await client`
+          SELECT listings FROM depop_cache
+          WHERE aesthetic = ${aesthetic}
+            AND garment_type = ${garmentType}
+            AND query ILIKE ${colorPattern}
+            AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+          ORDER BY RANDOM()
+          LIMIT 20
+        `;
     flattenRows(colorRows);
   }
 
