@@ -209,8 +209,9 @@ function scoreByColor(title: string, colors: string[]): number {
 
 // Fetch cached listings by aesthetic + garment_type for smart post-analysis recommendations
 export async function getDepopCacheByType(aesthetic: string, garmentType: string, limit = 6, colorHint = ""): Promise<any[]> {
-  // Fetch 4x more rows so we have enough to color-rank
-  const rowLimit = Math.ceil(limit / 4) * 4 + 8;
+  // When a color hint is provided, fetch many more rows so the color ranker has enough to work with
+  const hasColor = colorHint && extractColors(colorHint).length > 0;
+  const rowLimit = hasColor ? 40 : Math.ceil(limit / 4) * 4 + 8;
   const rows = await client`
     SELECT listings FROM depop_cache
     WHERE aesthetic = ${aesthetic}
