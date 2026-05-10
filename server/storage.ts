@@ -221,15 +221,16 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
     }
   }
 
+  // Normalize t-shirt variants in colorHint before keyword matching
+  const normalizedHint = colorHint.toLowerCase()
+    .replace(/\bt-shirt\b|\btshirt\b/g, "tee")
+    .replace(/\bgraphic tee\b/g, "tee")
+    .replace(/\bt-shirts\b/g, "tees");
+
   if (colors.length) {
     // Step 1: fetch rows whose cache query key contains the color word(s)
     // Also filter by garment sub-term if present (e.g. 'jeans' prevents blue skirts showing for jeans query)
     const colorPattern = `%${colors[0]}%`;
-    // Normalize t-shirt variants in colorHint before keyword matching
-    const normalizedHint = colorHint.toLowerCase()
-      .replace(/\bt-shirt\b|\btshirt\b/g, "tee")
-      .replace(/\bgraphic tee\b/g, "tee")
-      .replace(/\bt-shirts\b/g, "tees");
     const garmentTerms: Record<string, string[]> = {
       bottoms:   ["jeans","pants","trousers","shorts","skirt","legging","cargo","chino","denim","wide leg"],
       tops:      ["tee","top","hoodie","tank","cami","long sleeve","crop","sweater","blouse"],
