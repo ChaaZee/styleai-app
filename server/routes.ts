@@ -2135,7 +2135,41 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         return "tops"; // default: t-shirt, top, blouse, shirt, tee, sweater, knit
       }
 
-      function buildGarmentQueries(garments: any[]): { query: string; garmentType: string }[] {
+      // Aesthetic -> short Depop search prefix (how sellers actually tag)
+      const AESTHETIC_PREFIX: Record<string, string> = {
+        "Boho": "boho", "Coastal Grandmother": "coastal grandmother",
+        "Coquette": "coquette", "Cottagecore": "cottagecore",
+        "Dark Academia": "dark academia", "E-Girl": "e-girl",
+        "Grunge": "grunge", "Minimalist": "minimalist", "Old Money": "old money",
+        "Preppy": "preppy", "Skater": "skater", "Soft Girl": "soft girl",
+        "Streetwear": "streetwear", "Techwear": "techwear",
+        "Vintage": "vintage", "Y2K": "y2k",
+      };
+
+      function stripToDepopQuery(verbose: string, aesthetic: string): string {
+        let v = verbose.toLowerCase().trim();
+        // Remove repeated adjacent words ("denim denim" -> "denim")
+        v = v.replace(/\b(\w+) \1\b/g, "$1");
+        // Strip filler fabric/material words that add search noise
+        v = v.replace(/\b(cotton|polyester|synthetic|nylon|spandex|elastane|viscose|modal|rayon|acrylic|material|blend)\b/g, "");
+        // Normalise verbose garment names to short Depop terms
+        v = v.replace(/long[\s-]sleeve(?:d)?\s+(t-shirt|top|shirt|tee)\b/g, "long sleeve");
+        v = v.replace(/short[\s-]sleeve(?:d)?\s+(t-shirt|top|shirt|tee)\b/g, "tee");
+        v = v.replace(/\bt-shirt\b|\btshirt\b/g, "tee");
+        v = v.replace(/wash\s+jeans\b/g, "jeans");
+        v = v.replace(/athletic\s+shorts\b/g, "shorts");
+        v = v.replace(/athletic\s+(jersey|top)\b/g, "jersey");
+        v = v.replace(/high[\s-]?waist(?:ed)?/g, "high waist");
+        v = v.replace(/over[\s-]?sized\b/g, "oversized");
+        v = v.replace(/\s+/g, " ").trim();
+        // Prepend aesthetic prefix
+        const prefix = AESTHETIC_PREFIX[aesthetic] ?? aesthetic.toLowerCase();
+        const result = v.startsWith(prefix) ? v : `${prefix} ${v}`;
+        // Dedup again after prefix, then cap at 5 words
+        return result.replace(/\b(\w+) \1\b/g, "$1").split(" ").slice(0, 5).join(" ");
+      }
+
+      function buildGarmentQueries(garments: any[], aesthetic = ""): { query: string; garmentType: string }[] {
         // Skip accessories for Depop search (poor results)
         const skipTypes = /hat|bag|purse|sunglasses|glasses|watch|jewelry|necklace|ring|earring|bracelet|belt|sock|perfume|scarf|glove/i;
         const usefulGarments = garments
@@ -2147,12 +2181,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           if (g.color && g.color !== "unknown") parts.push(g.color);
           if (g.fabric && g.fabric !== "unknown" && g.fabric !== "fabric") parts.push(g.fabric);
           parts.push(g.item);
-          return { query: parts.join(" ").toLowerCase().trim(), garmentType: inferGarmentType(g.item) };
+          const verbose = parts.join(" ").toLowerCase().trim();
+          // Apply Depop-native query transformation: aesthetic prefix + stripped description
+          const query = aesthetic ? stripToDepopQuery(verbose, aesthetic) : verbose;
+          return { query, garmentType: inferGarmentType(g.item) };
         });
       }
 
       // garmentQueries used after analysis is parsed below
-      const rawGarmentQueries = buildGarmentQueries(garmentData.garments || []);
+      // Build without aesthetic first (aesthetic unknown until Pass 2 completes)
+      const rawGarmentQueries = buildGarmentQueries(garmentData.garments || [], "");
 
       // Build a structured garment description to ground the aesthetic classification
       const garmentSummary = [
@@ -2189,10 +2227,15 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       const analysis = JSON.parse(jsonMatch[0]);
 
-      // Final garment-specific Depop queries: use raw garment queries, no aesthetic prefix
-      const garmentDepopQueries: { query: string; garmentType: string }[] = rawGarmentQueries.length >= 2
-        ? rawGarmentQueries
-        : (analysis.keyPieces || []).map((p: string) => ({ query: p.toLowerCase(), garmentType: inferGarmentType(p) }));
+      // Rebuild with aesthetic prefix now that Pass 2 has returned the aesthetic
+      const resolvedAesthetic: string = analysis.aesthetic || "";
+      const aestheticGarmentQueries = rawGarmentQueries.length >= 2
+        ? buildGarmentQueries(garmentData.garments || [], resolvedAesthetic)
+        : (analysis.keyPieces || []).map((p: string) => ({
+            query: stripToDepopQuery(p.toLowerCase(), resolvedAesthetic),
+            garmentType: inferGarmentType(p),
+          }));
+      const garmentDepopQueries = aestheticGarmentQueries;
 
       // Build products from Gemini's split recommendations
       const mapRecs = (recs: any[], type: string, startId: number) =>
