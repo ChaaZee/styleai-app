@@ -235,27 +235,31 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
     const subTerms = (garmentTerms[garmentType] || []).filter(t => colorHint.toLowerCase().includes(t));
     const subPattern = subTerms.length ? `%${subTerms[0]}%` : null;
 
-    const colorRows = subPattern
-      ? await client`
-          SELECT listings FROM depop_cache
-          WHERE aesthetic = ${aesthetic}
-            AND garment_type = ${garmentType}
-            AND query ILIKE ${colorPattern}
-            AND query ILIKE ${subPattern}
-            AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
-          ORDER BY RANDOM()
-          LIMIT 20
-        `
-      : await client`
-          SELECT listings FROM depop_cache
-          WHERE aesthetic = ${aesthetic}
-            AND garment_type = ${garmentType}
-            AND query ILIKE ${colorPattern}
-            AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
-          ORDER BY RANDOM()
-          LIMIT 20
-        `;
-    flattenRows(colorRows);
+    // Try color + garment subterm first for precision, fall back to color-only if too few results
+    if (subPattern) {
+      const precise = await client`
+        SELECT listings FROM depop_cache
+        WHERE aesthetic = ${aesthetic}
+          AND garment_type = ${garmentType}
+          AND query ILIKE ${colorPattern}
+          AND query ILIKE ${subPattern}
+          AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+        ORDER BY RANDOM()
+        LIMIT 20
+      `;
+      flattenRows(precise);
+    }
+    // Always also fetch color-only rows to fill gaps (deduped by seen set)
+    const colorOnly = await client`
+      SELECT listings FROM depop_cache
+      WHERE aesthetic = ${aesthetic}
+        AND garment_type = ${garmentType}
+        AND query ILIKE ${colorPattern}
+        AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+      ORDER BY RANDOM()
+      LIMIT 20
+    `;
+    flattenRows(colorOnly);
   }
 
   // Step 2: fill remainder with random rows (covers no-color-match case)
