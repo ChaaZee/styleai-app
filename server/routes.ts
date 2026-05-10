@@ -2072,12 +2072,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.get("/api/debug-cache-type", async (req, res) => {
     const aesthetic = (req.query.aesthetic as string) || "Y2K";
     const garmentType = (req.query.garmentType as string) || "bottoms";
-    const byType = await getDepopCacheByType(aesthetic, garmentType, 10).catch((e: any) => ({ error: e.message }));
-    const byAesthetic = await getDepopCacheByAesthetic(aesthetic, 10).catch((e: any) => ({ error: e.message }));
+    const colorHint = (req.query.colorHint as string) || "";
+    const limit = parseInt((req.query.limit as string) || "10", 10);
+    const byType = await getDepopCacheByType(aesthetic, garmentType, limit, colorHint).catch((e: any) => ({ error: e.message }));
+    const byAesthetic = await getDepopCacheByAesthetic(aesthetic, limit).catch((e: any) => ({ error: e.message }));
     res.json({
-      aesthetic, garmentType,
+      aesthetic, garmentType, colorHint, limit,
       byTypeCount: Array.isArray(byType) ? byType.length : 0,
-      byTypeFirstTitles: Array.isArray(byType) ? byType.slice(0,3).map((l: any) => l.title) : byType,
+      byTypeFirstTitles: Array.isArray(byType) ? byType.slice(0, limit).map((l: any) => l.title) : byType,
       byAestheticCount: Array.isArray(byAesthetic) ? byAesthetic.length : 0,
       byAestheticFirstTitles: Array.isArray(byAesthetic) ? byAesthetic.slice(0,3).map((l: any) => l.title) : byAesthetic,
     });
