@@ -209,32 +209,48 @@ function scoreByColor(title: string, colors: string[]): number {
 
 // Fetch cached listings by aesthetic + garment_type for smart post-analysis recommendations
 export async function getDepopCacheByType(aesthetic: string, garmentType: string, limit = 6, colorHint = ""): Promise<any[]> {
-  // When a color hint is provided, fetch many more rows so the color ranker has enough to work with
-  const hasColor = colorHint && extractColors(colorHint).length > 0;
-  const rowLimit = hasColor ? 40 : Math.ceil(limit / 4) * 4 + 8;
-  const rows = await client`
-    SELECT listings FROM depop_cache
-    WHERE aesthetic = ${aesthetic}
-      AND garment_type = ${garmentType}
-      AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
-    ORDER BY RANDOM()
-    LIMIT ${rowLimit}
-  `;
-
-  // Flatten and dedupe
+  const colors = extractColors(colorHint);
   const seen = new Set<number>();
   const all: any[] = [];
-  for (const row of rows) {
-    for (const item of (row.listings as any[])) {
-      if (!seen.has(item.id)) {
-        seen.add(item.id);
-        all.push(item);
+
+  function flattenRows(rows: any[]) {
+    for (const row of rows) {
+      for (const item of (row.listings as any[])) {
+        if (!seen.has(item.id)) { seen.add(item.id); all.push(item); }
       }
     }
   }
 
-  // Color-score and sort: matching items first, then rest
-  const colors = extractColors(colorHint);
+  if (colors.length) {
+    // Step 1: fetch rows whose cache query key contains the color word(s) — these are seeded with that color
+    const colorPattern = `%${colors[0]}%`;  // use primary color for the ILIKE
+    const colorRows = await client`
+      SELECT listings FROM depop_cache
+      WHERE aesthetic = ${aesthetic}
+        AND garment_type = ${garmentType}
+        AND query ILIKE ${colorPattern}
+        AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+      ORDER BY RANDOM()
+      LIMIT 20
+    `;
+    flattenRows(colorRows);
+  }
+
+  // Step 2: fill remainder with random rows (covers no-color-match case)
+  const needed = Math.max(0, limit * 3 - all.length); // fetch extra for ranking
+  if (needed > 0) {
+    const fillRows = await client`
+      SELECT listings FROM depop_cache
+      WHERE aesthetic = ${aesthetic}
+        AND garment_type = ${garmentType}
+        AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+      ORDER BY RANDOM()
+      LIMIT ${needed}
+    `;
+    flattenRows(fillRows);
+  }
+
+  // Re-score by color (color-matched rows already at front, but re-sort for title matches too)
   if (colors.length) {
     all.sort((a, b) => scoreByColor(b.title || "", colors) - scoreByColor(a.title || "", colors));
   }
