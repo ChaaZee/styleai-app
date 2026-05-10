@@ -2812,9 +2812,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       if (!garmentEntries.length) return res.json({ ready: true, groups: [] });
 
       // Pull directly from permanent cache — garmentType+aesthetic first, then aesthetic-only
+      // Pass the original query as colorHint so results are ranked by color match
       const groups = await Promise.all(
         garmentEntries.map(async ({ query, garmentType }) => {
-          let listings = await getDepopCacheByType(aesthetic, garmentType, 10).catch(() => []);
+          let listings = await getDepopCacheByType(aesthetic, garmentType, 10, query).catch(() => []);
           if (!listings.length) {
             listings = await getDepopCacheByAesthetic(aesthetic, 10).catch(() => []);
           }

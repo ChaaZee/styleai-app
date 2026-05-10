@@ -188,9 +188,29 @@ export async function setDepopCache(query: string, listings: any[], aesthetic?: 
   `;
 }
 
+// Common color keywords extracted from Depop listing titles
+const COLOR_KEYWORDS = [
+  "black","white","grey","gray","navy","blue","red","green","brown","tan","beige",
+  "cream","ivory","khaki","olive","yellow","orange","pink","purple","burgundy",
+  "maroon","camel","rust","teal","mint","lavender","coral","gold","silver",
+  "charcoal","denim","light wash","dark wash","washed","faded",
+];
+
+function extractColors(query: string): string[] {
+  const q = query.toLowerCase();
+  return COLOR_KEYWORDS.filter(c => q.includes(c));
+}
+
+function scoreByColor(title: string, colors: string[]): number {
+  if (!colors.length) return 0;
+  const t = title.toLowerCase();
+  return colors.filter(c => t.includes(c)).length;
+}
+
 // Fetch cached listings by aesthetic + garment_type for smart post-analysis recommendations
-export async function getDepopCacheByType(aesthetic: string, garmentType: string, limit = 6): Promise<any[]> {
-  const rowLimit = Math.ceil(limit / 4) + 4;
+export async function getDepopCacheByType(aesthetic: string, garmentType: string, limit = 6, colorHint = ""): Promise<any[]> {
+  // Fetch 4x more rows so we have enough to color-rank
+  const rowLimit = Math.ceil(limit / 4) * 4 + 8;
   const rows = await client`
     SELECT listings FROM depop_cache
     WHERE aesthetic = ${aesthetic}
@@ -199,14 +219,26 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
     ORDER BY RANDOM()
     LIMIT ${rowLimit}
   `;
+
+  // Flatten and dedupe
+  const seen = new Set<number>();
   const all: any[] = [];
   for (const row of rows) {
     for (const item of (row.listings as any[])) {
-      if (all.length >= limit) break;
-      if (!all.find((x: any) => x.id === item.id)) all.push(item);
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        all.push(item);
+      }
     }
   }
-  return all;
+
+  // Color-score and sort: matching items first, then rest
+  const colors = extractColors(colorHint);
+  if (colors.length) {
+    all.sort((a, b) => scoreByColor(b.title || "", colors) - scoreByColor(a.title || "", colors));
+  }
+
+  return all.slice(0, limit);
 }
 
 export async function getDepopCacheByAesthetic(aesthetic: string, limit = 50): Promise<any[]> {
