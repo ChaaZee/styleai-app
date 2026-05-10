@@ -262,18 +262,50 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
     flattenRows(colorOnly);
   }
 
-  // Step 2: fill remainder with random rows (covers no-color-match case)
+  // Step 2: fill remainder — try garment-keyword-filtered first, then pure random
+  // This prevents e.g. "flannel" rows from polluting a "graphic tee" tops request
   const needed = Math.max(0, limit * 3 - all.length); // fetch extra for ranking
   if (needed > 0) {
-    const fillRows = await client`
-      SELECT listings FROM depop_cache
-      WHERE aesthetic = ${aesthetic}
-        AND garment_type = ${garmentType}
-        AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
-      ORDER BY RANDOM()
-      LIMIT ${needed}
-    `;
-    flattenRows(fillRows);
+    // Extract the most specific garment keyword from the colorHint (e.g. "tee" from "graphic tee")
+    const garmentKeywords: Record<string, string[]> = {
+      bottoms:   ["jeans","cargo","chino","trousers","shorts","skirt","legging","pants"],
+      tops:      ["tee","hoodie","blouse","tank","cami","sweater","sweatshirt","crop","long sleeve"],
+      outerwear: ["jacket","coat","blazer","puffer","bomber","cardigan","vest"],
+      shoes:     ["sneaker","boot","loafer","heel","sandal","platform","shoe"],
+      dresses:   ["dress","romper","slip","gown"],
+    };
+    const hint = colorHint.toLowerCase();
+    const kwList = garmentKeywords[garmentType] || [];
+    const matchedKw = kwList.find(kw => hint.includes(kw));
+
+    if (matchedKw && all.length < limit) {
+      // Try to fill with rows whose query key matches the specific garment keyword
+      const kwPattern = `%${matchedKw}%`;
+      const kwFill = await client`
+        SELECT listings FROM depop_cache
+        WHERE aesthetic = ${aesthetic}
+          AND garment_type = ${garmentType}
+          AND query ILIKE ${kwPattern}
+          AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+        ORDER BY RANDOM()
+        LIMIT ${needed}
+      `;
+      flattenRows(kwFill);
+    }
+
+    // Pure random fill for any remaining gaps
+    const stillNeeded = Math.max(0, limit * 3 - all.length);
+    if (stillNeeded > 0) {
+      const fillRows = await client`
+        SELECT listings FROM depop_cache
+        WHERE aesthetic = ${aesthetic}
+          AND garment_type = ${garmentType}
+          AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+        ORDER BY RANDOM()
+        LIMIT ${stillNeeded}
+      `;
+      flattenRows(fillRows);
+    }
   }
 
   // Re-score by color (color-matched rows already at front, but re-sort for title matches too)
