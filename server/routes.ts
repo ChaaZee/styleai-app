@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -1891,6 +1891,46 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
   // One-time: delete cached rows with empty titles so they get re-fetched with slug-derived titles
   // Cache stats — counts rows, listings, breakdown by aesthetic and permanent flag
+  // POST /api/backfill-embeddings — one-time backfill of vector embeddings for all cache rows
+  app.post("/api/backfill-embeddings", async (req, res) => {
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(400).json({ error: "OPENAI_API_KEY not set" });
+    }
+    res.json({ started: true, message: "Embedding backfill running in background" });
+
+    void (async () => {
+      try {
+        const { getEmbedding } = await import("./storage");
+        const pgmod = await import("postgres");
+        const pg2 = pgmod.default;
+        const c2 = pg2(process.env.DATABASE_URL!, { ssl: "require", max: 3 });
+        let total = 0;
+        let offset = 0;
+        while (true) {
+          const rows = await c2`
+            SELECT id, query FROM depop_cache WHERE embedding IS NULL ORDER BY id LIMIT 100 OFFSET ${offset}
+          ` as { id: number; query: string }[];
+          if (!rows.length) break;
+          for (const row of rows) {
+            const vec = await getEmbedding(row.query);
+            if (vec) {
+              const vecStr = `[${vec.join(",")}]`;
+              await c2`UPDATE depop_cache SET embedding = ${vecStr}::vector WHERE id = ${row.id}`;
+            }
+            await new Promise(r => setTimeout(r, 20));
+          }
+          total += rows.length;
+          offset += rows.length;
+          console.log(`[backfill] ${total} rows embedded`);
+        }
+        console.log(`[backfill] Complete: ${total} rows`);
+        await c2.end();
+      } catch (e) {
+        console.error("[backfill] Error:", e);
+      }
+    })();
+  });
+
   app.get("/api/cache-stats", async (req, res) => {
     try {
       const { default: pg } = await import("postgres");
@@ -2074,10 +2114,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const garmentType = (req.query.garmentType as string) || "bottoms";
     const colorHint = (req.query.colorHint as string) || "";
     const limit = parseInt((req.query.limit as string) || "10", 10);
-    const byType = await getDepopCacheByType(aesthetic, garmentType, limit, colorHint).catch((e: any) => ({ error: e.message }));
+    // Use vector search when colorHint provided, otherwise keyword fallback
+    const byType = colorHint
+      ? await getDepopCacheByEmbedding(colorHint, aesthetic, garmentType, limit, colorHint).catch((e: any) => ({ error: e.message }))
+      : await getDepopCacheByType(aesthetic, garmentType, limit, "").catch((e: any) => ({ error: e.message }));
     const byAesthetic = await getDepopCacheByAesthetic(aesthetic, limit).catch((e: any) => ({ error: e.message }));
     res.json({
       aesthetic, garmentType, colorHint, limit,
+      searchMode: colorHint ? "vector" : "keyword",
       byTypeCount: Array.isArray(byType) ? byType.length : 0,
       byTypeFirstTitles: Array.isArray(byType) ? byType.slice(0, limit).map((l: any) => l.title) : byType,
       byAestheticCount: Array.isArray(byAesthetic) ? byAesthetic.length : 0,
@@ -2813,15 +2857,18 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       if (!garmentEntries.length) return res.json({ ready: true, groups: [] });
 
-      // Pull directly from permanent cache — garmentType+aesthetic first, then aesthetic-only
-      // Pass the original query as colorHint so results are ranked by color match
+      // Pull from cache using semantic vector search (cosine similarity on embedded query strings)
+      // This finds cache rows whose garment description is semantically closest to what Gemini detected,
+      // without relying on exact keyword overlap or brand names.
+      // Falls back to keyword-based getDepopCacheByType if no embeddings available yet.
       const groups = await Promise.all(
         garmentEntries.map(async ({ query, garmentType }) => {
-          let listings = await getDepopCacheByType(aesthetic, garmentType, 10, query).catch(() => []);
+          // Use vector search: embed the detected garment description, find closest cache rows
+          let listings = await getDepopCacheByEmbedding(query, aesthetic, garmentType, 10, query).catch(() => []);
           if (!listings.length) {
+            // Fallback: aesthetic-only pool
             listings = await getDepopCacheByAesthetic(aesthetic, 10).catch(() => []);
           }
-          // Last resort: any aesthetic if still empty (shouldn't happen with 62K rows)
           if (!listings.length) {
             listings = await getDepopCacheByAesthetic("Minimalist", 10).catch(() => []);
           }

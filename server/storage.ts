@@ -1,6 +1,11 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, desc, and, lt, sql } from "drizzle-orm";
+import OpenAI from "openai";
+
+const openaiClient = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 import {
   scans,
   wardrobeItems,
@@ -60,6 +65,14 @@ export async function initDB() {
   await client`
     CREATE INDEX IF NOT EXISTS depop_cache_aesthetic_garment_idx ON depop_cache(aesthetic, garment_type)
   `;
+
+  // pgvector: semantic search on cache query strings
+  await client`CREATE EXTENSION IF NOT EXISTS vector`.catch(() => {});
+  await client`ALTER TABLE depop_cache ADD COLUMN IF NOT EXISTS embedding vector(1536)`.catch(() => {});
+  await client`
+    CREATE INDEX IF NOT EXISTS depop_cache_embedding_idx
+    ON depop_cache USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)
+  `.catch(() => {});
 
   await client`
     CREATE TABLE IF NOT EXISTS wardrobe_items (
@@ -144,6 +157,143 @@ export function dedupeListings(listings: any[]): any[] {
   });
 }
 
+// ─────────────────────────────────────────────
+// BRAND NORMALIZER — strips brand names so embeddings
+// focus on garment type + color + aesthetic, not brand
+// ─────────────────────────────────────────────
+const BRAND_WORDS = new Set([
+  // Skate brands
+  "thrasher","anti hero","antihero","santa cruz","independent","baker","element","real",
+  "girl","blind","flip","creature","zero","alien workshop","emerica","osiris","dc shoes",
+  "vans","almost","enjoi","spitfire","world industries","huf","alltimers","april","palace",
+  "polar","fucking awesome","fa","pass~port","bronze","quasi","paradise",
+  // Streetwear / hype
+  "supreme","palace","stussy","bape","a bathing ape","off white","off-white","vlone",
+  "kith","noah","aime leon dore","ald","cactus plant flea market","cpfm","human made",
+  "mastermind","needles","wtaps","neighborhood","undercover","visvim",
+  "nike","adidas","jordan","new balance","nb","reebok","puma","champion","fila",
+  "carhartt","dickies","wrangler","levis","levi","lee","wrangler",
+  // Grunge / band tees
+  "nirvana","metallica","black sabbath","led zeppelin","pearl jam","soundgarden",
+  "alice in chains","ramones","sex pistols","misfits","black flag","anti flag",
+  "motorhead","ozzy","guns n roses","acdc","ac/dc","slayer","pantera","iron maiden",
+  "deftones","nine inch nails","marilyn manson","system of a down","tool",
+  // Luxury / old money
+  "ralph lauren","polo","lacoste","burberry","gucci","prada","louis vuitton","lv",
+  "versace","fendi","balenciaga","givenchy","saint laurent","ysl","celine",
+  "loro piana","brioni","kiton","isaia","ermenegildo zegna","boglioli",
+  // Fast fashion / general
+  "zara","h&m","hm","uniqlo","gap","banana republic","j crew","jcrew","mango",
+  "topshop","asos","urban outfitters","uo","free people","anthropologie",
+  "patagonia","north face","columbia","arc'teryx","arcteryx","canada goose",
+  "quiksilver","billabong","volcom","rip curl","o'neill","oneill",
+  // Vintage / resale common
+  "vintage","y2k","90s","80s","70s","2000s","00s","retro",
+]);
+
+export function normalizeForEmbedding(query: string): string {
+  const words = query.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")  // strip punctuation
+    .split(/\s+/)
+    .filter(w => w.length > 1 && !BRAND_WORDS.has(w));
+  // Also strip numeric sizes (xl, m, s, 32, etc.)
+  const cleaned = words.filter(w => !/^(xs|s|m|l|xl|xxl|\d+)$/.test(w));
+  return cleaned.join(" ").trim() || query.toLowerCase();
+}
+
+// ─────────────────────────────────────────────
+// EMBEDDING HELPER — calls OpenAI text-embedding-3-small
+// ─────────────────────────────────────────────
+export async function getEmbedding(text: string): Promise<number[] | null> {
+  if (!openaiClient) return null;
+  try {
+    const normalized = normalizeForEmbedding(text);
+    const res = await openaiClient.embeddings.create({
+      model: "text-embedding-3-small",
+      input: normalized,
+      dimensions: 1536,
+    });
+    return res.data[0].embedding;
+  } catch (e) {
+    console.error("[embedding] failed:", e);
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────
+// VECTOR CACHE LOOKUP — semantic similarity search
+// Finds cached rows whose query string is semantically
+// closest to the garment description from Gemini,
+// filtered by aesthetic + garment_type first.
+// Falls back to getDepopCacheByType if no embeddings available.
+// ─────────────────────────────────────────────
+export async function getDepopCacheByEmbedding(
+  description: string,
+  aesthetic: string,
+  garmentType: string,
+  limit = 8,
+  colorHint = ""
+): Promise<any[]> {
+  // 1. Try vector search first
+  if (openaiClient) {
+    const embedding = await getEmbedding(description);
+    if (embedding) {
+      const vectorStr = `[${embedding.join(",")}]`;
+      try {
+        // Pull top candidates by cosine similarity, filtered by aesthetic + garment_type
+        // Fetch 3x limit so we have room to re-rank by color afterward
+        const rows = await client<{ listings: any[]; query: string }[]>`
+          SELECT listings, query
+          FROM depop_cache
+          WHERE aesthetic = ${aesthetic}
+            AND garment_type = ${garmentType}
+            AND embedding IS NOT NULL
+            AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+          ORDER BY embedding <=> ${vectorStr}::vector
+          LIMIT ${limit * 3}
+        `;
+
+        if (rows.length >= limit) {
+          // Flatten listings from top semantic matches
+          const all: any[] = [];
+          const seen = new Set<string>();
+          for (const row of rows) {
+            for (const item of (row.listings as any[])) {
+              if (!seen.has(item.id)) { seen.add(item.id); all.push(item); }
+            }
+          }
+
+          // Re-rank by color match if colorHint provided
+          if (colorHint && all.length > limit) {
+            const COLOR_KEYWORDS = [
+              "black","white","grey","gray","navy","blue","red","green","brown","tan",
+              "beige","cream","ivory","khaki","olive","yellow","orange","pink","purple",
+              "burgundy","maroon","camel","rust","teal","charcoal","denim",
+              "light wash","dark wash","washed","faded",
+            ];
+            const hintColors = COLOR_KEYWORDS.filter(c => colorHint.toLowerCase().includes(c));
+            if (hintColors.length) {
+              const scored = all.map(item => {
+                const title = (item.title || "").toLowerCase();
+                const score = hintColors.filter(c => title.includes(c)).length;
+                return { item, score };
+              });
+              scored.sort((a, b) => b.score - a.score);
+              return scored.slice(0, limit).map(s => s.item);
+            }
+          }
+          return all.slice(0, limit);
+        }
+      } catch (e) {
+        console.error("[vector search] failed, falling back:", e);
+      }
+    }
+  }
+
+  // 2. Fallback to keyword-based search
+  return getDepopCacheByType(aesthetic, garmentType, limit, colorHint || description);
+}
+
 export async function getDepopCache(query: string): Promise<any[] | null> {
   const rows = await client`
     SELECT listings, permanent FROM depop_cache
@@ -176,16 +326,38 @@ export async function getDepopCacheSince(query: string, since: Date): Promise<an
 
 export async function setDepopCache(query: string, listings: any[], aesthetic?: string, permanent = false, garmentType?: string): Promise<void> {
   const deduped = dedupeListings(listings);
-  await client`
-    INSERT INTO depop_cache (query, listings, aesthetic, permanent, garment_type, created_at)
-    VALUES (${query}, ${JSON.stringify(deduped)}, ${aesthetic ?? null}, ${permanent}, ${garmentType ?? null}, NOW())
-    ON CONFLICT (query) DO UPDATE
-      SET listings     = EXCLUDED.listings,
-          aesthetic    = COALESCE(EXCLUDED.aesthetic, depop_cache.aesthetic),
-          permanent    = EXCLUDED.permanent OR depop_cache.permanent,
-          garment_type = COALESCE(EXCLUDED.garment_type, depop_cache.garment_type),
-          created_at   = NOW()
-  `;
+
+  // Generate embedding for semantic search (best-effort, don't block on failure)
+  let embeddingVal: string | null = null;
+  try {
+    const vec = await getEmbedding(query);
+    if (vec) embeddingVal = `[${vec.join(",")}]`;
+  } catch (_) {}
+
+  if (embeddingVal) {
+    await client`
+      INSERT INTO depop_cache (query, listings, aesthetic, permanent, garment_type, embedding, created_at)
+      VALUES (${query}, ${JSON.stringify(deduped)}, ${aesthetic ?? null}, ${permanent}, ${garmentType ?? null}, ${embeddingVal}::vector, NOW())
+      ON CONFLICT (query) DO UPDATE
+        SET listings     = EXCLUDED.listings,
+            aesthetic    = COALESCE(EXCLUDED.aesthetic, depop_cache.aesthetic),
+            permanent    = EXCLUDED.permanent OR depop_cache.permanent,
+            garment_type = COALESCE(EXCLUDED.garment_type, depop_cache.garment_type),
+            embedding    = COALESCE(EXCLUDED.embedding, depop_cache.embedding),
+            created_at   = NOW()
+    `;
+  } else {
+    await client`
+      INSERT INTO depop_cache (query, listings, aesthetic, permanent, garment_type, created_at)
+      VALUES (${query}, ${JSON.stringify(deduped)}, ${aesthetic ?? null}, ${permanent}, ${garmentType ?? null}, NOW())
+      ON CONFLICT (query) DO UPDATE
+        SET listings     = EXCLUDED.listings,
+            aesthetic    = COALESCE(EXCLUDED.aesthetic, depop_cache.aesthetic),
+            permanent    = EXCLUDED.permanent OR depop_cache.permanent,
+            garment_type = COALESCE(EXCLUDED.garment_type, depop_cache.garment_type),
+            created_at   = NOW()
+    `;
+  }
 }
 
 // Common color keywords extracted from Depop listing titles
