@@ -253,59 +253,40 @@ export async function getDepopCacheByEmbedding(
           LIMIT ${limit * 3}
         `;
 
-        if (rows.length >= limit) {
-          // Flatten listings from top semantic matches
+        if (rows.length > 0) {
+          // If colorHint has a color word, sort rows so color-matching query keys come first
+          // (vector ordering is already good for garment type — we just nudge color rows up)
+          const COLOR_KEYWORDS = [
+            "black","white","grey","gray","navy","blue","red","green","brown","tan",
+            "beige","cream","ivory","khaki","olive","yellow","orange","pink","purple",
+            "burgundy","maroon","camel","rust","teal","charcoal","denim",
+            "light wash","dark wash","washed","faded",
+          ];
+          const hintColors = colorHint
+            ? COLOR_KEYWORDS.filter(c => colorHint.toLowerCase().includes(c))
+            : [];
+
+          let sortedRows = rows as { listings: any[]; query: string }[];
+          if (hintColors.length) {
+            // Stable-sort: rows whose query contains the color float to front
+            // Rows without color match stay in original vector-similarity order
+            sortedRows = [
+              ...rows.filter(r => hintColors.some(c => r.query.toLowerCase().includes(c))),
+              ...rows.filter(r => !hintColors.some(c => r.query.toLowerCase().includes(c))),
+            ];
+          }
+
+          // Flatten listings preserving sorted order
           const all: any[] = [];
           const seen = new Set<string>();
-          for (const row of rows) {
-            for (const item of (row.listings as any[])) {
+          for (const row of sortedRows) {
+            const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
+            for (const item of listings) {
               if (!seen.has(item.id)) { seen.add(item.id); all.push(item); }
             }
           }
 
-          // Re-rank: boost items from query rows that contain the target color
-          // Score by query key (reliable) rather than listing title (inconsistent)
-          if (colorHint && all.length > limit) {
-            const COLOR_KEYWORDS = [
-              "black","white","grey","gray","navy","blue","red","green","brown","tan",
-              "beige","cream","ivory","khaki","olive","yellow","orange","pink","purple",
-              "burgundy","maroon","camel","rust","teal","charcoal","denim",
-              "light wash","dark wash","washed","faded",
-            ];
-            const hintColors = COLOR_KEYWORDS.filter(c => colorHint.toLowerCase().includes(c));
-            if (hintColors.length) {
-              // Build a set of query keys that contain the color (from our top vector rows)
-              const colorQueryKeys = new Set(
-                rows.filter(r => hintColors.some(c => r.query.toLowerCase().includes(c)))
-                    .map(r => r.query)
-              );
-              // Tag each listing with whether it came from a color-matching query row
-              // We stored query alongside listings in the rows array
-              const rowsByQuery = new Map<string, any[]>();
-              for (const row of rows) {
-                const items: any[] = [];
-                for (const item of (row.listings as any[])) items.push(item);
-                rowsByQuery.set(row.query, items);
-              }
-              const colorItems: any[] = [];
-              const otherItems: any[] = [];
-              const usedIds = new Set<string>();
-              // First pass: items from color-matching query rows
-              for (const [q, items] of rowsByQuery) {
-                if (colorQueryKeys.has(q)) {
-                  for (const item of items) {
-                    if (!usedIds.has(item.id)) { usedIds.add(item.id); colorItems.push(item); }
-                  }
-                }
-              }
-              // Second pass: remaining items (still semantically relevant, just no color key)
-              for (const item of all) {
-                if (!usedIds.has(item.id)) otherItems.push(item);
-              }
-              return [...colorItems, ...otherItems].slice(0, limit);
-            }
-          }
-          return all.slice(0, limit);
+          if (all.length >= limit) return all.slice(0, limit);
         }
       } catch (e) {
         console.error("[vector search] failed, falling back:", e);
