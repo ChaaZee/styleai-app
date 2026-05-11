@@ -263,7 +263,8 @@ export async function getDepopCacheByEmbedding(
             }
           }
 
-          // Re-rank by color match if colorHint provided
+          // Re-rank: boost items from query rows that contain the target color
+          // Score by query key (reliable) rather than listing title (inconsistent)
           if (colorHint && all.length > limit) {
             const COLOR_KEYWORDS = [
               "black","white","grey","gray","navy","blue","red","green","brown","tan",
@@ -273,13 +274,35 @@ export async function getDepopCacheByEmbedding(
             ];
             const hintColors = COLOR_KEYWORDS.filter(c => colorHint.toLowerCase().includes(c));
             if (hintColors.length) {
-              const scored = all.map(item => {
-                const title = (item.title || "").toLowerCase();
-                const score = hintColors.filter(c => title.includes(c)).length;
-                return { item, score };
-              });
-              scored.sort((a, b) => b.score - a.score);
-              return scored.slice(0, limit).map(s => s.item);
+              // Build a set of query keys that contain the color (from our top vector rows)
+              const colorQueryKeys = new Set(
+                rows.filter(r => hintColors.some(c => r.query.toLowerCase().includes(c)))
+                    .map(r => r.query)
+              );
+              // Tag each listing with whether it came from a color-matching query row
+              // We stored query alongside listings in the rows array
+              const rowsByQuery = new Map<string, any[]>();
+              for (const row of rows) {
+                const items: any[] = [];
+                for (const item of (row.listings as any[])) items.push(item);
+                rowsByQuery.set(row.query, items);
+              }
+              const colorItems: any[] = [];
+              const otherItems: any[] = [];
+              const usedIds = new Set<string>();
+              // First pass: items from color-matching query rows
+              for (const [q, items] of rowsByQuery) {
+                if (colorQueryKeys.has(q)) {
+                  for (const item of items) {
+                    if (!usedIds.has(item.id)) { usedIds.add(item.id); colorItems.push(item); }
+                  }
+                }
+              }
+              // Second pass: remaining items (still semantically relevant, just no color key)
+              for (const item of all) {
+                if (!usedIds.has(item.id)) otherItems.push(item);
+              }
+              return [...colorItems, ...otherItems].slice(0, limit);
             }
           }
           return all.slice(0, limit);
