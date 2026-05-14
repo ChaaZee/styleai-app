@@ -651,26 +651,43 @@ export async function upsertUserProfile(
   onboarded?: boolean
 ) {
   const vecStr = `[${tasteVector.join(",")}]`;
-  await client`
-    INSERT INTO user_profiles (user_id, taste_vector, interaction_count, liked_ids, skipped_ids, onboarded, created_at, updated_at)
-    VALUES (
-      ${userId}, ${vecStr}::vector, ${interactionDelta},
-      ${likedId ? [likedId] : []}::text[],
-      ${skippedId ? [skippedId] : []}::text[],
-      ${onboarded ?? false}, NOW(), NOW()
-    )
-    ON CONFLICT (user_id) DO UPDATE SET
-      taste_vector      = ${vecStr}::vector,
-      interaction_count = user_profiles.interaction_count + ${interactionDelta},
-      liked_ids         = CASE WHEN ${likedId ?? null} IS NOT NULL
-                               THEN array_append(user_profiles.liked_ids, ${likedId ?? null})
-                               ELSE user_profiles.liked_ids END,
-      skipped_ids       = CASE WHEN ${skippedId ?? null} IS NOT NULL
-                               THEN array_append(user_profiles.skipped_ids, ${skippedId ?? null})
-                               ELSE user_profiles.skipped_ids END,
-      onboarded         = COALESCE(${onboarded ?? null}, user_profiles.onboarded),
-      updated_at        = NOW()
-  `;
+
+  // Check if profile exists first (avoids complex INSERT type inference issues)
+  const existing = await client`SELECT user_id FROM user_profiles WHERE user_id = ${userId}`;
+
+  if (!existing.length) {
+    // Fresh insert
+    await client`
+      INSERT INTO user_profiles (user_id, taste_vector, interaction_count, liked_ids, skipped_ids, onboarded, created_at, updated_at)
+      VALUES (
+        ${userId},
+        ${vecStr}::vector,
+        ${interactionDelta},
+        ARRAY[]::text[],
+        ARRAY[]::text[],
+        ${onboarded ?? false},
+        NOW(), NOW()
+      )
+    `;
+  } else {
+    // Update existing
+    await client`
+      UPDATE user_profiles SET
+        taste_vector      = ${vecStr}::vector,
+        interaction_count = interaction_count + ${interactionDelta},
+        onboarded         = CASE WHEN ${onboarded ?? null}::boolean IS NOT NULL THEN ${onboarded ?? false} ELSE onboarded END,
+        updated_at        = NOW()
+      WHERE user_id = ${userId}
+    `;
+  }
+
+  // Append liked/skipped IDs separately to avoid array type inference issues
+  if (likedId) {
+    await client`UPDATE user_profiles SET liked_ids = array_append(liked_ids, ${likedId}) WHERE user_id = ${userId}`;
+  }
+  if (skippedId) {
+    await client`UPDATE user_profiles SET skipped_ids = array_append(skipped_ids, ${skippedId}) WHERE user_id = ${userId}`;
+  }
 }
 
 /**
