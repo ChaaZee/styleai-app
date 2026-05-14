@@ -64,17 +64,17 @@ export default function OnboardingModal({ userId, onComplete, onClose }: Onboard
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[9999]">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={selected.size > 0 ? undefined : onClose}
       />
 
-      {/* Sheet */}
+      {/* Sheet — anchored to bottom on mobile, centered on desktop */}
       <div
-        className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden"
-        style={{ background: "hsl(228 20% 10%)", maxHeight: "90vh" }}
+        className="absolute bottom-0 left-0 right-0 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:top-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:w-full rounded-t-3xl sm:rounded-3xl overflow-hidden"
+        style={{ background: "hsl(228 20% 10%)", maxHeight: "92dvh" }}
       >
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-white/10">
