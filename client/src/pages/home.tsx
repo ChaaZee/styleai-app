@@ -2,6 +2,7 @@ import React from "react";
 import { useLocation } from "wouter";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { rankByVector, getTopAesthetics } from "@/lib/styleVector";
+import OnboardingModal from "@/components/OnboardingModal";
 
 // ── Clothing SVG illustrations (same set as discover) ───────────────────────
 const Icons: Record<string, JSX.Element> = {
@@ -270,6 +271,16 @@ const FEED_ITEMS: FeedItem[] = [
   { id: 135, label: "Slim Fit Suit",             icon: "jacket",    query: "slim fit suit business casual men",         aesthetic: "Business Casual",  gender: "male" },
 ];
 
+// ── Anonymous user ID (same as For You page) ─────────────────────────────────
+function getUserId(): string {
+  let id = localStorage.getItem("stitch_user_id");
+  if (!id) {
+    id = "u_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem("stitch_user_id", id);
+  }
+  return id;
+}
+
 const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Trending"];
 
 // Map chip label → aesthetic value(s) in FEED_ITEMS
@@ -307,6 +318,10 @@ export default function HomePage() {
 
   const [rankedItems, setRankedItems] = useState<FeedItem[]>(rerank);
   const [depopCards, setDepopCards] = useState<any[]>([]);
+  const [forYouCards, setForYouCards] = useState<any[]>([]);
+  const [forYouLoading, setForYouLoading] = useState(false);
+  const [forYouOnboarded, setForYouOnboarded] = useState<boolean | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Re-rank on mount
   useEffect(() => {
@@ -362,6 +377,39 @@ export default function HomePage() {
       window.removeEventListener("stitch_depop_updated", onDepopUpdated);
     };
   }, []);
+
+  // ── For You: check onboarding + load personalized cards ─────────────────
+  const userId = getUserId();
+  useEffect(() => {
+    // Check if user is onboarded
+    fetch(`/api/user-profile/${userId}`)
+      .then(r => r.json())
+      .then(data => {
+        setForYouOnboarded(data.onboarded ?? false);
+        if (data.onboarded) {
+          // Load personalized cards
+          setForYouLoading(true);
+          return fetch(`/api/for-you/${userId}?offset=0`)
+            .then(r => r.json())
+            .then(d => {
+              setForYouCards(d.items || []);
+              setForYouLoading(false);
+            });
+        }
+      })
+      .catch(() => setForYouOnboarded(false));
+  }, [userId]);
+
+  // When user completes onboarding, reload For You cards
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    setForYouOnboarded(true);
+    setForYouLoading(true);
+    fetch(`/api/for-you/${userId}?offset=0`)
+      .then(r => r.json())
+      .then(d => { setForYouCards(d.items || []); setForYouLoading(false); })
+      .catch(() => setForYouLoading(false));
+  };
 
   // Derive visible feed from active chip
   const feedItems = useMemo(() => {
@@ -438,8 +486,16 @@ export default function HomePage() {
         {/* Section label */}
         <div className="px-5 sm:px-8 flex items-center justify-between mb-0 pb-3">
           <span className="font-label text-[10px] text-foreground">{sectionLabel}</span>
-          {activeChip === "For You" && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">↑ 24 new</span>
+          {activeChip === "For You" && forYouOnboarded && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">Personalized</span>
+          )}
+          {activeChip === "For You" && forYouOnboarded === false && (
+            <button
+              onClick={() => setShowOnboarding(true)}
+              className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-white font-medium"
+            >
+              Set up →
+            </button>
           )}
           {activeChip !== "For You" && feedItems.length > 0 && (
             <span className="text-[10px] text-muted-foreground">{feedItems.length} item{feedItems.length !== 1 ? "s" : ""}</span>
@@ -447,14 +503,102 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Grid — every slot is a real Depop product card */}
+      {/* ── For You Grid (vector-personalized) ── */}
+      {activeChip === "For You" && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: "hsl(var(--border))" }}>
+          {/* Not onboarded yet */}
+          {forYouOnboarded === false && (
+            <div className="col-span-2 md:col-span-3 flex flex-col items-center justify-center py-16 gap-4 bg-background">
+              <p className="text-muted-foreground text-sm" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                Tell us your style to personalize this feed
+              </p>
+              <button
+                onClick={() => setShowOnboarding(true)}
+                className="px-5 py-2.5 rounded-full text-sm font-medium text-white"
+                style={{ background: "#5088B8", fontFamily: "'Jost', sans-serif", letterSpacing: "0.06em" }}
+              >
+                Set up my taste profile
+              </button>
+            </div>
+          )}
+
+          {/* Loading */}
+          {forYouOnboarded === true && forYouLoading && (
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-background animate-pulse">
+                <div className="w-full aspect-[3/4] bg-muted" />
+                <div className="px-3 pb-3 pt-2 space-y-1.5">
+                  <div className="h-2 w-12 bg-muted rounded" />
+                  <div className="h-3 w-3/4 bg-muted rounded" />
+                  <div className="h-3 w-1/3 bg-muted rounded" />
+                </div>
+              </div>
+            ))
+          )}
+
+          {/* Personalized cards */}
+          {forYouOnboarded === true && !forYouLoading && forYouCards.map((item: any, idx: number) => {
+            const imageUrl = item.preview || item.image || "";
+            const price = item.price?.priceAmount ?? item.price ?? null;
+            const depopUrl = item.slug
+              ? `https://www.depop.com/products/${item.slug}/`
+              : `https://www.depop.com/search/?q=${encodeURIComponent(item.title || "")}`;
+
+            return (
+              <a
+                key={item.id || idx}
+                href={depopUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative bg-background hover:bg-muted/30 transition-colors cursor-pointer block group overflow-hidden"
+              >
+                <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Shop</div>
+                {imageUrl ? (
+                  <div
+                    className="w-full aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                    style={{ backgroundImage: `url('${imageUrl}')` }}
+                  />
+                ) : (
+                  <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center text-muted-foreground/30">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  </div>
+                )}
+                <div className="px-3 pb-3 pt-2">
+                  <p className="font-label text-[9px] text-muted-foreground mb-0.5 uppercase tracking-widest" style={{ fontSize: "9px" }}>
+                    {item._aesthetic || "Depop"}
+                  </p>
+                  <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">{item.title}</p>
+                  <div className="flex items-center justify-between">
+                    {price && <p className="text-xs text-primary font-semibold">${parseFloat(price).toFixed(0)}</p>}
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0 ml-auto">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </div>
+                </div>
+              </a>
+            );
+          })}
+
+          {/* Empty state after load */}
+          {forYouOnboarded === true && !forYouLoading && forYouCards.length === 0 && (
+            <div className="col-span-2 md:col-span-3 flex flex-col items-center justify-center py-16 gap-3 bg-background">
+              <p className="text-muted-foreground text-sm" style={{ fontFamily: "'DM Sans', sans-serif" }}>No results yet.</p>
+              <button onClick={() => setShowOnboarding(true)} className="text-primary text-sm underline" style={{ fontFamily: "'Jost', sans-serif" }}>Retune taste</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Default Grid (non-For You chips) ── */}
+      {activeChip !== "For You" && (
       <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: "hsl(var(--border))" }}>
         {feedItems.map((item, idx) => {
           const card = depopCards.length > 0
             ? depopCards[idx % depopCards.length]
             : null;
 
-          // While cards are loading, show a skeleton placeholder
           if (!card) {
             return (
               <div key={item.id} className="bg-background animate-pulse">
@@ -476,14 +620,11 @@ export default function HomePage() {
               rel="noopener noreferrer"
               className="relative bg-background hover:bg-muted/30 transition-colors cursor-pointer block group overflow-hidden"
             >
-              {/* Shop badge */}
               <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Shop</div>
-              {/* Product image */}
               <div
                 className="w-full aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
                 style={{ backgroundImage: `url('${card.image}')` }}
               />
-              {/* Info */}
               <div className="px-3 pb-3 pt-2">
                 <p className="font-label text-[9px] text-muted-foreground mb-0.5" style={{ letterSpacing: '0.14em' }}>{card.brand || item.aesthetic}</p>
                 <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">{card.title || item.label}</p>
@@ -500,6 +641,15 @@ export default function HomePage() {
           );
         })}
       </div>
+      )}
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <OnboardingModal
+          userId={userId}
+          onComplete={handleOnboardingComplete}
+          onClose={() => setShowOnboarding(false)}
+        />
+      )}
     </div>
   );
 }
