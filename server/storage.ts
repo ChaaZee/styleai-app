@@ -74,6 +74,21 @@ export async function initDB() {
     ON depop_cache USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)
   `.catch(() => {});
 
+  // user_profiles table for personalized For You recommendations
+  await client`CREATE EXTENSION IF NOT EXISTS vector`.catch(() => {});
+  await client`
+    CREATE TABLE IF NOT EXISTS user_profiles (
+      user_id           TEXT PRIMARY KEY,
+      taste_vector      vector(1536),
+      interaction_count INTEGER DEFAULT 0,
+      liked_ids         TEXT[] DEFAULT '{}',
+      skipped_ids       TEXT[] DEFAULT '{}',
+      onboarded         BOOLEAN DEFAULT FALSE,
+      created_at        TIMESTAMPTZ DEFAULT NOW(),
+      updated_at        TIMESTAMPTZ DEFAULT NOW()
+    )
+  `.catch(() => {});
+
   await client`
     CREATE TABLE IF NOT EXISTS wardrobe_items (
       id SERIAL PRIMARY KEY,
@@ -605,3 +620,133 @@ export const storage: IStorage = {
       .limit(limit);
   },
 };
+
+// ─────────────────────────────────────────────
+// USER PROFILE / TASTE VECTOR FUNCTIONS
+// ─────────────────────────────────────────────
+
+/** Fetch a user's taste vector and metadata */
+export async function getUserProfile(userId: string) {
+  const rows = await client<{
+    user_id: string;
+    taste_vector: string | null;
+    interaction_count: number;
+    liked_ids: string[];
+    skipped_ids: string[];
+    onboarded: boolean;
+  }[]>`
+    SELECT user_id, taste_vector::text, interaction_count, liked_ids, skipped_ids, onboarded
+    FROM user_profiles WHERE user_id = ${userId}
+  `;
+  return rows[0] ?? null;
+}
+
+/** Create or update a user profile with a new taste vector */
+export async function upsertUserProfile(
+  userId: string,
+  tasteVector: number[],
+  interactionDelta = 0,
+  likedId?: string,
+  skippedId?: string,
+  onboarded?: boolean
+) {
+  const vecStr = `[${tasteVector.join(",")}]`;
+  await client`
+    INSERT INTO user_profiles (user_id, taste_vector, interaction_count, liked_ids, skipped_ids, onboarded, created_at, updated_at)
+    VALUES (
+      ${userId}, ${vecStr}::vector, ${interactionDelta},
+      ${likedId ? [likedId] : []}::text[],
+      ${skippedId ? [skippedId] : []}::text[],
+      ${onboarded ?? false}, NOW(), NOW()
+    )
+    ON CONFLICT (user_id) DO UPDATE SET
+      taste_vector      = ${vecStr}::vector,
+      interaction_count = user_profiles.interaction_count + ${interactionDelta},
+      liked_ids         = CASE WHEN ${likedId ?? null} IS NOT NULL
+                               THEN array_append(user_profiles.liked_ids, ${likedId ?? null})
+                               ELSE user_profiles.liked_ids END,
+      skipped_ids       = CASE WHEN ${skippedId ?? null} IS NOT NULL
+                               THEN array_append(user_profiles.skipped_ids, ${skippedId ?? null})
+                               ELSE user_profiles.skipped_ids END,
+      onboarded         = COALESCE(${onboarded ?? null}, user_profiles.onboarded),
+      updated_at        = NOW()
+  `;
+}
+
+/**
+ * Get personalized For You recommendations for a user.
+ * Finds depop_cache items whose embeddings are closest to the user's taste vector.
+ * Excludes already-liked and skipped items.
+ */
+export async function getForYouRecommendations(
+  userId: string,
+  limit = 20,
+  offset = 0
+): Promise<{ items: any[]; hasMore: boolean }> {
+  const profile = await getUserProfile(userId);
+  if (!profile || !profile.taste_vector) {
+    return { items: [], hasMore: false };
+  }
+
+  const excluded = [
+    ...(profile.liked_ids || []),
+    ...(profile.skipped_ids || []),
+  ];
+
+  // Cosine similarity across ALL aesthetics/types — pure taste-based
+  const rows = await client<{ listings: any[]; query: string; aesthetic: string }[]>`
+    SELECT listings, query, aesthetic
+    FROM depop_cache
+    WHERE embedding IS NOT NULL
+      AND permanent = TRUE
+      AND (${excluded.length} = 0 OR query != ALL(${excluded}::text[]))
+    ORDER BY embedding <=> ${profile.taste_vector}::vector
+    LIMIT ${limit * 3}
+    OFFSET ${offset}
+  `;
+
+  // Flatten + dedupe
+  const all: any[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
+    for (const item of listings) {
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        all.push({ ...item, _aesthetic: row.aesthetic });
+      }
+    }
+  }
+
+  return { items: all.slice(0, limit), hasMore: all.length > limit };
+}
+
+/**
+ * Average a batch of existing embeddings from cache rows matching given aesthetics.
+ * Used to seed a user's taste vector from onboarding picks.
+ */
+export async function getAverageEmbeddingForAesthetics(aesthetics: string[]): Promise<number[] | null> {
+  if (!aesthetics.length) return null;
+
+  // Sample up to 50 rows per aesthetic for the average
+  const rows = await client<{ embedding: string }[]>`
+    SELECT embedding::text FROM depop_cache
+    WHERE aesthetic = ANY(${aesthetics}::text[])
+      AND embedding IS NOT NULL
+      AND permanent = TRUE
+    ORDER BY RANDOM()
+    LIMIT ${aesthetics.length * 50}
+  `;
+
+  if (!rows.length) return null;
+
+  const dim = 1536;
+  const avg = new Array(dim).fill(0);
+  for (const row of rows) {
+    // Parse "[0.1,0.2,...]" format
+    const nums = row.embedding.slice(1, -1).split(",").map(Number);
+    for (let i = 0; i < dim; i++) avg[i] += nums[i];
+  }
+  const n = rows.length;
+  return avg.map(v => v / n);
+}

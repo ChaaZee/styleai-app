@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -1929,6 +1929,129 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         console.error("[backfill] Error:", e);
       }
     })();
+  });
+
+  // ─────────────────────────────────────────────
+  // FOR YOU — Personalized recommendations
+  // ─────────────────────────────────────────────
+
+  // POST /api/onboarding
+  // Seeds a user's taste vector from their aesthetic picks.
+  // Body: { userId: string, aesthetics: string[] }
+  app.post("/api/onboarding", async (req, res) => {
+    try {
+      const { userId, aesthetics } = req.body as { userId: string; aesthetics: string[] };
+      if (!userId || !aesthetics?.length) {
+        return res.status(400).json({ error: "userId and aesthetics required" });
+      }
+      // Average the embeddings of all cache rows matching picked aesthetics
+      const tasteVector = await getAverageEmbeddingForAesthetics(aesthetics);
+      if (!tasteVector) {
+        return res.status(500).json({ error: "Could not build taste vector" });
+      }
+      await upsertUserProfile(userId, tasteVector, 0, undefined, undefined, true);
+      res.json({ success: true, aesthetics, dimensions: tasteVector.length });
+    } catch (e: any) {
+      console.error("[onboarding]", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/interact
+  // Updates a user's taste vector based on a like, save, or skip action.
+  // Body: { userId: string, itemId: string, action: "like"|"save"|"skip", query: string }
+  // The query is the depop_cache query key for the item (used to fetch its embedding)
+  app.post("/api/interact", async (req, res) => {
+    try {
+      const { userId, itemId, action, query } = req.body as {
+        userId: string; itemId: string; action: "like" | "save" | "skip"; query: string;
+      };
+      if (!userId || !itemId || !action) {
+        return res.status(400).json({ error: "userId, itemId, action required" });
+      }
+
+      // Weights: save = 3, like = 1, skip = -0.5
+      const WEIGHTS: Record<string, number> = { save: 3, like: 1, skip: -0.5 };
+      const weight = WEIGHTS[action] ?? 1;
+
+      // Get current profile
+      const profile = await getUserProfile(userId);
+
+      // Get embedding for the interacted item (via its query string)
+      let itemEmbedding: number[] | null = null;
+      if (query) {
+        itemEmbedding = await getEmbedding(query);
+      }
+
+      if (!itemEmbedding) {
+        return res.json({ success: true, updated: false, reason: "no embedding for item" });
+      }
+
+      const dim = 1536;
+      let newVector: number[];
+
+      if (!profile?.taste_vector) {
+        // No existing vector — use item embedding directly (scaled by weight)
+        newVector = itemEmbedding.map(v => v * Math.abs(weight));
+      } else {
+        // Update running weighted average
+        // taste_vector = (taste_vector * n + item_embedding * weight) / (n + |weight|)
+        const currentVec = profile.taste_vector.slice(1, -1).split(",").map(Number);
+        const n = profile.interaction_count || 1;
+        const totalWeight = n + Math.abs(weight);
+        newVector = currentVec.map((v, i) =>
+          (v * n + itemEmbedding![i] * weight) / totalWeight
+        );
+      }
+
+      // Normalize the vector to unit length (keeps cosine similarity stable)
+      const magnitude = Math.sqrt(newVector.reduce((sum, v) => sum + v * v, 0));
+      if (magnitude > 0) newVector = newVector.map(v => v / magnitude);
+
+      await upsertUserProfile(
+        userId,
+        newVector,
+        Math.abs(weight),
+        action !== "skip" ? itemId : undefined,
+        action === "skip" ? itemId : undefined
+      );
+
+      res.json({ success: true, updated: true, action, interactionCount: (profile?.interaction_count || 0) + Math.abs(weight) });
+    } catch (e: any) {
+      console.error("[interact]", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/for-you/:userId?offset=0
+  // Returns personalized Depop recommendations for a user.
+  app.get("/api/for-you/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const offset = parseInt((req.query.offset as string) || "0", 10);
+
+      const profile = await getUserProfile(userId);
+      if (!profile || !profile.onboarded) {
+        return res.status(404).json({ error: "user_not_onboarded", onboarded: false });
+      }
+
+      const { items, hasMore } = await getForYouRecommendations(userId, 20, offset);
+      res.json({ items, hasMore, interactionCount: profile.interaction_count });
+    } catch (e: any) {
+      console.error("[for-you]", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/user-profile/:userId — check if user exists + is onboarded
+  app.get("/api/user-profile/:userId", async (req, res) => {
+    try {
+      const profile = await getUserProfile(req.params.userId);
+      if (!profile) return res.json({ exists: false, onboarded: false });
+      res.json({ exists: true, onboarded: profile.onboarded, interactionCount: profile.interaction_count });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.get("/api/cache-stats", async (req, res) => {

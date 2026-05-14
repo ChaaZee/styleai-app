@@ -11,6 +11,7 @@ import WardrobePage from "@/pages/wardrobe";
 import HistoryPage from "@/pages/history";
 import ProfilePage from "@/pages/profile";
 import DiscoverPage from "@/pages/discover";
+import ForYouPage from "@/pages/forYou";
 import HowItWorksPage from "@/pages/howItWorks";
 import StyleQuizPage from "@/pages/styleQuiz";
 import NavBar from "@/components/NavBar";
@@ -166,7 +167,7 @@ function AppContent() {
 
   const [currentLocation] = useLocation();
   const isQuizRoute = currentLocation === "/quiz";
-  const isDiscoverRoute = currentLocation.startsWith("/discover");
+  const isDiscoverRoute = currentLocation.startsWith("/discover") || currentLocation.startsWith("/for-you");
 
   return (
     <div className="bg-background text-foreground flex flex-col" style={{ height: "100dvh" }}>
@@ -181,6 +182,7 @@ function AppContent() {
           <Route path="/history" component={HistoryPage} />
           <Route path="/profile" component={ProfilePage} />
           <Route path="/discover" component={DiscoverPage} />
+          <Route path="/for-you" component={ForYouPage} />
           <Route path="/how-it-works" component={HowItWorksPage} />
           <Route>
             <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">Page not found</div>

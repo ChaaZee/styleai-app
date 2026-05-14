@@ -8,7 +8,7 @@ export default function NavBar() {
   const isWardrobe = location.startsWith("/wardrobe");
   const isHistory = location.startsWith("/history");
   const isScan = location === "/scan" || location.startsWith("/results");
-  const isDiscover = location.startsWith("/discover");
+  const isForYou = location.startsWith("/for-you");
 
   return (
     <nav
@@ -79,18 +79,18 @@ export default function NavBar() {
         </button>
       </Link>
 
-      {/* Discover */}
-      <Link href="/discover">
+      {/* For You */}
+      <Link href="/for-you">
         <button
-          data-testid="nav-discover"
+          data-testid="nav-for-you"
           className={`flex flex-col items-center gap-0.5 px-4 py-2 transition-colors ${
-            isDiscover ? "text-primary" : "text-muted-foreground"
+            isForYou ? "text-primary" : "text-muted-foreground"
           }`}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isDiscover ? 2.2 : 1.75} strokeLinecap="round">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isForYou ? 2.2 : 1.75} strokeLinecap="round">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
           </svg>
-          <span style={{ fontFamily: "'Jost', sans-serif", fontWeight: 300, fontSize: "9px", letterSpacing: "0.14em", textTransform: "uppercase" }}>Discover</span>
+          <span style={{ fontFamily: "'Jost', sans-serif", fontWeight: 300, fontSize: "9px", letterSpacing: "0.14em", textTransform: "uppercase" }}>For You</span>
         </button>
       </Link>
       </div>
