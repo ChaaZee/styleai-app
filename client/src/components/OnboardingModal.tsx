@@ -64,17 +64,27 @@ export default function OnboardingModal({ userId, onComplete, onClose }: Onboard
   };
 
   return (
-    <div className="fixed inset-0 z-[9999]">
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999 }}>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
         onClick={selected.size > 0 ? undefined : onClose}
       />
 
-      {/* Sheet — anchored to bottom on mobile, centered on desktop */}
+      {/* Sheet — pinned to bottom edge of viewport */}
       <div
-        className="absolute bottom-0 left-0 right-0 sm:bottom-auto sm:left-1/2 sm:-translate-x-1/2 sm:top-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:w-full rounded-t-3xl sm:rounded-3xl overflow-hidden"
-        style={{ background: "hsl(228 20% 10%)", maxHeight: "92dvh" }}
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: "hsl(228 20% 10%)",
+          maxHeight: "92dvh",
+          borderTopLeftRadius: "1.5rem",
+          borderTopRightRadius: "1.5rem",
+          overflow: "hidden",
+          zIndex: 10000,
+        }}
       >
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-white/10">
