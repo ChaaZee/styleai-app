@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
+import { createPortal } from "react-dom";
 
 // ── Aesthetic tiles config ────────────────────────────────────────────────────
 // Each tile has a label, a short vibe description, and a representative emoji / keyword
@@ -63,7 +65,7 @@ export default function OnboardingModal({ userId, onComplete, onClose }: Onboard
     }
   };
 
-  return (
+  const modal = (
     <div style={{ position: "fixed", inset: 0, zIndex: 9999 }}>
       {/* Backdrop */}
       <div
@@ -176,4 +178,5 @@ export default function OnboardingModal({ userId, onComplete, onClose }: Onboard
       </div>
     </div>
   );
+  return createPortal(modal, document.body);
 }
