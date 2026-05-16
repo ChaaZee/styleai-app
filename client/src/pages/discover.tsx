@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { onLike, onUnlike, rankByVector } from "@/lib/styleVector";
+import { getUserId } from "@/lib/deviceId";
 
 // ── Clothing icon map ─────────────────────────────────────────────────────────
 type IconKey = "shirt"|"pants"|"dress"|"shoes"|"bag"|"jacket"|"skirt"|"accessory";
@@ -38,6 +39,8 @@ interface OutfitCard {
   likesCount?: number;
 }
 interface LikedItem { id: string; aesthetic: string; likedAt: number; }
+interface DepopListing { title: string; image: string; url: string; price: number; }
+interface ShopTheLookGroup { piece: string; items: DepopListing[]; }
 
 // ── Heart burst overlay ───────────────────────────────────────────────────────
 function HeartBurst({ visible }: { visible: boolean }) {
@@ -48,6 +51,100 @@ function HeartBurst({ visible }: { visible: boolean }) {
         style={{ animation: "heartPop 0.55s ease forwards" }}>
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
       </svg>
+    </div>
+  );
+}
+
+// ── Shop the Look panel ───────────────────────────────────────────────────────
+function ShopTheLookPanel({ aesthetic, keyPieces }: { aesthetic: string; keyPieces: string[] }) {
+  const [groups, setGroups] = useState<ShopTheLookGroup[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const fetched = useRef<string>("");
+
+  useEffect(() => {
+    const key = `${aesthetic}|${keyPieces.slice(0,4).join(",")}`;
+    if (!keyPieces.length || fetched.current === key) return;
+    fetched.current = key;
+    setLoading(true);
+    const pieces = encodeURIComponent(keyPieces.slice(0,4).join(","));
+    fetch(`/api/discover/shop-the-look?aesthetic=${encodeURIComponent(aesthetic)}&pieces=${pieces}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (Array.isArray(data)) setGroups(data);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [aesthetic, keyPieces]);
+
+  // Fallback to static links while loading or if no results
+  const showFallback = !loading && (!groups || groups.every(g => !g.items?.length));
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="font-label text-[9px] text-muted-foreground">Shop the Look</p>
+        <div className="flex items-center gap-1">
+          <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FF2300" }}>
+            <span className="text-white font-bold" style={{ fontSize: "8px" }}>d</span>
+          </div>
+          <span className="text-[9px] text-muted-foreground">Depop</span>
+        </div>
+      </div>
+
+      {loading && (
+        <div className="flex gap-1.5">
+          {keyPieces.slice(0,4).map((_, i) => (
+            <div key={i} className="flex-1 rounded-xl border border-border aspect-square shimmer" />
+          ))}
+        </div>
+      )}
+
+      {!loading && groups && groups.some(g => g.items?.length > 0) && (
+        <div className="flex gap-1.5">
+          {groups.map(({ piece, items }) => {
+            const item = items[0];
+            if (!item) return null;
+            return (
+              <a key={piece}
+                href={item.url}
+                target="_blank" rel="noopener noreferrer"
+                className="flex-1 flex flex-col items-center gap-1 rounded-xl border border-border overflow-hidden hover:border-primary/50 transition-colors group">
+                {item.image ? (
+                  <div className="w-full aspect-square overflow-hidden">
+                    <img src={item.image} alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  </div>
+                ) : (
+                  <div className="w-full aspect-square flex items-center justify-center">
+                    <span className="text-foreground/60">{ClothingIcons[pieceIcon(piece)]}</span>
+                  </div>
+                )}
+                <div className="px-1 pb-1.5 w-full">
+                  <p className="text-[8px] text-muted-foreground text-center leading-tight line-clamp-1">{piece}</p>
+                  {item.price > 0 && (
+                    <p className="text-[8px] font-medium text-foreground text-center">${item.price.toFixed(0)}</p>
+                  )}
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      {showFallback && (
+        <div className="flex gap-1.5">
+          {keyPieces.slice(0,4).map(piece => (
+            <a key={piece}
+              href={`https://www.depop.com/search/?q=${encodeURIComponent(`${piece} ${aesthetic}`)}`}
+              target="_blank" rel="noopener noreferrer"
+              className="flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-xl border border-border hover:border-primary/50 transition-colors group">
+              <span className="text-foreground/60 group-hover:text-primary transition-colors">{ClothingIcons[pieceIcon(piece)]}</span>
+              <span className="text-[9px] text-muted-foreground text-center leading-tight line-clamp-2">{piece}</span>
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -119,30 +216,9 @@ function DiscoverCard({ card, liked, onToggleLike }: {
           ))}
         </div>
 
-        {/* Key pieces */}
+        {/* Shop the Look — real Depop items via vector search */}
         {card.keyPieces.length > 0 && (
-          <div className="rounded-xl border border-border bg-card p-3">
-            <div className="flex items-center justify-between mb-2">
-              <p className="font-label text-[9px] text-muted-foreground">Shop the Look</p>
-              <div className="flex items-center gap-1">
-                <div className="w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FF2300" }}>
-                  <span className="text-white font-bold" style={{ fontSize: "8px" }}>d</span>
-                </div>
-                <span className="text-[9px] text-muted-foreground">Depop</span>
-              </div>
-            </div>
-            <div className="flex gap-1.5">
-              {card.keyPieces.slice(0,4).map(piece => (
-                <a key={piece}
-                  href={`https://www.depop.com/search/?q=${encodeURIComponent(`${piece} ${card.aesthetic}`)}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-xl border border-border hover:border-primary/50 transition-colors group">
-                  <span className="text-foreground/60 group-hover:text-primary transition-colors">{ClothingIcons[pieceIcon(piece)]}</span>
-                  <span className="text-[9px] text-muted-foreground text-center leading-tight line-clamp-2">{piece}</span>
-                </a>
-              ))}
-            </div>
-          </div>
+          <ShopTheLookPanel aesthetic={card.aesthetic} keyPieces={card.keyPieces} />
         )}
 
         {/* Tags + source */}
@@ -170,6 +246,7 @@ export default function DiscoverPage() {
   const [cards, setCards] = useState<OutfitCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [idx, setIdx] = useState(0);
+  const userId = getUserId();
 
   // Touch swipe state
   const touchStartY = useRef(0);
@@ -182,7 +259,9 @@ export default function DiscoverPage() {
       try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), 55000);
-        const r = await fetch("/api/discover", { signal: ctrl.signal });
+        // Pass userId for personalized ordering if available
+        const url = userId ? `/api/discover?userId=${encodeURIComponent(userId)}` : "/api/discover";
+        const r = await fetch(url, { signal: ctrl.signal });
         clearTimeout(t);
         const data = await r.json();
         if (cancelled) return;
@@ -201,8 +280,8 @@ export default function DiscoverPage() {
           subreddit: row.subreddit || null,
           likesCount: row.likes_count ?? row.likesCount ?? 0,
         }));
-        // Simple rank — no heavy interleaving
-        const ranked = rankByVector(parsed);
+        // If userId returned personalised (already taste-ordered), skip client-side re-rank
+        const ranked = userId ? parsed : rankByVector(parsed);
         if (!cancelled) { setCards(ranked); setLoading(false); }
       } catch {
         if (!cancelled) setLoading(false);
@@ -249,7 +328,7 @@ export default function DiscoverPage() {
     swiping.current = false;
     const dy = touchStartY.current - e.changedTouches[0].clientY;
     const dx = Math.abs(touchStartX.current - e.changedTouches[0].clientX);
-    if (Math.abs(dy) < 50 || dx > Math.abs(dy) * 0.8) return; // too short or too horizontal
+    if (Math.abs(dy) < 50 || dx > Math.abs(dy) * 0.8) return;
     if (dy > 0) goNext(); else goPrev();
   };
 

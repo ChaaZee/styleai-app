@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -1280,7 +1280,7 @@ async function analyzeAndStore(
   const styleBreakdown = Array.isArray(analysis.styleBreakdown) ? analysis.styleBreakdown : [];
   const tags: string[] = Array.isArray(analysis.occasions) ? analysis.occasions.slice(0, 3) : [];
 
-  return storage.createDiscoverCard({
+  const card = await storage.createDiscoverCard({
     imageUrl,
     aesthetic: analysis.aesthetic || aesthetic,
     confidence: analysis.confidence || 80,
@@ -1292,6 +1292,13 @@ async function analyzeAndStore(
     postUrl,
     subreddit,
   });
+
+  // Auto-embed the new card for vector search (fire-and-forget)
+  if (card?.id) {
+    embedDiscoverCard(card.id, card.aesthetic, tags, analysis.keyPieces || []).catch(() => {});
+  }
+
+  return card;
 }
 
 // ── Auto-seed on startup ─────────────────────────────────────────────────────
@@ -2536,10 +2543,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
   // ── Discover feed ─────────────────────────────────────────────────────────────────
 
-  // GET /api/discover — returns all cards, trending first
-  app.get("/api/discover", async (_req, res) => {
+  // GET /api/discover?userId=xxx — returns cards ordered by taste vector if userId given
+  app.get("/api/discover", async (req, res) => {
     try {
-      const cards = await storage.getDiscoverCards();
+      const userId = req.query.userId as string | undefined;
+      let cards: any[];
+      if (userId) {
+        cards = await getDiscoverCardsByTaste(userId);
+      } else {
+        cards = await storage.getDiscoverCards();
+      }
       res.json(cards);
     } catch (err: any) {
       console.error("Discover fetch error:", err);
@@ -2558,7 +2571,76 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/discover/:id/like — increment likes_count for a card
+  // GET /api/discover/shop-the-look?aesthetic=X&pieces=piece1,piece2 — real Depop items per piece
+  app.get("/api/discover/shop-the-look", async (req, res) => {
+    try {
+      const aesthetic = (req.query.aesthetic as string) || "";
+      const piecesRaw = (req.query.pieces as string) || "";
+      if (!aesthetic || !piecesRaw) {
+        return res.status(400).json({ error: "Missing aesthetic or pieces" });
+      }
+      const keyPieces = piecesRaw.split(",").map((p: string) => p.trim()).filter(Boolean);
+      const results = await getShopTheLookItems(aesthetic, keyPieces, 3);
+      res.json(results);
+    } catch (err: any) {
+      console.error("[shop-the-look]", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/wardrobe/gap-recommendations/:userId — taste-matched items for missing garment types
+  app.get("/api/wardrobe/gap-recommendations/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      if (!userId) return res.status(400).json({ error: "Missing userId" });
+      const wardrobeItems = await storage.getWardrobeItems();
+      const mapped = wardrobeItems.map((w: any) => ({
+        name: w.name,
+        category: w.category,
+        brand: w.brand,
+      }));
+      const recs = await getWardrobeGapRecommendations(userId, mapped, 6);
+      res.json(recs);
+    } catch (err: any) {
+      console.error("[wardrobe-gap]", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/discover/:id/similar — similar discover cards by aesthetic+tags vector
+  app.get("/api/discover/:id/similar", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!id) return res.status(400).json({ error: "Invalid id" });
+      // Fetch the card's aesthetic + tags
+      const rows = await (storage as any).getDiscoverCardById
+        ? [(await (storage as any).getDiscoverCardById(id))].filter(Boolean)
+        : [];
+      // Fallback: query DB directly
+      const { default: pg } = await import("postgres").catch(() => ({ default: null }));
+      const cardRows = rows.length > 0 ? rows : await (async () => {
+        try {
+          const { client: pgClient } = await import("./storage") as any;
+          // We can't easily import raw client here, so use the storage function
+          return [];
+        } catch { return []; }
+      })();
+      // Best approach: pass aesthetic+tags via query params, or look up the card
+      const aestheticParam = req.query.aesthetic as string;
+      const tagsParam = req.query.tags as string;
+      if (!aestheticParam) {
+        return res.status(400).json({ error: "Pass ?aesthetic=X&tags=a,b" });
+      }
+      const tags = tagsParam ? tagsParam.split(",").map((t: string) => t.trim()) : [];
+      const similar = await getSimilarDiscoverCards(aestheticParam, tags, id, 4);
+      res.json(similar);
+    } catch (err: any) {
+      console.error("[discover-similar]", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+    // POST /api/discover/:id/like — increment likes_count for a card
   app.post("/api/discover/:id/like", async (req, res) => {
     try {
       const id = Number(req.params.id);

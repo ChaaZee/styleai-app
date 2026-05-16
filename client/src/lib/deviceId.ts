@@ -18,3 +18,19 @@ export function getDeviceId(): string {
   }
   return id;
 }
+
+// Stitch taste/profile user ID (separate from device scan ID)
+const USER_KEY = "stitch_user_id";
+
+export function getUserId(): string | null {
+  return localStorage.getItem(USER_KEY);
+}
+
+export function getOrCreateUserId(): string {
+  let id = localStorage.getItem(USER_KEY);
+  if (!id) {
+    id = uuidv4();
+    localStorage.setItem(USER_KEY, id);
+  }
+  return id;
+}

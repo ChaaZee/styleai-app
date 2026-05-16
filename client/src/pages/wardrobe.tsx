@@ -1,11 +1,91 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Trash2, Upload, Sparkles } from "lucide-react";
+import { Plus, Trash2, Upload, Sparkles, ExternalLink } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { WardrobeItem } from "@shared/schema";
+import { getUserId } from "@/lib/deviceId";
 
 const CATEGORIES = ["All", "tops", "bottoms", "shoes", "outerwear", "accessories"];
+
+interface GapItem {
+  title: string;
+  image: string;
+  url: string;
+  price: number;
+  _garmentType?: string;
+  _aesthetic?: string;
+}
+
+function GapRecommendations({ userId, itemCount }: { userId: string; itemCount: number }) {
+  const { data: recs, isLoading } = useQuery<GapItem[]>({
+    queryKey: ["/api/wardrobe/gap-recommendations", userId],
+    queryFn: async () => {
+      const res = await fetch(`/api/wardrobe/gap-recommendations/${userId}`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: itemCount > 3 && !!userId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (!userId || itemCount <= 3) return null;
+
+  return (
+    <div className="mx-5 sm:mx-8 mb-4 rounded-xl bg-foreground p-4">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+          <Sparkles size={14} className="text-primary" strokeWidth={1.75} />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-background">Wardrobe Insight</p>
+          <p className="text-[10px] text-background/70 leading-snug">
+            Items your taste profile is missing
+          </p>
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="flex gap-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex-1 rounded-lg aspect-square shimmer opacity-30" />
+          ))}
+        </div>
+      )}
+
+      {!isLoading && recs && recs.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+          {recs.slice(0, 6).map((item, i) => (
+            <a key={i} href={item.url} target="_blank" rel="noopener noreferrer"
+              className="flex-shrink-0 w-20 group">
+              <div className="w-20 h-20 rounded-lg overflow-hidden border border-background/20 mb-1">
+                {item.image ? (
+                  <img src={item.image} alt={item.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                ) : (
+                  <div className="w-full h-full bg-background/10 flex items-center justify-center">
+                    <ExternalLink size={12} className="text-background/40" />
+                  </div>
+                )}
+              </div>
+              <p className="text-[8px] text-background/70 leading-tight line-clamp-2">{item.title}</p>
+              {item.price > 0 && (
+                <p className="text-[9px] font-medium text-background">${item.price.toFixed(0)}</p>
+              )}
+            </a>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && (!recs || recs.length === 0) && (
+        <p className="text-[10px] text-background/50">
+          Set up your taste profile in the Home tab to get personalised gap picks.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function WardrobePage() {
   const [activeCategory, setActiveCategory] = useState("All");
@@ -17,6 +97,7 @@ export default function WardrobePage() {
   const [brand, setBrand] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const userId = getUserId();
 
   const { data: items = [], isLoading } = useQuery<WardrobeItem[]>({
     queryKey: ["/api/wardrobe"],
@@ -48,8 +129,6 @@ export default function WardrobePage() {
   });
 
   const filtered = activeCategory === "All" ? items : items.filter(i => i.category === activeCategory);
-
-  // Estimate value — rough avg $80/item
   const estValue = items.length * 80;
 
   return (
@@ -58,7 +137,6 @@ export default function WardrobePage() {
       {/* Header */}
       <div className="px-5 sm:px-8 pt-5 sm:pt-7 pb-3">
         <h1 className="font-display text-3xl sm:text-4xl text-foreground mb-3">My Wardrobe</h1>
-        {/* Stats row — matches mockup */}
         <div className="flex gap-6">
           <div>
             <p className="text-sm font-bold text-foreground">{items.length}</p>
@@ -93,21 +171,8 @@ export default function WardrobePage() {
         ))}
       </div>
 
-      {/* Wardrobe gap alert — only show when items exist */}
-      {items.length > 3 && (
-        <div className="mx-5 sm:mx-8 mb-4 rounded-xl bg-foreground p-4 flex gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-            <Sparkles size={14} className="text-primary" strokeWidth={1.75} />
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-background mb-0.5">Wardrobe Insight</p>
-            <p className="text-[10px] text-background/70 leading-snug">
-              Based on your items, adding a versatile blazer would unlock {Math.floor(items.length * 0.6)} new outfit combinations.
-            </p>
-            <button className="text-[10px] text-primary mt-1 font-medium">Shop blazers →</button>
-          </div>
-        </div>
-      )}
+      {/* Gap recommendations — real vector-based, only if user has taste profile */}
+      {userId && <GapRecommendations userId={userId} itemCount={items.length} />}
 
       {/* Section header */}
       <div className="px-5 sm:px-8 flex items-center justify-between mb-3">
@@ -147,7 +212,7 @@ export default function WardrobePage() {
         </div>
       )}
 
-      {/* Image-only grid with overlay — matches mockup wardrobe-grid */}
+      {/* Image-only grid with overlay */}
       {!isLoading && (
         <div className="px-5 sm:px-8 grid grid-cols-3 sm:grid-cols-4 gap-2.5 sm:gap-3 pb-4">
           {filtered.map((item) => (
@@ -161,12 +226,10 @@ export default function WardrobePage() {
                 alt={item.name}
                 className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
               />
-              {/* Overlay — always visible like mockup */}
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
                 <p className="text-[9px] font-semibold text-white leading-tight truncate">{item.name}</p>
                 {item.brand && <p className="text-[9px] text-white/65 truncate">{item.brand}</p>}
               </div>
-              {/* Delete on hover */}
               <button
                 onClick={() => deleteMutation.mutate(item.id)}
                 data-testid={`button-delete-${item.id}`}
@@ -177,7 +240,7 @@ export default function WardrobePage() {
             </div>
           ))}
 
-          {/* Scan to add tile — matches wardrobe-add in mockup */}
+          {/* Scan to add tile */}
           <button
             onClick={() => setAdding(true)}
             className="rounded-xl border-2 border-dashed border-border aspect-square flex flex-col items-center justify-center gap-1 hover:border-primary/50 hover:bg-muted/40 transition-all"

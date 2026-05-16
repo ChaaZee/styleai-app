@@ -123,6 +123,8 @@ export async function initDB() {
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS post_url TEXT`;
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0`;
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS subreddit TEXT`;
+  await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS embedding vector(1536)`.catch(() => {});
+  await client`ALTER TABLE wardrobe_items ADD COLUMN IF NOT EXISTS embedding vector(1536)`.catch(() => {});
 
   // Depop search result cache — keyed by query string, TTL 24h (permanent rows never expire)
   await client`
@@ -766,4 +768,172 @@ export async function getAverageEmbeddingForAesthetics(aesthetics: string[]): Pr
   }
   const n = rows.length;
   return avg.map(v => v / n);
+}
+
+// ─────────────────────────────────────────────
+// DISCOVER — personalized ordering + shop-the-look
+// ─────────────────────────────────────────────
+
+/**
+ * Get discover cards ordered by similarity to a user's taste vector.
+ * Falls back to likes_count ordering if user has no taste vector.
+ */
+export async function getDiscoverCardsByTaste(userId: string): Promise<any[]> {
+  const profile = await getUserProfile(userId);
+  if (!profile?.taste_vector) {
+    // Fallback: order by likes_count desc
+    return client`
+      SELECT * FROM discover_cards ORDER BY likes_count DESC, created_at DESC LIMIT 50
+    `;
+  }
+  // Order by cosine similarity to taste vector
+  return client`
+    SELECT *, 1 - (embedding <=> ${profile.taste_vector}::vector) AS taste_score
+    FROM discover_cards
+    WHERE embedding IS NOT NULL
+    ORDER BY embedding <=> ${profile.taste_vector}::vector
+    LIMIT 50
+  `;
+}
+
+/**
+ * "Shop the Look" — given a discover card's aesthetic + key pieces,
+ * find real Depop cache listings using semantic search.
+ */
+export async function getShopTheLookItems(
+  aesthetic: string,
+  keyPieces: string[],
+  limit = 3
+): Promise<{ piece: string; items: any[] }[]> {
+  const results: { piece: string; items: any[] }[] = [];
+  for (const piece of keyPieces.slice(0, 4)) {
+    const description = `${aesthetic} ${piece}`;
+    const items = await getDepopCacheByEmbedding(description, aesthetic, inferGarmentType(piece), limit, piece)
+      .catch(() => []);
+    results.push({ piece, items });
+  }
+  return results;
+}
+
+// Infer garment type from piece string (reuse logic from routes)
+function inferGarmentType(piece: string): string {
+  const p = piece.toLowerCase();
+  if (/jean|pant|trouser|cargo|short|skirt|legging/.test(p)) return "bottoms";
+  if (/shoe|sneaker|boot|heel|sandal|loafer|platform/.test(p)) return "shoes";
+  if (/dress|romper|jumpsuit|slip/.test(p)) return "dresses";
+  if (/jacket|coat|blazer|cardigan|vest|puffer|bomber|outerwear|flannel|overshirt/.test(p)) return "outerwear";
+  return "tops";
+}
+
+// ─────────────────────────────────────────────
+// WARDROBE — gap analysis via vector search
+// ─────────────────────────────────────────────
+
+/**
+ * Given a user's wardrobe items, find what's missing:
+ * 1. Embed each owned item's name+category
+ * 2. Find depop_cache rows that are FAR from all owned items
+ *    but close to the user's taste vector → genuine gaps
+ */
+export async function getWardrobeGapRecommendations(
+  userId: string,
+  wardrobeItems: { name: string; category: string; brand?: string }[],
+  limit = 6
+): Promise<any[]> {
+  if (!wardrobeItems.length) return [];
+  const profile = await getUserProfile(userId);
+  if (!profile?.taste_vector) return [];
+
+  // Get items from depop_cache closest to taste vector
+  // but exclude garment types the user already owns a lot of
+  const categoryCount: Record<string, number> = {};
+  for (const item of wardrobeItems) {
+    categoryCount[item.category] = (categoryCount[item.category] || 0) + 1;
+  }
+  // Find categories with 0 or few items
+  const ALL_TYPES = ["tops", "bottoms", "shoes", "outerwear", "dresses"];
+  const missingTypes = ALL_TYPES.filter(t => (categoryCount[t] || 0) < 2);
+
+  if (!missingTypes.length) {
+    // Wardrobe is complete — just return taste-based recommendations
+    return getForYouRecommendations(userId, limit).then(r => r.items);
+  }
+
+  // Pull items from taste vector search filtered to missing types
+  const rows = await client<{ listings: any[]; query: string; garment_type: string; aesthetic: string }[]>`
+    SELECT listings, query, garment_type, aesthetic
+    FROM depop_cache
+    WHERE garment_type = ANY(${missingTypes}::text[])
+      AND embedding IS NOT NULL
+      AND permanent = TRUE
+    ORDER BY embedding <=> ${profile.taste_vector}::vector
+    LIMIT ${limit * 4}
+  `;
+
+  const all: any[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
+    for (const item of listings) {
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        all.push({ ...item, _garmentType: row.garment_type, _aesthetic: row.aesthetic });
+      }
+    }
+  }
+  return all.slice(0, limit);
+}
+
+// ─────────────────────────────────────────────
+// HISTORY — similar scans via aesthetic vector
+// ─────────────────────────────────────────────
+
+/**
+ * Given a scan's aesthetic + style breakdown, find other scans
+ * with similar aesthetic using cosine similarity on discover_cards embeddings.
+ * Returns the top N most similar cards to show as "similar outfits".
+ */
+export async function getSimilarDiscoverCards(
+  aesthetic: string,
+  tags: string[],
+  excludeId?: number,
+  limit = 4
+): Promise<any[]> {
+  if (!openaiClient) return [];
+  try {
+    const text = `${aesthetic} ${tags.join(" ")}`.trim();
+    const vec = await getEmbedding(text);
+    if (!vec) return [];
+    const vecStr = `[${vec.join(",")}]`;
+    const rows = await client`
+      SELECT id, image_url, aesthetic, tags, key_pieces, post_url, subreddit,
+             1 - (embedding <=> ${vecStr}::vector) AS similarity
+      FROM discover_cards
+      WHERE embedding IS NOT NULL
+        AND id != ${excludeId ?? -1}
+      ORDER BY embedding <=> ${vecStr}::vector
+      LIMIT ${limit}
+    `;
+    return rows;
+  } catch (e) {
+    console.error("[getSimilarDiscoverCards]", e);
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────
+// UTILITY — embed and store a single discover_card
+// Called after card creation to populate the embedding column.
+// ─────────────────────────────────────────────
+export async function embedDiscoverCard(id: number, aesthetic: string, tags: string[], keyPieces: string[]): Promise<void> {
+  if (!openaiClient) return;
+  try {
+    const text = `${aesthetic} ${tags.join(" ")} ${keyPieces.join(" ")}`.trim();
+    const vec = await getEmbedding(text);
+    if (!vec) return;
+    const vecStr = `[${vec.join(",")}]`;
+    await client`UPDATE discover_cards SET embedding = ${vecStr}::vector WHERE id = ${id}`;
+  } catch (e: any) {
+    console.warn("[embedDiscoverCard]", e.message);
+  }
 }
