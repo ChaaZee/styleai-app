@@ -337,7 +337,7 @@ export default function DiscoverPage() {
       <div className="flex flex-col items-center justify-center gap-4 bg-background" style={{ height: "100%", paddingBottom: "64px", boxSizing: "border-box" }}>
         <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin"/>
         <p className="text-sm text-muted-foreground">Loading outfits…</p>
-        <p className="text-xs text-muted-foreground/50">Server may take a moment to wake up</p>
+        <p className="text-xs text-muted-foreground/50">This may take a few seconds</p>
       </div>
     );
   }

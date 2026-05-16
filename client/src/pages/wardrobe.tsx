@@ -129,7 +129,6 @@ export default function WardrobePage() {
   });
 
   const filtered = activeCategory === "All" ? items : items.filter(i => i.category === activeCategory);
-  const estValue = items.length * 80;
 
   return (
     <div className="max-w-4xl mx-auto fade-up">
@@ -143,12 +142,8 @@ export default function WardrobePage() {
             <p className="text-[10px] text-muted-foreground">Items</p>
           </div>
           <div>
-            <p className="text-sm font-bold text-foreground">0</p>
-            <p className="text-[10px] text-muted-foreground">Outfits</p>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-foreground">${estValue.toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground">Est. value</p>
+            <p className="text-sm font-bold text-foreground">{CATEGORIES.filter(c => c !== "All").filter(c => items.some(i => i.category === c)).length}</p>
+            <p className="text-[10px] text-muted-foreground">Categories</p>
           </div>
         </div>
       </div>
@@ -231,7 +226,7 @@ export default function WardrobePage() {
                 {item.brand && <p className="text-[9px] text-white/65 truncate">{item.brand}</p>}
               </div>
               <button
-                onClick={() => deleteMutation.mutate(item.id)}
+                onClick={() => { if (window.confirm(`Remove "${item.name}" from your wardrobe?`)) deleteMutation.mutate(item.id); }}
                 data-testid={`button-delete-${item.id}`}
                 className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-background/90 border border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >

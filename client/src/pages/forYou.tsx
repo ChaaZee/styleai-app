@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import NavBar from "../components/NavBar";
 import OnboardingModal from "../components/OnboardingModal";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -168,8 +167,8 @@ export default function ForYouPage() {
       setItems(prev => [...prev, ...fresh]);
       setOffset(prev => prev + 20);
       setHasMore(data.hasMore);
-    } catch (e) {
-      console.error("[for-you] load error:", e);
+    } catch {
+      // silently fail — user sees no new items
     } finally {
       setLoading(false);
     }
@@ -180,7 +179,7 @@ export default function ForYouPage() {
     if (onboarded === true && items.length === 0) {
       loadMore();
     }
-  }, [onboarded]);
+  }, [onboarded, loadMore]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -209,7 +208,7 @@ export default function ForYouPage() {
         action,
         query: item.title || "",
       }),
-    }).catch(console.error);
+    }).catch(() => {});
   };
 
   // After onboarding completes
@@ -222,9 +221,9 @@ export default function ForYouPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen" style={{ background: "hsl(228 20% 8%)", paddingBottom: 100 }}>
+    <div className="min-h-screen bg-background" style={{ paddingBottom: 100 }}>
       {/* Header */}
-      <div className="sticky top-0 z-10 border-b border-border" style={{ background: "hsl(228 20% 8%)" }}>
+      <div className="sticky top-0 z-10 border-b border-border bg-background">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1
@@ -311,7 +310,7 @@ export default function ForYouPage() {
         />
       )}
 
-      <NavBar />
+
     </div>
   );
 }

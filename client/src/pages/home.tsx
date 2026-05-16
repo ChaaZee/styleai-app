@@ -281,13 +281,13 @@ function getUserId(): string {
   return id;
 }
 
-const CHIPS = ["For You", "Minimal", "Coastal", "Dark Acad.", "Streetwear", "Trending"];
+const CHIPS = ["For You", "Minimal", "Coastal", "Dark Academia", "Streetwear", "Trending"];
 
 // Map chip label → aesthetic value(s) in FEED_ITEMS
 const CHIP_AESTHETIC_MAP: Record<string, string[]> = {
   "Minimal":    ["Minimalist"],
   "Coastal":    ["Coastal"],
-  "Dark Acad.": ["Dark Academia"],
+  "Dark Academia": ["Dark Academia"],
   "Streetwear": ["Streetwear"],
   "Old Money":  ["Old Money"],
   "Y2K":        ["Y2K"],
@@ -506,20 +506,53 @@ export default function HomePage() {
       {/* ── For You Grid (vector-personalized) ── */}
       {activeChip === "For You" && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: "hsl(var(--border))" }}>
-          {/* Not onboarded yet */}
+          {/* Not onboarded yet — show setup CTA + trending teaser */}
           {forYouOnboarded === false && (
-            <div className="col-span-2 md:col-span-3 flex flex-col items-center justify-center py-16 gap-4 bg-background">
-              <p className="text-muted-foreground text-sm" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                Tell us your style to personalize this feed
-              </p>
-              <button
-                onClick={() => setShowOnboarding(true)}
-                className="px-5 py-2.5 rounded-full text-sm font-medium text-white"
-                style={{ background: "#5088B8", fontFamily: "'Jost', sans-serif", letterSpacing: "0.06em" }}
-              >
-                Set up my taste profile
-              </button>
-            </div>
+            <>
+              <div className="col-span-2 md:col-span-3 bg-background px-5 py-4 flex items-center justify-between border-b border-border/40">
+                <p className="text-muted-foreground text-xs" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                  Personalise your feed
+                </p>
+                <button
+                  onClick={() => setShowOnboarding(true)}
+                  className="px-4 py-1.5 rounded-full text-xs font-medium text-white flex-shrink-0"
+                  style={{ background: "#5088B8", fontFamily: "'Jost', sans-serif", letterSpacing: "0.06em" }}
+                >
+                  Set up taste →
+                </button>
+              </div>
+              {/* Teaser: trending items from the feed so new users see content immediately */}
+              {rankedItems.slice(0, 6).map((item: any, idx: number) => {
+                const imageUrl = item.imageUrl || item.image || "";
+                const depopLink = item.url || `https://www.depop.com/search/?q=${encodeURIComponent(item.query || item.label || "")}`;
+                return (
+                  <a
+                    key={item.id || idx}
+                    href={depopLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative bg-background hover:bg-muted/30 transition-colors cursor-pointer block group overflow-hidden"
+                  >
+                    <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">
+                      {item.aesthetic || item.label || ""}
+                    </div>
+                    {imageUrl ? (
+                      <div className="w-full aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                        style={{ backgroundImage: `url('${imageUrl}')` }} />
+                    ) : (
+                      <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center">
+                        <span className="text-muted-foreground text-xs">{item.label || ""}</span>
+                      </div>
+                    )}
+                    {item.label && (
+                      <div className="px-2.5 pb-2.5 pt-1.5 bg-background">
+                        <p className="text-[11px] font-medium text-foreground leading-tight line-clamp-2">{item.label}</p>
+                      </div>
+                    )}
+                  </a>
+                );
+              })}
+            </>
           )}
 
           {/* Loading */}

@@ -65,8 +65,8 @@ function buildImageKeywords(name: string): string {
     if (terms.some(t => n.includes(t))) return `https://images.unsplash.com/${photoId}?w=400&q=80`;
   }
   // Generic fashion keyword fallback — dynamic Unsplash image by clothing keyword
-  const keyword = encodeURIComponent(`${n} fashion outfit clothing`);
-  return `https://source.unsplash.com/featured/400x533/?${keyword}`;
+  // source.unsplash.com is deprecated — use a generic fashion placeholder
+  return `https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400&q=80`;
 }
 
 // ── Depop helpers ───────────────────────────────────────────────────
@@ -2446,7 +2446,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         type: "outfit",
       }));
 
-      const finalProducts = products.length >= 3 ? products : legacyProducts.length >= 3 ? legacyProducts : generateMockResults(analysis.aesthetic);
+      // Use real products only — no mock fallback that would pollute the DB
+      const finalProducts = products.length > 0 ? products : legacyProducts.length > 0 ? legacyProducts : [];
       const imageDataUrl = `data:${mimeType};base64,${imageBase64}`;
 
       // Sync primary style score to Gemini's actual confidence so it reflects reality
@@ -2607,25 +2608,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/discover/:id/similar — similar discover cards by aesthetic+tags vector
+  // GET /api/discover/:id/similar?aesthetic=X&tags=a,b — similar discover cards by embedding
   app.get("/api/discover/:id/similar", async (req, res) => {
     try {
       const id = Number(req.params.id);
       if (!id) return res.status(400).json({ error: "Invalid id" });
-      // Fetch the card's aesthetic + tags
-      const rows = await (storage as any).getDiscoverCardById
-        ? [(await (storage as any).getDiscoverCardById(id))].filter(Boolean)
-        : [];
-      // Fallback: query DB directly
-      const { default: pg } = await import("postgres").catch(() => ({ default: null }));
-      const cardRows = rows.length > 0 ? rows : await (async () => {
-        try {
-          const { client: pgClient } = await import("./storage") as any;
-          // We can't easily import raw client here, so use the storage function
-          return [];
-        } catch { return []; }
-      })();
-      // Best approach: pass aesthetic+tags via query params, or look up the card
       const aestheticParam = req.query.aesthetic as string;
       const tagsParam = req.query.tags as string;
       if (!aestheticParam) {
@@ -2635,7 +2622,6 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const similar = await getSimilarDiscoverCards(aestheticParam, tags, id, 4);
       res.json(similar);
     } catch (err: any) {
-      console.error("[discover-similar]", err);
       res.status(500).json({ error: err.message });
     }
   });

@@ -276,11 +276,12 @@ export default function ResultsPage() {
     );
   }
 
-  const styleBreakdown: StyleBreakdown[] = JSON.parse(scan.styleBreakdown);
-  const occasions: string[] = JSON.parse(scan.occasions);
-  const keyPieces: string[] = JSON.parse(scan.keyPieces);
-  const colorPalette: string[] = JSON.parse(scan.colorPalette);
-  const results: Product[] = JSON.parse(scan.results);
+  // Safe JSON parsing — malformed DB rows return empty arrays instead of crashing
+  const styleBreakdown: StyleBreakdown[] = (() => { try { return JSON.parse(scan.styleBreakdown || "[]"); } catch { return []; } })();
+  const occasions: string[] = (() => { try { return JSON.parse(scan.occasions || "[]"); } catch { return []; } })();
+  const keyPieces: string[] = (() => { try { return JSON.parse(scan.keyPieces || "[]"); } catch { return []; } })();
+  const colorPalette: string[] = (() => { try { return JSON.parse(scan.colorPalette || "[]"); } catch { return []; } })();
+  const results: Product[] = (() => { try { return JSON.parse(scan.results || "[]"); } catch { return []; } })();
 
   // Budget filter
   const budgetFiltered = activeBudget === "Budget"
