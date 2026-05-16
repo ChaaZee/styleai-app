@@ -2575,11 +2575,31 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // GET /api/discover/shop-the-look?aesthetic=X&pieces=piece1,piece2 — real Depop items per piece
   app.get("/api/discover/shop-the-look", async (req, res) => {
     try {
-      const aesthetic = (req.query.aesthetic as string) || "";
+      const rawAesthetic = (req.query.aesthetic as string) || "";
       const piecesRaw = (req.query.pieces as string) || "";
-      if (!aesthetic || !piecesRaw) {
+      if (!rawAesthetic || !piecesRaw) {
         return res.status(400).json({ error: "Missing aesthetic or pieces" });
       }
+      // Normalize Gemini variant labels → cached aesthetic (e.g. "E-Girl / Alt" → "E-Girl")
+      const CACHED_AESTHETICS = ["Boho","Coastal Grandmother","Coquette","Cottagecore","Dark Academia","E-Girl","Grunge","Minimalist","Old Money","Preppy","Skater","Soft Girl","Streetwear","Techwear","Vintage","Y2K"];
+      const AESTHETIC_FALLBACK: Record<string, string> = {
+        "Clean Fit": "Minimalist", "Skatecore": "Skater", "Quiet Luxury": "Old Money",
+        "Classic": "Old Money", "Casual": "Minimalist", "Normcore": "Minimalist",
+        "Business Casual": "Old Money", "Rave": "E-Girl", "Retro-Futurism": "Techwear",
+        "Glam": "Coquette", "Party": "Coquette", "Indie": "Vintage",
+        "Dark Feminine": "Coquette", "Mob Wife": "Old Money", "Biker": "Grunge",
+        "Punk": "Grunge", "Academia": "Dark Academia", "Light Academia": "Cottagecore",
+        "Barbiecore": "Coquette", "Balletcore": "Soft Girl", "Coastal": "Coastal Grandmother",
+        "Beach": "Boho", "Western": "Boho", "Grunge / Punk": "Grunge",
+        "E-Girl / Alt": "E-Girl", "Athleisure": "Streetwear", "Sporty": "Streetwear",
+        "Hip Hop": "Streetwear", "Tomboy": "Skater", "Androgynous": "Minimalist",
+        "Smart Casual": "Minimalist", "Workwear": "Old Money", "Dark Romantic": "Coquette",
+        "Fairycore": "Cottagecore", "Ethereal": "Soft Girl", "Kawaii": "Soft Girl",
+        "Avant Garde": "Techwear",
+      };
+      const aesthetic = CACHED_AESTHETICS.includes(rawAesthetic)
+        ? rawAesthetic
+        : (AESTHETIC_FALLBACK[rawAesthetic] ?? "Minimalist");
       const keyPieces = piecesRaw.split(",").map((p: string) => p.trim()).filter(Boolean);
       const results = await getShopTheLookItems(aesthetic, keyPieces, 3);
       res.json(results);

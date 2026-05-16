@@ -6,7 +6,7 @@ interface DepopItem {
   id: string;
   title: string;
   price?: { priceAmount?: string; currencyCode?: string };
-  preview?: string;
+  image?: string;
   slug?: string;
   brand_name?: string;
   _aesthetic?: string;
@@ -43,9 +43,9 @@ function ForYouCard({
       {/* Image */}
       <a href={depopUrl} target="_blank" rel="noopener noreferrer">
         <div className="aspect-square bg-muted overflow-hidden">
-          {item.preview ? (
+          {item.image ? (
             <img
-              src={item.preview}
+              src={item.image}
               alt={item.title}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
