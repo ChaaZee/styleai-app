@@ -525,8 +525,14 @@ export async function getDepopCacheByAesthetic(aesthetic: string, limit = 50): P
     ORDER BY RANDOM()
     LIMIT ${rowLimit}
   `;
-  // Flatten, shuffle, return limit
-  const all: any[] = rows.flatMap((r: any) => r.listings as any[]);
+  // Flatten, dedup by URL (same item can appear in multiple cache rows), shuffle, return limit
+  const seen = new Set<string>();
+  const all: any[] = rows.flatMap((r: any) => r.listings as any[]).filter((l: any) => {
+    const key = l.url || l.product_link || (l.image ? l.image.split('?')[0] : '');
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   for (let i = all.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [all[i], all[j]] = [all[j], all[i]];

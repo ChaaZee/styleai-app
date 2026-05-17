@@ -97,6 +97,18 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
     ? i.url
     : `https://www.depop.com/search/?q=${encodeURIComponent(searchQ)}`;
 
+  // Reject non-clothing items: trading cards, toys, games, electronics, home goods, etc.
+  const NON_CLOTHING_SIGNALS = [
+    "trading card","pokemon card","yugioh","yu-gi-oh","magic card","sports card",
+    "collectible","funko","action figure","figurine","toy",
+    "video game","console","phone case","electronics",
+    "poster","print","sticker","art print","wall art",
+    "candle","mug","cup","pillow","blanket",
+    "book","magazine","vinyl record","cd "," dvd",
+  ];
+  const titleLower = title.toLowerCase();
+  if (NON_CLOTHING_SIGNALS.some(s => titleLower.includes(s))) return null;
+
   return {
     id: idx,
     title,
@@ -373,7 +385,7 @@ async function fetchDepopListings(
       );
       if (!dataRes.ok) return [];
       const items: any[] = await dataRes.json();
-      listings = items.map((i, idx) => normaliseDepopItem(i, idx, query)).filter((l: any) => l.image);
+      listings = items.map((i, idx) => normaliseDepopItem(i, idx, query)).filter((l: any) => l && l.image);
     }
 
     // 3. Store in cache
@@ -1404,7 +1416,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const getAesthetic = (term: string): string => {
       const lower = term.toLowerCase();
       for (const [kw, aesthetic] of Object.entries(AESTHETIC_MAP)) {
-        if (lower.includes(kw)) return aesthetic;
+        // Use word-boundary matching so "card" doesn't match inside "cardigan"
+        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(?<![a-z])${escaped}(?![a-z])`, 'i');
+        if (regex.test(lower)) return aesthetic;
       }
       return "Streetwear"; // default fallback
     };
@@ -2912,7 +2927,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const results = await Promise.all(
         targetAesthetics.map(a => getDepopCacheByAesthetic(a, 50))
       );
-      const listings = results.flat();
+      // Cross-aesthetic dedup — same item can legitimately exist under multiple aesthetics
+      const seenUrls = new Set<string>();
+      const listings = results.flat().filter((l: any) => {
+        const key = l.url || l.product_link || (l.image ? l.image.split('?')[0] : '');
+        if (!key || seenUrls.has(key)) return false;
+        seenUrls.add(key);
+        return true;
+      });
       // If nothing cached yet, fire background seed for all default queries
       if (!listings.length) {
         // Run in batches of 8 to avoid overwhelming Apify free tier
@@ -2967,7 +2989,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         );
         if (!dataRes.ok) return null;
         const items: any[] = await dataRes.json();
-        const listings = items.map((item, idx) => normaliseDepopItem(item, idx, run.query)).filter(l => l.image);
+        const listings = items.map((item, idx) => normaliseDepopItem(item, idx, run.query)).filter(l => l && l.image);
         if (listings.length) {
           await setDepopCache(run.query, listings, aesthetic).catch(() => {});
         }
@@ -3017,7 +3039,6 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       // Compound/variant labels Gemini sometimes returns
       "Grunge / Punk":    "Grunge",
       "E-Girl / Alt":     "E-Girl",
-      "Skatecore":        "Skater",
       // Additional taxonomy aesthetics
       "Athleisure":       "Streetwear",
       "Sporty":           "Streetwear",
