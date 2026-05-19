@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -2527,6 +2527,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         styleBreakdown[0].score = analysis.confidence;
       }
 
+      // Remap female-only aesthetics for male users before saving the scan
+      const analyzeUserId = req.body?.userId as string | undefined;
+      if (analyzeUserId) {
+        const userProfile = await getUserProfile(analyzeUserId).catch(() => null);
+        const userGender = (userProfile as any)?.gender || "both";
+        analysis.aesthetic = remapAestheticForGender(analysis.aesthetic, userGender);
+      }
+
       const deviceId = req.headers["x-device-id"] as string | undefined;
 
       const scan = await storage.createScan({
@@ -3000,7 +3008,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
     // For home feed, use top 3 user aesthetics or first 3 defaults — 3 × 50 = 150 listings max
     const topDefaults = DEFAULT_FEED_AESTHETICS.slice(0, 3);
-    const targetAesthetics = aesthetics.length ? aesthetics.slice(0, 3) : topDefaults;
+    // Filter out female-only aesthetics for male users before querying cache
+    const filterAesthetics = (list: string[]) =>
+      gender === "male" ? list.filter(a => !FEMALE_ONLY_AESTHETICS.has(a)) : list;
+    const targetAesthetics = filterAesthetics(
+      aesthetics.length ? aesthetics.slice(0, 3) : topDefaults
+    );
     try {
       // Pull more per aesthetic when gender filtering to compensate for filtered items
       const perAesthetic = gender === "both" ? 50 : 100;

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { createPortal } from "react-dom";
 
 // ── Aesthetic tiles config ────────────────────────────────────────────────────
 // Each tile has a label, a short vibe description, and a representative emoji / keyword
@@ -29,10 +28,21 @@ interface OnboardingModalProps {
   onClose: () => void;
 }
 
+// Aesthetics that are female-only — hidden from male users
+const FEMALE_ONLY_AESTHETICS = new Set(["Coquette", "Soft Girl", "Cottagecore", "Coastal Grandmother", "E-Girl"]);
+
 export default function OnboardingModal({ userId, onComplete, onClose }: OnboardingModalProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Determine gender from localStorage to filter aesthetic tiles
+  const userGender = (() => {
+    try { return (JSON.parse(localStorage.getItem("stitch_profile") || "{}") as any).gender || "both"; } catch { return "both"; }
+  })();
+  const visibleAesthetics = userGender === "male"
+    ? AESTHETICS.filter(a => !FEMALE_ONLY_AESTHETICS.has(a.label))
+    : AESTHETICS;
 
   const toggle = (label: string) => {
     setSelected(prev => {
@@ -115,7 +125,7 @@ export default function OnboardingModal({ userId, onComplete, onClose }: Onboard
         {/* Tiles — scrollable */}
         <div className="overflow-y-auto px-4 py-4" style={{ maxHeight: "calc(90vh - 200px)" }}>
           <div className="grid grid-cols-2 gap-2.5">
-            {AESTHETICS.map(({ label, vibe, icon }) => {
+            {visibleAesthetics.map(({ label, vibe, icon }) => {
               const active = selected.has(label);
               return (
                 <button

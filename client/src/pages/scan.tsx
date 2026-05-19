@@ -75,6 +75,9 @@ export default function ScanPage() {
       const resized = await resizeImage(selectedFile);
       const formData = new FormData();
       formData.append("image", resized, "photo.jpg");
+      // Send userId so server can look up gender and remap aesthetics accordingly
+      const userId = localStorage.getItem("stitch_user_id") || "";
+      if (userId) formData.append("userId", userId);
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "x-device-id": getDeviceId() },

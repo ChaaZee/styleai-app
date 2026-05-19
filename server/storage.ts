@@ -736,6 +736,32 @@ export async function getLikedItems(userId: string): Promise<any[]> {
   return Array.isArray(items) ? items : [];
 }
 
+// ── Gender-gated aesthetics ──────────────────────────────────────────────────
+// Aesthetics that should never appear for male users
+export const FEMALE_ONLY_AESTHETICS = new Set([
+  "Coquette", "Soft Girl", "Cottagecore", "Coastal Grandmother", "E-Girl",
+  "Clean Girl", "Balletcore", "Romantic", "Fairycore",
+]);
+// Remap: if Gemini returns a female-only aesthetic for a male user, use this instead
+export const MALE_AESTHETIC_REMAP: Record<string, string> = {
+  "Clean Girl":          "Minimalist",
+  "Coquette":            "Old Money",
+  "Soft Girl":           "Preppy",
+  "Soft Girl / Kawaii":  "Preppy",
+  "Cottagecore":         "Boho",
+  "E-Girl":              "Grunge",
+  "E-Girl / Alt":        "Grunge",
+  "Coastal Grandmother": "Minimalist",
+  "Balletcore":          "Minimalist",
+  "Romantic":            "Vintage",
+  "Fairycore":           "Boho",
+};
+
+export function remapAestheticForGender(aesthetic: string, gender: string): string {
+  if (gender !== "male") return aesthetic;
+  return MALE_AESTHETIC_REMAP[aesthetic] ?? aesthetic;
+}
+
 // Gender signals used to filter listing titles
 const FEMALE_TITLE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear|dress|skirt|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit)\b/i;
 const MALE_TITLE_SIGNALS   = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|oxford shirt|blazer|loafer|brogues|suit jacket)\b/i;
@@ -787,10 +813,12 @@ export async function getForYouRecommendations(
     OFFSET ${offset}
   `;
 
-  // Flatten + dedupe + gender filter
+  // Flatten + dedupe + gender filter + aesthetic block
   const all: any[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
+    // Skip entire cache rows from aesthetics blocked for this gender
+    if (gender === "male" && FEMALE_ONLY_AESTHETICS.has(row.aesthetic)) continue;
     const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
     for (const item of listings) {
       const key = item.url || item.id;
@@ -798,7 +826,7 @@ export async function getForYouRecommendations(
       seen.add(key);
       if (!genderPassesFilter(item.title || "", gender)) continue;
       all.push({ ...item, _aesthetic: row.aesthetic });
-      if (all.length >= limit + 1) break; // have enough
+      if (all.length >= limit + 1) break;
     }
     if (all.length >= limit + 1) break;
   }
