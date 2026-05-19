@@ -1,5 +1,5 @@
 import { useParams, useLocation, useSearch } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, ExternalLink, Loader2 } from "lucide-react";
 import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 import { useState, useEffect, useRef } from "react";
@@ -182,6 +182,7 @@ export default function ResultsPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const search = useSearch();
+  const queryClient = useQueryClient();
   const backTo = new URLSearchParams(search).get("from") === "history" ? "/history" : "/";
   const [activeRetailer, setActiveRetailer] = useState("All");
   const [activeBudget, setActiveBudget] = useState("All");
@@ -202,6 +203,29 @@ export default function ResultsPage() {
       return res.json();
     },
   });
+
+  // Pre-populate likedPieces from server so hearts persist when revisiting via history
+  useEffect(() => {
+    if (!scan) return;
+    const userId = localStorage.getItem("stitch_user_id");
+    if (!userId) return;
+    fetch(`/api/liked-items/${userId}`)
+      .then(r => r.ok ? r.json() : { items: [] })
+      .then(({ items }: { items: { id?: string }[] }) => {
+        const prefix = `piece_${scan.id}_`;
+        const restored: Record<string, boolean> = {};
+        items.forEach(item => {
+          if (item.id && item.id.startsWith(prefix)) {
+            const pieceName = item.id.slice(prefix.length);
+            restored[pieceName] = true;
+          }
+        });
+        if (Object.keys(restored).length > 0) {
+          setLikedPieces(restored);
+        }
+      })
+      .catch(() => {});
+  }, [scan?.id]);
 
   // Passive signal: viewed for > 2s → mild boost to this outfit's aesthetic
   const vectorFiredRef = useRef(false);
@@ -429,7 +453,12 @@ export default function ResultsPage() {
                             _aesthetic: scan.aesthetic,
                           },
                         }),
-                      }).catch(() => {});
+                      })
+                        .then(() => {
+                          // Bust the history liked-items cache so next visit shows fresh data
+                          queryClient.invalidateQueries({ queryKey: ["/api/liked-items", userId] });
+                        })
+                        .catch(() => {});
                     }
                   } else {
                     onUnlike(scan.aesthetic);

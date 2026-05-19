@@ -2138,28 +2138,6 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/debug-append — diagnostic endpoint to test appendLikedItem and surface errors
-  app.post("/api/debug-append", async (req, res) => {
-    try {
-      const { userId } = req.body as { userId: string };
-      if (!userId) return res.status(400).json({ error: "userId required" });
-      await appendLikedItem(userId, {
-        id: "debug-probe",
-        title: "Debug Probe Item",
-        image: "",
-        url: "https://www.depop.com/products/debug-probe",
-        price: 0,
-        brand: "",
-        _aesthetic: "",
-        likedAt: new Date().toISOString(),
-      });
-      const items = await getLikedItems(userId);
-      res.json({ success: true, itemCount: items.length, items });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message, stack: e.stack });
-    }
-  });
-
   // GET /api/liked-items/:userId — returns all liked/saved Depop items for history tab
   app.get("/api/liked-items/:userId", async (req, res) => {
     try {
