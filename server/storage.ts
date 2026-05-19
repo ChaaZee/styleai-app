@@ -727,20 +727,22 @@ export async function appendLikedItem(userId: string, item: {
   const deduped = normalized.filter((el: any) => el?.url !== dedupKey && el?.id !== dedupKey);
   // Prepend new item (newest first)
   const newItems = [item, ...deduped];
-  await client`UPDATE user_profiles SET liked_items = ${client.json(newItems)} WHERE user_id = ${userId}`;
+  // Use sql.typed(value, 114) — JSON type OID — instead of sql.json() (JSONB OID 3802).
+  // On some Render/Node environments the JSONB serializer for OID 3802 is not registered,
+  // causing a "Received an instance of Array" TypeError. OID 114 (json) always has its
+  // serializer registered (JSON.stringify) and postgres accepts json in jsonb columns.
+  await client`UPDATE user_profiles SET liked_items = ${client.typed(newItems, 114)} WHERE user_id = ${userId}`;
 }
 
 /** Remove a single liked item by its id or url dedup key */
 export async function removeLikedItem(userId: string, itemKey: string) {
-  await client`
-    UPDATE user_profiles
-    SET liked_items = COALESCE(
-      (SELECT jsonb_agg(el) FROM jsonb_array_elements(liked_items) AS el
-       WHERE el->>'url' != ${itemKey} AND el->>'id' != ${itemKey}),
-      '[]'::jsonb
-    )
-    WHERE user_id = ${userId}
-  `;
+  // Two-step approach matching appendLikedItem — avoids the OID 3802 serializer issue.
+  const rows = await client`SELECT liked_items FROM user_profiles WHERE user_id = ${userId}`;
+  const existing: any[] = Array.isArray(rows[0]?.liked_items) ? rows[0].liked_items : [];
+  const newItems = existing
+    .map((el: any) => (typeof el === "string" ? JSON.parse(el) : el))
+    .filter((el: any) => el?.url !== itemKey && el?.id !== itemKey);
+  await client`UPDATE user_profiles SET liked_items = ${client.typed(newItems, 114)} WHERE user_id = ${userId}`;
 }
 
 /** Fetch all liked items for a user, newest first */
