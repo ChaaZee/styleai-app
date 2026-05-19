@@ -2058,7 +2058,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           brand: fullItem?.brand || fullItem?.brand_name || "",
           _aesthetic: fullItem?._aesthetic || "",
           likedAt: new Date().toISOString(),
-        }).catch((e: any) => console.error("[appendLikedItem]", e.message));
+        }).catch((e: any) => { console.error("[appendLikedItem]", e.message, e.stack); });
       }
 
       // Get embedding for the interacted item (via its query string)
@@ -2135,6 +2135,28 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       res.json({ exists: true, onboarded: profile.onboarded, interactionCount: profile.interaction_count });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/debug-append — diagnostic endpoint to test appendLikedItem and surface errors
+  app.post("/api/debug-append", async (req, res) => {
+    try {
+      const { userId } = req.body as { userId: string };
+      if (!userId) return res.status(400).json({ error: "userId required" });
+      await appendLikedItem(userId, {
+        id: "debug-probe",
+        title: "Debug Probe Item",
+        image: "",
+        url: "https://www.depop.com/products/debug-probe",
+        price: 0,
+        brand: "",
+        _aesthetic: "",
+        likedAt: new Date().toISOString(),
+      });
+      const items = await getLikedItems(userId);
+      res.json({ success: true, itemCount: items.length, items });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message, stack: e.stack });
     }
   });
 
