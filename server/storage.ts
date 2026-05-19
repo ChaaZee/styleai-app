@@ -733,7 +733,21 @@ export async function appendLikedItem(userId: string, item: {
   const newItems = [item, ...deduped];
   const jsonLiteral = JSON.stringify(newItems).replace(/'/g, "''");
   const userIdSafe  = userId.replace(/'/g, "''");
-  await client.unsafe(`UPDATE user_profiles SET liked_items = '${jsonLiteral}'::jsonb WHERE user_id = '${userIdSafe}'`);
+
+  if (rows.length > 0) {
+    // Row exists — just update liked_items
+    await client.unsafe(`UPDATE user_profiles SET liked_items = '${jsonLiteral}'::jsonb WHERE user_id = '${userIdSafe}'`);
+  } else {
+    // Row doesn't exist yet (first interaction fires before upsertUserProfile creates it).
+    // Insert a minimal stub row so the liked item isn't lost.
+    // upsertUserProfile runs immediately after and will fill in taste_vector properly.
+    const zeroVec = `[${new Array(1536).fill('0').join(',')}]`;
+    await client.unsafe(`
+      INSERT INTO user_profiles (user_id, taste_vector, interaction_count, liked_ids, skipped_ids, onboarded, liked_items, gender, created_at, updated_at)
+      VALUES ('${userIdSafe}', '${zeroVec}'::vector, 0, ARRAY[]::text[], ARRAY[]::text[], false, '${jsonLiteral}'::jsonb, 'both', NOW(), NOW())
+      ON CONFLICT (user_id) DO UPDATE SET liked_items = '${jsonLiteral}'::jsonb
+    `);
+  }
 }
 
 /** Remove a single liked item by its id or url dedup key */
