@@ -698,6 +698,39 @@ export async function upsertUserProfile(
   }
 }
 
+/** Append a full liked item object to the liked_items JSONB array */
+export async function appendLikedItem(userId: string, item: {
+  id: string;
+  title: string;
+  image?: string;
+  url?: string;
+  price?: number;
+  brand?: string;
+  _aesthetic?: string;
+  likedAt: string;
+}) {
+  // Prevent duplicates — remove existing entry with same id then prepend new one
+  await client`
+    UPDATE user_profiles
+    SET liked_items = (
+      jsonb_build_array(${JSON.stringify(item)}::jsonb) ||
+      (SELECT jsonb_agg(el) FROM jsonb_array_elements(liked_items) AS el
+       WHERE el->>'id' != ${item.id})
+    )
+    WHERE user_id = ${userId}
+  `;
+}
+
+/** Fetch all liked items for a user, newest first */
+export async function getLikedItems(userId: string): Promise<any[]> {
+  const rows = await client`
+    SELECT liked_items FROM user_profiles WHERE user_id = ${userId}
+  `;
+  if (!rows.length) return [];
+  const items = rows[0].liked_items;
+  return Array.isArray(items) ? items : [];
+}
+
 /**
  * Get personalized For You recommendations for a user.
  * Finds depop_cache items whose embeddings are closest to the user's taste vector.

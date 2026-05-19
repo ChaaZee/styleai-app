@@ -329,7 +329,13 @@ export default function ForYouPage() {
     fetch("/api/interact", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, itemId: item.id, action, query: item.title || "" }),
+      body: JSON.stringify({
+        userId,
+        itemId: item.id,
+        action,
+        query: item.title || "",
+        item, // full item for liked_items storage
+      }),
     }).catch(() => {});
   }, [userId]);
 

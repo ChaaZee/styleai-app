@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -2038,6 +2038,23 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         action === "skip" ? itemId : undefined
       );
 
+      // Store full item details for liked/saved items so history can display them
+      if ((action === "like" || action === "save") && req.body.item) {
+        const fullItem = req.body.item as any;
+        await appendLikedItem(userId, {
+          id: itemId,
+          title: fullItem.title || query,
+          image: fullItem.image || "",
+          url: fullItem.url || "",
+          price: typeof fullItem.price === "object"
+            ? parseFloat(fullItem.price?.priceAmount || "0")
+            : parseFloat(String(fullItem.price || 0)),
+          brand: fullItem.brand || fullItem.brand_name || "",
+          _aesthetic: fullItem._aesthetic || "",
+          likedAt: new Date().toISOString(),
+        }).catch(() => {}); // non-blocking, don't fail the interaction
+      }
+
       res.json({ success: true, updated: true, action, interactionCount: (profile?.interaction_count || 0) + Math.abs(weight) });
     } catch (e: any) {
       console.error("[interact]", e);
@@ -2071,6 +2088,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const profile = await getUserProfile(req.params.userId);
       if (!profile) return res.json({ exists: false, onboarded: false });
       res.json({ exists: true, onboarded: profile.onboarded, interactionCount: profile.interaction_count });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/liked-items/:userId — returns all liked/saved Depop items for history tab
+  app.get("/api/liked-items/:userId", async (req, res) => {
+    try {
+      const items = await getLikedItems(req.params.userId);
+      res.json({ items });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
