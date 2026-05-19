@@ -2971,26 +2971,51 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   ];
 
   // GET /api/depop-feed?aesthetics=<json array> — return cached Depop cards for home feed
+  // Gender filter for home feed listings — mirrors the same logic in storage.ts
+  const FEED_FEMALE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear|dress|skirt|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit)\b/i;
+  const FEED_MALE_SIGNALS   = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|blazer|loafer|brogues|suit jacket)\b/i;
+  function feedGenderOk(title: string, gender: string): boolean {
+    if (!gender || gender === "both") return true;
+    const hasFem  = FEED_FEMALE_SIGNALS.test(title);
+    const hasMasc = FEED_MALE_SIGNALS.test(title);
+    const neutral = !hasFem && !hasMasc;
+    if (gender === "male")   return neutral || (hasMasc && !hasFem);
+    if (gender === "female") return neutral || (hasFem && !hasMasc);
+    return true;
+  }
+
   app.get("/api/depop-feed", async (req, res) => {
-    const { aesthetics: aestheticsRaw = "[]" } = req.query as Record<string, string>;
+    const { aesthetics: aestheticsRaw = "[]", userId = "", gender: genderParam = "" } = req.query as Record<string, string>;
     let aesthetics: string[] = [];
     try { aesthetics = JSON.parse(aestheticsRaw); } catch { aesthetics = []; }
+
+    // Resolve gender: prefer server-stored profile (authoritative) over param
+    let gender = genderParam || "both";
+    if (userId) {
+      try {
+        const profile = await getUserProfile(userId);
+        if (profile && (profile as any).gender) gender = (profile as any).gender;
+      } catch {}
+    }
+
     // For home feed, use top 3 user aesthetics or first 3 defaults — 3 × 50 = 150 listings max
-    const topDefaults = DEFAULT_FEED_AESTHETICS.slice(0, 3); // Streetwear, Minimalist, Y2K
+    const topDefaults = DEFAULT_FEED_AESTHETICS.slice(0, 3);
     const targetAesthetics = aesthetics.length ? aesthetics.slice(0, 3) : topDefaults;
     try {
-      // Pull up to 50 listings per aesthetic (150 total — enough for 135-card grid)
+      // Pull more per aesthetic when gender filtering to compensate for filtered items
+      const perAesthetic = gender === "both" ? 50 : 100;
       const results = await Promise.all(
-        targetAesthetics.map(a => getDepopCacheByAesthetic(a, 50))
+        targetAesthetics.map(a => getDepopCacheByAesthetic(a, perAesthetic))
       );
-      // Cross-aesthetic dedup — same item can legitimately exist under multiple aesthetics
+      // Cross-aesthetic dedup + gender filter
       const seenUrls = new Set<string>();
       const listings = results.flat().filter((l: any) => {
         const key = l.url || l.product_link || (l.image ? l.image.split('?')[0] : '');
         if (!key || seenUrls.has(key)) return false;
+        if (!feedGenderOk(l.title || "", gender)) return false;
         seenUrls.add(key);
         return true;
-      });
+      }).slice(0, 150); // cap at 150
       // If nothing cached yet, fire background seed for all default queries
       if (!listings.length) {
         // Run in batches of 8 to avoid overwhelming Apify free tier

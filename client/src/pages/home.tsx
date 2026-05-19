@@ -336,13 +336,15 @@ export default function HomePage() {
   }, [rerank]);
 
   // Fetch cached Depop cards for home feed
-  // Passes top aesthetics if available; server falls back to defaults for new users
+  // Passes top aesthetics, userId (for server-side gender lookup), and gender fallback
   useEffect(() => {
     const tops = getTopAesthetics(3);
-    // Always call — server handles empty aesthetics with defaults
-    const url = tops.length
-      ? `/api/depop-feed?aesthetics=${encodeURIComponent(JSON.stringify(tops))}`
-      : `/api/depop-feed`;
+    const genderPref = getGenderPref();
+    const params = new URLSearchParams();
+    if (tops.length) params.set("aesthetics", JSON.stringify(tops));
+    params.set("userId", userId);
+    params.set("gender", genderPref);
+    const url = `/api/depop-feed?${params.toString()}`;
 
     let retryTimer: ReturnType<typeof setTimeout>;
 
@@ -381,12 +383,21 @@ export default function HomePage() {
   // ── For You: check onboarding + load personalized cards ─────────────────
   const userId = getUserId();
   useEffect(() => {
-    // Check if user is onboarded
     fetch(`/api/user-profile/${userId}`)
       .then(r => r.json())
       .then(data => {
         setForYouOnboarded(data.onboarded ?? false);
         if (data.onboarded) {
+          // Sync gender to server so both home + fits feeds filter correctly
+          try {
+            const profile = JSON.parse(localStorage.getItem("stitch_profile") || "{}");
+            const gender: string = (profile as any).gender || "both";
+            fetch(`/api/user-gender/${userId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ gender }),
+            }).catch(() => {});
+          } catch {}
           // Load personalized cards
           setForYouLoading(true);
           return fetch(`/api/for-you/${userId}?offset=0`)
