@@ -2621,6 +2621,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     res.json(scan);
   });
 
+  // Delete a scan
+  app.delete("/api/scans/:id", async (req, res) => {
+    try {
+      await storage.deleteScan(Number(req.params.id));
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Get wardrobe
   app.get("/api/wardrobe", async (req, res) => {
     const items = await storage.getWardrobeItems();

@@ -33,6 +33,24 @@ export default function HistoryPage() {
   const userId = getUserId();
   const queryClient = useQueryClient();
 
+  const [deletingScanIds, setDeletingScanIds] = useState<Set<number>>(new Set());
+
+  const handleDeleteScan = async (scanId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // don't navigate to results
+    setDeletingScanIds(prev => new Set([...prev, scanId]));
+    // Optimistic removal
+    queryClient.setQueryData(["/api/scans", deviceId], (old: Scan[] | undefined) =>
+      (old || []).filter(s => s.id !== scanId)
+    );
+    try {
+      await fetch(`/api/scans/${scanId}`, { method: "DELETE" });
+    } catch {
+      queryClient.invalidateQueries({ queryKey: ["/api/scans", deviceId] });
+    } finally {
+      setDeletingScanIds(prev => { const n = new Set(prev); n.delete(scanId); return n; });
+    }
+  };
+
   const handleDelete = async (itemKey: string) => {
     // Optimistic: remove from cache immediately
     setDeletingKeys(prev => new Set([...prev, itemKey]));
@@ -158,42 +176,58 @@ export default function HistoryPage() {
                 const breakdown: { label: string; score: number }[] = (() => {
                   try { return JSON.parse(scan.styleBreakdown); } catch { return []; }
                 })();
+                const isDeleting = deletingScanIds.has(scan.id);
                 return (
                   <div
                     key={scan.id}
                     data-testid={`card-scan-${scan.id}`}
                     style={{ animationDelay: `${i * 40}ms` }}
-                    className="rounded-xl border border-border bg-card overflow-hidden fade-up"
+                    className={`rounded-xl border border-border bg-card overflow-hidden fade-up transition-opacity ${isDeleting ? "opacity-40 pointer-events-none" : ""}`}
                   >
-                    <button
-                      onClick={() => setLocation(`/results/${scan.id}`)}
-                      className="w-full p-3 flex items-center gap-3 hover:bg-muted/20 transition-all text-left group"
-                    >
-                      <div
-                        className="w-16 h-16 rounded-xl bg-cover bg-center border border-border flex-shrink-0"
-                        style={{ backgroundImage: `url('${scan.imageData}')` }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground text-sm truncate mb-1">{scan.aesthetic}</p>
-                        {breakdown[0] && (
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <div className="h-1 w-20 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full bg-primary rounded-full" style={{ width: `${breakdown[0].score}%` }} />
+                    <div className="flex items-center group">
+                      {/* Main tap area — navigate to results */}
+                      <button
+                        onClick={() => setLocation(`/results/${scan.id}`)}
+                        className="flex-1 p-3 flex items-center gap-3 hover:bg-muted/20 transition-all text-left"
+                      >
+                        <div
+                          className="w-16 h-16 rounded-xl bg-cover bg-center border border-border flex-shrink-0"
+                          style={{ backgroundImage: `url('${scan.imageData}')` }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground text-sm truncate mb-1">{scan.aesthetic}</p>
+                          {breakdown[0] && (
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <div className="h-1 w-20 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-primary rounded-full" style={{ width: `${breakdown[0].score}%` }} />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">{breakdown[0].score}%</span>
                             </div>
-                            <span className="text-[10px] text-muted-foreground">{breakdown[0].score}%</span>
+                          )}
+                          <div className="flex items-center gap-2">
+                            {palette.slice(0, 4).map((hex, j) => (
+                              <div key={j} className="w-2.5 h-2.5 rounded-full border border-border/60" style={{ backgroundColor: hex }} />
+                            ))}
+                            <span className="text-[10px] text-muted-foreground">{formatDate(scan.createdAt)}</span>
                           </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          {palette.slice(0, 4).map((hex, j) => (
-                            <div key={j} className="w-2.5 h-2.5 rounded-full border border-border/60" style={{ backgroundColor: hex }} />
-                          ))}
-                          <span className="text-[10px] text-muted-foreground">{formatDate(scan.createdAt)}</span>
                         </div>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <ChevronRight size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.75} />
-                      </div>
-                    </button>
+                        <ChevronRight size={14} className="text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" strokeWidth={1.75} />
+                      </button>
+
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => handleDeleteScan(scan.id, e)}
+                        className="px-3 py-5 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors border-l border-border"
+                        title="Delete scan"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                          <path d="M10 11v6M14 11v6"/>
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 );
               })}

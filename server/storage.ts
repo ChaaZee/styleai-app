@@ -147,6 +147,7 @@ export interface IStorage {
   createScan(scan: InsertScan): Promise<Scan>;
   getScans(deviceId?: string): Promise<Scan[]>;
   getScan(id: number): Promise<Scan | undefined>;
+  deleteScan(id: number): Promise<void>;
   createWardrobeItem(item: InsertWardrobeItem): Promise<WardrobeItem>;
   getWardrobeItems(): Promise<WardrobeItem[]>;
   deleteWardrobeItem(id: number): Promise<void>;
@@ -569,6 +570,9 @@ export const storage: IStorage = {
   async getScan(id) {
     const [row] = await db.select().from(scans).where(eq(scans.id, id));
     return row;
+  },
+  async deleteScan(id) {
+    await db.delete(scans).where(eq(scans.id, id));
   },
   async createWardrobeItem(item) {
     const [row] = await db.insert(wardrobeItems).values(item).returning();
