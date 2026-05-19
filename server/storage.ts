@@ -715,20 +715,19 @@ export async function appendLikedItem(userId: string, item: {
 }) {
   // Use url as stable dedup key (id is just a sequential index, not unique across sessions)
   const dedupKey = item.url || item.id;
-  // Use client.json() to pass a proper JSONB object — avoids the double-serialization bug
-  // where JSON.stringify + ::jsonb stores a string scalar instead of a JSONB object
-  await client`
-    UPDATE user_profiles
-    SET liked_items = (
-      jsonb_build_array(${client.json(item)}) ||
-      COALESCE(
-        (SELECT jsonb_agg(el) FROM jsonb_array_elements(liked_items) AS el
-         WHERE el->>'url' != ${dedupKey} AND el->>'id' != ${dedupKey}),
-        '[]'::jsonb
-      )
-    )
-    WHERE user_id = ${userId}
-  `;
+
+  // Two-step approach: fetch → merge in JS → store as full array via client.json().
+  // This avoids all in-SQL JSONB parameter-type issues (JSON.stringify + ::jsonb stores
+  // string scalars; single-step SQL updates have environment-specific type-binding issues).
+  const rows = await client`SELECT liked_items FROM user_profiles WHERE user_id = ${userId}`;
+  const existing: any[] = Array.isArray(rows[0]?.liked_items) ? rows[0].liked_items : [];
+  // Normalize legacy string-scalar entries
+  const normalized = existing.map((el: any) => (typeof el === "string" ? JSON.parse(el) : el));
+  // Deduplicate by url or id
+  const deduped = normalized.filter((el: any) => el?.url !== dedupKey && el?.id !== dedupKey);
+  // Prepend new item (newest first)
+  const newItems = [item, ...deduped];
+  await client`UPDATE user_profiles SET liked_items = ${client.json(newItems)} WHERE user_id = ${userId}`;
 }
 
 /** Remove a single liked item by its id or url dedup key */
