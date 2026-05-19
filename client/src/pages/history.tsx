@@ -1,66 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
-import { useState } from "react";
 import type { Scan } from "@shared/schema";
 import { getDeviceId } from "../lib/deviceId";
 
-interface SimilarCard {
-  id: number;
-  image_url: string;
-  aesthetic: string;
-  tags: string;
-  post_url?: string;
-  similarity?: number;
-}
-
-function SimilarOutfits({ scanId, aesthetic, tags }: { scanId: number; aesthetic: string; tags: string[] }) {
-  const { data: cards, isLoading } = useQuery<SimilarCard[]>({
-    queryKey: ["/api/discover/similar", scanId],
-    queryFn: async () => {
-      const tagsStr = encodeURIComponent(tags.slice(0, 5).join(","));
-      const res = await fetch(
-        `/api/discover/${scanId}/similar?aesthetic=${encodeURIComponent(aesthetic)}&tags=${tagsStr}`
-      );
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-    staleTime: 10 * 60 * 1000,
-    enabled: !!aesthetic,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex gap-2 mt-2">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="w-16 h-16 rounded-xl shimmer flex-shrink-0" />
-        ))}
-      </div>
-    );
-  }
-
-  if (!cards || cards.length === 0) return null;
-
-  return (
-    <div className="mt-2">
-      <p className="text-[9px] text-muted-foreground mb-1.5 font-medium uppercase tracking-wider">Similar outfits</p>
-      <div className="flex gap-1.5">
-        {cards.slice(0, 4).map(card => (
-          <a key={card.id} href={card.post_url || "#"} target="_blank" rel="noopener noreferrer"
-            className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 border border-border hover:border-primary/40 transition-colors group">
-            <img src={card.image_url} alt={card.aesthetic}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function HistoryPage() {
   const [, setLocation] = useLocation();
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const deviceId = getDeviceId();
   const { data: scans = [], isLoading } = useQuery<Scan[]>({
     queryKey: ["/api/scans", deviceId],
@@ -133,8 +78,6 @@ export default function HistoryPage() {
             const tags: string[] = (() => {
               try { return JSON.parse(scan.occasions || "[]"); } catch { return []; }
             })();
-            const isExpanded = expandedId === scan.id;
-
             return (
               <div
                 key={scan.id}
@@ -174,25 +117,8 @@ export default function HistoryPage() {
 
                   <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                     <ChevronRight size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.75} />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setExpandedId(isExpanded ? null : scan.id); }}
-                      className="text-[9px] text-muted-foreground hover:text-primary transition-colors px-1.5 py-0.5 rounded-full border border-border/60"
-                    >
-                      {isExpanded ? "Hide" : "Similar"}
-                    </button>
                   </div>
                 </button>
-
-                {/* Similar outfits — expanded */}
-                {isExpanded && (
-                  <div className="px-3 pb-3 border-t border-border/40">
-                    <SimilarOutfits
-                      scanId={scan.id}
-                      aesthetic={scan.aesthetic}
-                      tags={tags}
-                    />
-                  </div>
-                )}
               </div>
             );
           })}
