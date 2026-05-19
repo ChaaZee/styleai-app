@@ -1962,19 +1962,42 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // Body: { userId: string, aesthetics: string[] }
   app.post("/api/onboarding", async (req, res) => {
     try {
-      const { userId, aesthetics } = req.body as { userId: string; aesthetics: string[] };
+      const { userId, aesthetics, gender } = req.body as { userId: string; aesthetics: string[]; gender?: string };
       if (!userId || !aesthetics?.length) {
         return res.status(400).json({ error: "userId and aesthetics required" });
       }
-      // Average the embeddings of all cache rows matching picked aesthetics
       const tasteVector = await getAverageEmbeddingForAesthetics(aesthetics);
       if (!tasteVector) {
         return res.status(500).json({ error: "Could not build taste vector" });
       }
       await upsertUserProfile(userId, tasteVector, 0, undefined, undefined, true);
+      // Save gender preference if provided
+      if (gender && ["male", "female", "both"].includes(gender)) {
+        const { default: pg } = await import("postgres");
+        const c = pg(process.env.DATABASE_URL!, { ssl: "require" });
+        await c`UPDATE user_profiles SET gender = ${gender} WHERE user_id = ${userId}`;
+        await c.end();
+      }
       res.json({ success: true, aesthetics, dimensions: tasteVector.length });
     } catch (e: any) {
       console.error("[onboarding]", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // PATCH /api/user-gender/:userId — update gender preference without re-running onboarding
+  app.patch("/api/user-gender/:userId", async (req, res) => {
+    try {
+      const { gender } = req.body as { gender: string };
+      if (!["male", "female", "both"].includes(gender)) {
+        return res.status(400).json({ error: "gender must be male | female | both" });
+      }
+      const { default: pg } = await import("postgres");
+      const c = pg(process.env.DATABASE_URL!, { ssl: "require" });
+      await c`UPDATE user_profiles SET gender = ${gender} WHERE user_id = ${req.params.userId}`;
+      await c.end();
+      res.json({ success: true, gender });
+    } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });

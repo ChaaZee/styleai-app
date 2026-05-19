@@ -643,7 +643,7 @@ export async function getUserProfile(userId: string) {
     skipped_ids: string[];
     onboarded: boolean;
   }[]>`
-    SELECT user_id, taste_vector::text, interaction_count, liked_ids, skipped_ids, onboarded
+    SELECT user_id, taste_vector::text, interaction_count, liked_ids, skipped_ids, onboarded, gender
     FROM user_profiles WHERE user_id = ${userId}
   `;
   return rows[0] ?? null;
@@ -736,10 +736,24 @@ export async function getLikedItems(userId: string): Promise<any[]> {
   return Array.isArray(items) ? items : [];
 }
 
+// Gender signals used to filter listing titles
+const FEMALE_TITLE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear|dress|skirt|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit)\b/i;
+const MALE_TITLE_SIGNALS   = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|oxford shirt|blazer|loafer|brogues|suit jacket)\b/i;
+
+function genderPassesFilter(title: string, gender: string): boolean {
+  if (gender === "both") return true;
+  const hasFem  = FEMALE_TITLE_SIGNALS.test(title);
+  const hasMasc = MALE_TITLE_SIGNALS.test(title);
+  const isNeutral = !hasFem && !hasMasc;
+  if (gender === "male")   return isNeutral || (hasMasc && !hasFem);
+  if (gender === "female") return isNeutral || (hasFem && !hasMasc);
+  return true;
+}
+
 /**
  * Get personalized For You recommendations for a user.
  * Finds depop_cache items whose embeddings are closest to the user's taste vector.
- * Excludes already-liked and skipped items.
+ * Excludes already-liked and skipped items. Filters by gender preference.
  */
 export async function getForYouRecommendations(
   userId: string,
@@ -751,10 +765,15 @@ export async function getForYouRecommendations(
     return { items: [], hasMore: false };
   }
 
+  const gender: string = (profile as any).gender || "both";
+
   const excluded = [
     ...(profile.liked_ids || []),
     ...(profile.skipped_ids || []),
   ];
+
+  // Pull more rows to compensate for gender filtering (3x for both, 6x for single gender)
+  const fetchMultiple = gender === "both" ? 3 : 6;
 
   // Cosine similarity across ALL aesthetics/types — pure taste-based
   const rows = await client<{ listings: any[]; query: string; aesthetic: string }[]>`
@@ -764,21 +783,24 @@ export async function getForYouRecommendations(
       AND permanent = TRUE
       AND (${excluded.length} = 0 OR query != ALL(${excluded}::text[]))
     ORDER BY embedding <=> ${profile.taste_vector}::vector
-    LIMIT ${limit * 3}
+    LIMIT ${limit * fetchMultiple}
     OFFSET ${offset}
   `;
 
-  // Flatten + dedupe
+  // Flatten + dedupe + gender filter
   const all: any[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
     const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
     for (const item of listings) {
-      if (!seen.has(item.id)) {
-        seen.add(item.id);
-        all.push({ ...item, _aesthetic: row.aesthetic });
-      }
+      const key = item.url || item.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!genderPassesFilter(item.title || "", gender)) continue;
+      all.push({ ...item, _aesthetic: row.aesthetic });
+      if (all.length >= limit + 1) break; // have enough
     }
+    if (all.length >= limit + 1) break;
   }
 
   return { items: all.slice(0, limit), hasMore: all.length > limit };

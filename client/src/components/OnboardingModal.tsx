@@ -55,7 +55,14 @@ export default function OnboardingModal({ userId, onComplete, onClose }: Onboard
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, aesthetics: [...selected] }),
+        body: JSON.stringify({
+          userId,
+          aesthetics: [...selected],
+          // Sync gender from localStorage so server-side filter works immediately
+          gender: (() => {
+            try { return (JSON.parse(localStorage.getItem("stitch_profile") || "{}") as any).gender || "both"; } catch { return "both"; }
+          })(),
+        }),
       });
       if (!res.ok) throw new Error("Failed to save preferences");
       onComplete();

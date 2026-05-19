@@ -250,7 +250,7 @@ export default function ForYouPage() {
   const loaderRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Check onboarding
+  // Check onboarding + sync gender from localStorage → server
   useEffect(() => {
     fetch(`/api/user-profile/${userId}`)
       .then(r => r.json())
@@ -260,6 +260,17 @@ export default function ForYouPage() {
           setShowOnboarding(true);
         } else {
           setOnboarded(true);
+          // Sync gender preference to server so For You filter works
+          // (existing users who onboarded before gender was stored server-side)
+          try {
+            const profile = JSON.parse(localStorage.getItem("stitch_profile") || "{}");
+            const gender: string = (profile as any).gender || "both";
+            fetch(`/api/user-gender/${userId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ gender }),
+            }).catch(() => {});
+          } catch {}
         }
       })
       .catch(() => {
