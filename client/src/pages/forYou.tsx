@@ -7,6 +7,7 @@ interface DepopItem {
   title: string;
   price?: { priceAmount?: string; currencyCode?: string };
   image?: string;
+  url?: string;
   slug?: string;
   brand_name?: string;
   _aesthetic?: string;
@@ -41,7 +42,9 @@ function FitCard({
     ? `$${parseFloat(item.price.priceAmount).toFixed(0)}`
     : null;
 
-  const depopUrl = item.slug
+  const depopUrl = item.url?.startsWith("https://www.depop.com/products/")
+    ? item.url
+    : item.slug
     ? `https://www.depop.com/products/${item.slug}/`
     : `https://www.depop.com/search/?q=${encodeURIComponent(item.title || "")}`;
 

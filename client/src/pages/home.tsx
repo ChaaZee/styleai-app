@@ -521,37 +521,26 @@ export default function HomePage() {
                   Set up taste →
                 </button>
               </div>
-              {/* Teaser: trending items from the feed so new users see content immediately */}
-              {rankedItems.slice(0, 6).map((item: any, idx: number) => {
-                const imageUrl = item.imageUrl || item.image || "";
-                const depopLink = item.url || `https://www.depop.com/search/?q=${encodeURIComponent(item.query || item.label || "")}`;
-                return (
-                  <a
-                    key={item.id || idx}
-                    href={depopLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="relative bg-background hover:bg-muted/30 transition-colors cursor-pointer block group overflow-hidden"
-                  >
-                    <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">
-                      {item.aesthetic || item.label || ""}
-                    </div>
-                    {imageUrl ? (
-                      <div className="w-full aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
-                        style={{ backgroundImage: `url('${imageUrl}')` }} />
-                    ) : (
-                      <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center">
-                        <span className="text-muted-foreground text-xs">{item.label || ""}</span>
-                      </div>
-                    )}
-                    {item.label && (
-                      <div className="px-2.5 pb-2.5 pt-1.5 bg-background">
-                        <p className="text-[11px] font-medium text-foreground leading-tight line-clamp-2">{item.label}</p>
-                      </div>
-                    )}
-                  </a>
-                );
-              })}
+              {/* Teaser: use real depop cards so links go to actual products */}
+              {depopCards.slice(0, 6).map((card: any, idx: number) => (
+                <a
+                  key={card.url || idx}
+                  href={card.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative bg-background hover:bg-muted/30 transition-colors cursor-pointer block group overflow-hidden"
+                >
+                  <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Shop</div>
+                  <div
+                    className="w-full aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                    style={{ backgroundImage: `url('${card.image}')` }}
+                  />
+                  <div className="px-2.5 pb-2.5 pt-1.5 bg-background">
+                    <p className="text-[11px] font-medium text-foreground leading-tight line-clamp-2">{card.title}</p>
+                    {card.price > 0 && <p className="text-[11px] text-primary font-semibold mt-0.5">${card.price.toFixed(0)}</p>}
+                  </div>
+                </a>
+              ))}
             </>
           )}
 
@@ -573,7 +562,10 @@ export default function HomePage() {
           {forYouOnboarded === true && !forYouLoading && forYouCards.map((item: any, idx: number) => {
             const imageUrl = item.image || "";
             const price = item.price?.priceAmount ?? item.price ?? null;
-            const depopUrl = item.slug
+            // Prefer the stored product URL, then slug fallback, never the search fallback
+            const depopUrl = item.url?.startsWith("https://www.depop.com/products/")
+              ? item.url
+              : item.slug
               ? `https://www.depop.com/products/${item.slug}/`
               : `https://www.depop.com/search/?q=${encodeURIComponent(item.title || "")}`;
 
