@@ -715,11 +715,12 @@ export async function appendLikedItem(userId: string, item: {
 }) {
   // Use url as stable dedup key (id is just a sequential index, not unique across sessions)
   const dedupKey = item.url || item.id;
-  // COALESCE handles the empty-array case: jsonb_agg returns NULL for zero rows
+  // Use client.json() to pass a proper JSONB object — avoids the double-serialization bug
+  // where JSON.stringify + ::jsonb stores a string scalar instead of a JSONB object
   await client`
     UPDATE user_profiles
     SET liked_items = (
-      jsonb_build_array(${JSON.stringify(item)}::jsonb) ||
+      jsonb_build_array(${client.json(item)}) ||
       COALESCE(
         (SELECT jsonb_agg(el) FROM jsonb_array_elements(liked_items) AS el
          WHERE el->>'url' != ${dedupKey} AND el->>'id' != ${dedupKey}),
@@ -750,7 +751,9 @@ export async function getLikedItems(userId: string): Promise<any[]> {
   `;
   if (!rows.length) return [];
   const items = rows[0].liked_items;
-  return Array.isArray(items) ? items : [];
+  if (!Array.isArray(items)) return [];
+  // Normalise: legacy rows may be stored as JSON strings due to old double-serialization bug
+  return items.map((el: any) => (typeof el === "string" ? JSON.parse(el) : el));
 }
 
 // ── Gender-gated aesthetics ──────────────────────────────────────────────────
