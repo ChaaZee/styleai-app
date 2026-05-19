@@ -709,13 +709,18 @@ export async function appendLikedItem(userId: string, item: {
   _aesthetic?: string;
   likedAt: string;
 }) {
-  // Prevent duplicates — remove existing entry with same id then prepend new one
+  // Use url as stable dedup key (id is just a sequential index, not unique across sessions)
+  const dedupKey = item.url || item.id;
+  // COALESCE handles the empty-array case: jsonb_agg returns NULL for zero rows
   await client`
     UPDATE user_profiles
     SET liked_items = (
       jsonb_build_array(${JSON.stringify(item)}::jsonb) ||
-      (SELECT jsonb_agg(el) FROM jsonb_array_elements(liked_items) AS el
-       WHERE el->>'id' != ${item.id})
+      COALESCE(
+        (SELECT jsonb_agg(el) FROM jsonb_array_elements(liked_items) AS el
+         WHERE el->>'url' != ${dedupKey} AND el->>'id' != ${dedupKey}),
+        '[]'::jsonb
+      )
     )
     WHERE user_id = ${userId}
   `;

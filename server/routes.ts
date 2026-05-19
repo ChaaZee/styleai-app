@@ -2039,20 +2039,26 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       );
 
       // Store full item details for liked/saved items so history can display them
-      if ((action === "like" || action === "save") && req.body.item) {
+      if (action === "like" || action === "save") {
         const fullItem = req.body.item as any;
+        // Use URL as stable ID — numeric itemId is just a sequential index
+        const stableId = (fullItem?.url && fullItem.url.startsWith("https://www.depop.com/products/"))
+          ? fullItem.url
+          : itemId;
         await appendLikedItem(userId, {
-          id: itemId,
-          title: fullItem.title || query,
-          image: fullItem.image || "",
-          url: fullItem.url || "",
-          price: typeof fullItem.price === "object"
-            ? parseFloat(fullItem.price?.priceAmount || "0")
-            : parseFloat(String(fullItem.price || 0)),
-          brand: fullItem.brand || fullItem.brand_name || "",
-          _aesthetic: fullItem._aesthetic || "",
+          id: stableId,
+          title: (fullItem?.title || query || "").slice(0, 200),
+          image: fullItem?.image || "",
+          url: fullItem?.url || "",
+          price: fullItem
+            ? (typeof fullItem.price === "object"
+              ? parseFloat(fullItem.price?.priceAmount || "0")
+              : parseFloat(String(fullItem.price || 0)))
+            : 0,
+          brand: fullItem?.brand || fullItem?.brand_name || "",
+          _aesthetic: fullItem?._aesthetic || "",
           likedAt: new Date().toISOString(),
-        }).catch(() => {}); // non-blocking, don't fail the interaction
+        }).catch((e: any) => console.error("[appendLikedItem]", e.message)); // log errors but don't fail
       }
 
       res.json({ success: true, updated: true, action, interactionCount: (profile?.interaction_count || 0) + Math.abs(weight) });
