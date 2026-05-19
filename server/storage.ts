@@ -25,6 +25,12 @@ if (!process.env.DATABASE_URL) {
 const client = postgres(process.env.DATABASE_URL, {
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
   max: 10,
+  // prepare: false disables named prepared statements and uses the Simple Query Protocol.
+  // This avoids a postgres.js bug where ParameterDescription overrides our parameter type
+  // with the column's OID (e.g. 3802 for jsonb), and the jsonb serializer (OID 3802) is
+  // missing from options.serializers on some Render/Node environments — causing the
+  // 'Received an instance of Array' TypeError in Bind() for JSONB array parameters.
+  prepare: false,
 });
 const db = drizzle(client);
 
