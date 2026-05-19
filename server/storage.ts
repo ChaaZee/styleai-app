@@ -838,29 +838,48 @@ export async function getForYouRecommendations(
  * Average a batch of existing embeddings from cache rows matching given aesthetics.
  * Used to seed a user's taste vector from onboarding picks.
  */
-export async function getAverageEmbeddingForAesthetics(aesthetics: string[]): Promise<number[] | null> {
+export async function getAverageEmbeddingForAesthetics(aesthetics: string[], gender?: string): Promise<number[] | null> {
   if (!aesthetics.length) return null;
 
+  // For male users, exclude female-only aesthetics from the seed pool
+  const seedAesthetics = (gender === "male")
+    ? aesthetics.filter(a => !FEMALE_ONLY_AESTHETICS.has(a))
+    : aesthetics;
+  if (!seedAesthetics.length) return null;
+
   // Sample up to 50 rows per aesthetic for the average
-  const rows = await client<{ embedding: string }[]>`
-    SELECT embedding::text FROM depop_cache
-    WHERE aesthetic = ANY(${aesthetics}::text[])
+  const rows = await client<{ embedding: string; listings: any[] }[]>`
+    SELECT embedding::text, listings FROM depop_cache
+    WHERE aesthetic = ANY(${seedAesthetics}::text[])
       AND embedding IS NOT NULL
       AND permanent = TRUE
     ORDER BY RANDOM()
-    LIMIT ${aesthetics.length * 50}
+    LIMIT ${seedAesthetics.length * 80}
   `;
 
   if (!rows.length) return null;
 
+  // For gendered users, filter rows where the majority of listings pass the title check
+  // This steers the seed vector away from womenswear-heavy cache rows
+  const filteredRows = (gender === "male" || gender === "female")
+    ? rows.filter(row => {
+        const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
+        const passCount = listings.filter((l: any) => genderPassesFilter(l.title || "", gender!)).length;
+        // Keep the row if >40% of its listings pass the gender filter
+        return passCount / Math.max(listings.length, 1) >= 0.4;
+      })
+    : rows;
+
+  const useRows = filteredRows.length >= 5 ? filteredRows : rows; // fallback if too few pass
+
   const dim = 1536;
   const avg = new Array(dim).fill(0);
-  for (const row of rows) {
+  for (const row of useRows) {
     // Parse "[0.1,0.2,...]" format
-    const nums = row.embedding.slice(1, -1).split(",").map(Number);
+    const nums = (row.embedding as unknown as string).slice(1, -1).split(",").map(Number);
     for (let i = 0; i < dim; i++) avg[i] += nums[i];
   }
-  const n = rows.length;
+  const n = useRows.length;
   return avg.map(v => v / n);
 }
 

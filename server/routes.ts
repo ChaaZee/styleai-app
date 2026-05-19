@@ -1966,7 +1966,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       if (!userId || !aesthetics?.length) {
         return res.status(400).json({ error: "userId and aesthetics required" });
       }
-      const tasteVector = await getAverageEmbeddingForAesthetics(aesthetics);
+      // Pass gender so the seed vector is built from gender-appropriate cache rows
+      const tasteVector = await getAverageEmbeddingForAesthetics(aesthetics, gender);
       if (!tasteVector) {
         return res.status(500).json({ error: "Could not build taste vector" });
       }
@@ -1985,18 +1986,34 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // PATCH /api/user-gender/:userId — update gender preference without re-running onboarding
+  // PATCH /api/user-gender/:userId — update gender preference and re-seed taste vector
   app.patch("/api/user-gender/:userId", async (req, res) => {
     try {
       const { gender } = req.body as { gender: string };
+      const userId = req.params.userId;
       if (!["male", "female", "both"].includes(gender)) {
         return res.status(400).json({ error: "gender must be male | female | both" });
       }
       const { default: pg } = await import("postgres");
       const c = pg(process.env.DATABASE_URL!, { ssl: "require" });
-      await c`UPDATE user_profiles SET gender = ${gender} WHERE user_id = ${req.params.userId}`;
+      await c`UPDATE user_profiles SET gender = ${gender} WHERE user_id = ${userId}`;
+
+      // Re-seed taste vector with gender-appropriate embeddings so the feed updates immediately.
+      // Pull the user's current onboarding aesthetics from the existing vector direction,
+      // or fall back to a sensible default set per gender.
+      const defaultAesthetics: Record<string, string[]> = {
+        male:   ["Streetwear", "Old Money", "Vintage", "Grunge", "Dark Academia"],
+        female: ["Coquette", "Soft Girl", "Old Money", "Vintage", "Minimalist"],
+        both:   ["Vintage", "Old Money", "Minimalist", "Streetwear", "Grunge"],
+      };
+      const aesthetics = defaultAesthetics[gender] ?? defaultAesthetics.both;
+      const newVector = await getAverageEmbeddingForAesthetics(aesthetics, gender);
+      if (newVector) {
+        await c`UPDATE user_profiles SET taste_vector = ${JSON.stringify(newVector)}::vector WHERE user_id = ${userId}`;
+      }
+
       await c.end();
-      res.json({ success: true, gender });
+      res.json({ success: true, gender, vectorReseeded: !!newVector });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
