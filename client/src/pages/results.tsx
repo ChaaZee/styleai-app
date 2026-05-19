@@ -1,4 +1,4 @@
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { X, ExternalLink, Loader2 } from "lucide-react";
 import { depopUrl, isDepopAesthetic } from "@/lib/depop";
@@ -181,6 +181,8 @@ function isLight(hex: string): boolean {
 export default function ResultsPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  const backTo = new URLSearchParams(search).get("from") === "history" ? "/history" : "/";
   const [activeRetailer, setActiveRetailer] = useState("All");
   const [activeBudget, setActiveBudget] = useState("All");
   const [depopMode, setDepopMode] = useState(false);
@@ -322,7 +324,7 @@ export default function ResultsPage() {
             <p className="text-sm font-semibold text-foreground">{results.length} matches found</p>
           </div>
           <button
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation(backTo)}
             data-testid="button-back"
             className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
           >
@@ -405,9 +407,30 @@ export default function ResultsPage() {
                   const wasLiked = !!likedPieces[piece];
                   setLikedPieces(prev => ({ ...prev, [piece]: !wasLiked }));
                   if (!wasLiked) {
-                    // Strong signal: liked a specific piece → boost outfit aesthetic + secondary styles
+                    // Boost local taste vector
                     const secondaryAesthetics = styleBreakdown.slice(1).map(s => s.label);
                     onResultSaved([scan.aesthetic, ...secondaryAesthetics]);
+                    // Persist to liked_items so it shows in History → Liked
+                    const userId = localStorage.getItem("stitch_user_id") || "";
+                    if (userId) {
+                      fetch("/api/interact", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          userId,
+                          itemId: `piece_${scan.id}_${piece}`,
+                          action: "like",
+                          query: piece,
+                          item: {
+                            id: `piece_${scan.id}_${piece}`,
+                            title: piece,
+                            image: scan.imageData || "",
+                            url: "",
+                            _aesthetic: scan.aesthetic,
+                          },
+                        }),
+                      }).catch(() => {});
+                    }
                   } else {
                     onUnlike(scan.aesthetic);
                   }

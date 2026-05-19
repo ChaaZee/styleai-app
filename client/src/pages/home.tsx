@@ -335,11 +335,29 @@ export default function HomePage() {
     return () => window.removeEventListener("stitch_vector_updated", handler);
   }, [rerank]);
 
+  // Local-vector aesthetic names → depop cache names (normalise before sending)
+  const VECTOR_TO_CACHE: Record<string, string> = {
+    "Coastal": "Minimalist",       // no "Coastal" cache — use Minimalist
+    "Clean Girl": "Minimalist",    // female-only → remap
+    "Hypebeast": "Streetwear",
+    "Indie": "Grunge",
+    "Athleisure": "Streetwear",
+    "Business Casual": "Old Money",
+    "Romantic": "Vintage",
+  };
+  // Female-only aesthetics — strip from depop-feed request for male users
+  const FEMALE_ONLY_CLIENT = new Set(["Coquette","Soft Girl","Cottagecore","Coastal Grandmother","E-Girl","Clean Girl","Balletcore","Romantic","Fairycore"]);
+
   // Fetch cached Depop cards for home feed
   // Passes top aesthetics, userId (for server-side gender lookup), and gender fallback
   useEffect(() => {
-    const tops = getTopAesthetics(3);
+    const rawTops = getTopAesthetics(3);
     const genderPref = getGenderPref();
+    // Normalise local vector aesthetic names to depop cache names, then gender-filter
+    const tops = rawTops
+      .map(a => VECTOR_TO_CACHE[a] ?? a)
+      .filter(a => genderPref !== "male" || !FEMALE_ONLY_CLIENT.has(a))
+      .filter((a, i, arr) => arr.indexOf(a) === i); // dedupe after remap
     const params = new URLSearchParams();
     if (tops.length) params.set("aesthetics", JSON.stringify(tops));
     params.set("userId", userId);

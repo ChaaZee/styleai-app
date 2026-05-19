@@ -187,7 +187,7 @@ export default function HistoryPage() {
                     <div className="flex items-center group">
                       {/* Main tap area — navigate to results */}
                       <button
-                        onClick={() => setLocation(`/results/${scan.id}`)}
+                        onClick={() => setLocation(`/results/${scan.id}?from=history`)}
                         className="flex-1 p-3 flex items-center gap-3 hover:bg-muted/20 transition-all text-left"
                       >
                         <div
