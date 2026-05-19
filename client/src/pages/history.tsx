@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
@@ -28,8 +28,30 @@ interface LikedItem {
 export default function HistoryPage() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"scans" | "liked">("scans");
+  const [deletingKeys, setDeletingKeys] = useState<Set<string>>(new Set());
   const deviceId = getDeviceId();
   const userId = getUserId();
+  const queryClient = useQueryClient();
+
+  const handleDelete = async (itemKey: string) => {
+    // Optimistic: remove from cache immediately
+    setDeletingKeys(prev => new Set([...prev, itemKey]));
+    queryClient.setQueryData(["/api/liked-items", userId], (old: any) => ({
+      items: (old?.items || []).filter((i: LikedItem) => i.url !== itemKey && i.id !== itemKey),
+    }));
+    try {
+      await fetch(`/api/liked-items/${userId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemKey }),
+      });
+    } catch {
+      // Revert on error
+      queryClient.invalidateQueries({ queryKey: ["/api/liked-items", userId] });
+    } finally {
+      setDeletingKeys(prev => { const n = new Set(prev); n.delete(itemKey); return n; });
+    }
+  };
 
   const { data: scans = [], isLoading: scansLoading } = useQuery<Scan[]>({
     queryKey: ["/api/scans", deviceId],
@@ -214,71 +236,83 @@ export default function HistoryPage() {
           {!likedLoading && likedItems.length > 0 && (
             <div className="px-5 sm:px-8 pb-6">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {likedItems.map((item, i) => (
-                  <a
-                    key={item.id + i}
-                    href={item.url || `https://www.depop.com/search/?q=${encodeURIComponent(item.title)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-xl border border-border bg-card overflow-hidden group hover:border-primary/40 transition-colors block"
-                    style={{ animationDelay: `${i * 30}ms` }}
-                  >
-                    {/* Image */}
-                    <div className="aspect-[3/4] bg-muted overflow-hidden relative">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                          loading="lazy"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
-                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <rect x="3" y="3" width="18" height="18" rx="2"/>
-                            <circle cx="8.5" cy="8.5" r="1.5"/>
-                            <polyline points="21 15 16 10 5 21"/>
-                          </svg>
-                        </div>
-                      )}
-                      {/* Liked heart badge */}
-                      <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="#ff3b3b" stroke="#ff3b3b" strokeWidth="2" strokeLinecap="round">
-                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                {likedItems.map((item, i) => {
+                  const itemKey = item.url || item.id;
+                  const isDeleting = deletingKeys.has(itemKey);
+                  return (
+                    <div
+                      key={item.id + i}
+                      className={`rounded-xl border border-border bg-card overflow-hidden group hover:border-primary/40 transition-all relative ${isDeleting ? "opacity-40 pointer-events-none" : ""}`}
+                      style={{ animationDelay: `${i * 30}ms` }}
+                    >
+                      {/* Delete button — top right, shown on hover */}
+                      <button
+                        onClick={() => handleDelete(itemKey)}
+                        className="absolute top-2 right-2 z-20 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+                        title="Remove"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                         </svg>
-                      </div>
-                      {/* Aesthetic chip */}
-                      {item._aesthetic && (
-                        <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full text-[8px] font-medium text-white/90 tracking-widest uppercase"
-                          style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", fontFamily: "'Jost', sans-serif" }}>
-                          {item._aesthetic}
-                        </div>
-                      )}
-                    </div>
+                      </button>
 
-                    {/* Info */}
-                    <div className="p-2.5">
-                      <p className="text-xs text-foreground font-medium leading-snug line-clamp-2 mb-1"
-                        style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                        {item.title}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        {item.price && item.price > 0 ? (
-                          <span className="text-xs text-primary font-semibold" style={{ fontFamily: "'Jost', sans-serif" }}>
-                            ${item.price.toFixed(0)}
-                          </span>
-                        ) : <span />}
-                        {/* Depop badge */}
-                        <div className="flex items-center gap-1">
-                          <div className="w-3.5 h-3.5 rounded-full bg-[#FF2300] flex items-center justify-center">
-                            <span className="text-white font-bold" style={{ fontSize: "7px", lineHeight: 1 }}>d</span>
+                      {/* Clickable area — opens Depop */}
+                      <a
+                        href={item.url || `https://www.depop.com/search/?q=${encodeURIComponent(item.title)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                      >
+                        {/* Image */}
+                        <div className="aspect-[3/4] bg-muted overflow-hidden relative">
+                          {item.image ? (
+                            <img
+                              src={item.image}
+                              alt={item.title}
+                              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                              loading="lazy"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
+                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                              </svg>
+                            </div>
+                          )}
+                          {/* Aesthetic chip */}
+                          {item._aesthetic && (
+                            <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full text-[8px] font-medium text-white/90 tracking-widest uppercase"
+                              style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", fontFamily: "'Jost', sans-serif" }}>
+                              {item._aesthetic}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="p-2.5">
+                          <p className="text-xs text-foreground font-medium leading-snug line-clamp-2 mb-1"
+                            style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                            {item.title}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            {item.price && item.price > 0 ? (
+                              <span className="text-xs text-primary font-semibold" style={{ fontFamily: "'Jost', sans-serif" }}>
+                                ${item.price.toFixed(0)}
+                              </span>
+                            ) : <span />}
+                            <div className="w-3.5 h-3.5 rounded-full bg-[#FF2300] flex items-center justify-center">
+                              <span className="text-white font-bold" style={{ fontSize: "7px", lineHeight: 1 }}>d</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </a>
                     </div>
-                  </a>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

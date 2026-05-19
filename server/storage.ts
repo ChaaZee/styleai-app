@@ -726,6 +726,19 @@ export async function appendLikedItem(userId: string, item: {
   `;
 }
 
+/** Remove a single liked item by its id or url dedup key */
+export async function removeLikedItem(userId: string, itemKey: string) {
+  await client`
+    UPDATE user_profiles
+    SET liked_items = COALESCE(
+      (SELECT jsonb_agg(el) FROM jsonb_array_elements(liked_items) AS el
+       WHERE el->>'url' != ${itemKey} AND el->>'id' != ${itemKey}),
+      '[]'::jsonb
+    )
+    WHERE user_id = ${userId}
+  `;
+}
+
 /** Fetch all liked items for a user, newest first */
 export async function getLikedItems(userId: string): Promise<any[]> {
   const rows = await client`

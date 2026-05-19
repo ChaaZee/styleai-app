@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -2039,6 +2039,28 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       // Get current profile
       const profile = await getUserProfile(userId);
 
+      // Store liked/saved item FIRST — before any early returns — so history is always populated
+      if (action === "like" || action === "save") {
+        const fullItem = req.body.item as any;
+        const stableId = (fullItem?.url && fullItem.url.startsWith("https://www.depop.com/products/"))
+          ? fullItem.url
+          : itemId;
+        await appendLikedItem(userId, {
+          id: stableId,
+          title: (fullItem?.title || query || "").slice(0, 200),
+          image: fullItem?.image || "",
+          url: fullItem?.url || "",
+          price: fullItem
+            ? (typeof fullItem.price === "object"
+              ? parseFloat(fullItem.price?.priceAmount || "0")
+              : parseFloat(String(fullItem.price || 0)))
+            : 0,
+          brand: fullItem?.brand || fullItem?.brand_name || "",
+          _aesthetic: fullItem?._aesthetic || "",
+          likedAt: new Date().toISOString(),
+        }).catch((e: any) => console.error("[appendLikedItem]", e.message));
+      }
+
       // Get embedding for the interacted item (via its query string)
       let itemEmbedding: number[] | null = null;
       if (query) {
@@ -2077,29 +2099,6 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         action !== "skip" ? itemId : undefined,
         action === "skip" ? itemId : undefined
       );
-
-      // Store full item details for liked/saved items so history can display them
-      if (action === "like" || action === "save") {
-        const fullItem = req.body.item as any;
-        // Use URL as stable ID — numeric itemId is just a sequential index
-        const stableId = (fullItem?.url && fullItem.url.startsWith("https://www.depop.com/products/"))
-          ? fullItem.url
-          : itemId;
-        await appendLikedItem(userId, {
-          id: stableId,
-          title: (fullItem?.title || query || "").slice(0, 200),
-          image: fullItem?.image || "",
-          url: fullItem?.url || "",
-          price: fullItem
-            ? (typeof fullItem.price === "object"
-              ? parseFloat(fullItem.price?.priceAmount || "0")
-              : parseFloat(String(fullItem.price || 0)))
-            : 0,
-          brand: fullItem?.brand || fullItem?.brand_name || "",
-          _aesthetic: fullItem?._aesthetic || "",
-          likedAt: new Date().toISOString(),
-        }).catch((e: any) => console.error("[appendLikedItem]", e.message)); // log errors but don't fail
-      }
 
       res.json({ success: true, updated: true, action, interactionCount: (profile?.interaction_count || 0) + Math.abs(weight) });
     } catch (e: any) {
@@ -2144,6 +2143,18 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     try {
       const items = await getLikedItems(req.params.userId);
       res.json({ items });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/liked-items/:userId — remove a single liked item by its key (url or id)
+  app.delete("/api/liked-items/:userId", async (req, res) => {
+    try {
+      const { itemKey } = req.body as { itemKey: string };
+      if (!itemKey) return res.status(400).json({ error: "itemKey required" });
+      await removeLikedItem(req.params.userId, itemKey);
+      res.json({ success: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
