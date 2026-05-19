@@ -722,33 +722,30 @@ export async function appendLikedItem(userId: string, item: {
   // Use url as stable dedup key (id is just a sequential index, not unique across sessions)
   const dedupKey = item.url || item.id;
 
-  // Two-step approach: fetch → merge in JS → store as full array via client.json().
-  // This avoids all in-SQL JSONB parameter-type issues (JSON.stringify + ::jsonb stores
-  // string scalars; single-step SQL updates have environment-specific type-binding issues).
+  // Two-step: fetch current array, merge in JS, write back as inline SQL literal.
+  // We embed the JSON directly in the query string to bypass ALL postgres.js parameter-
+  // binding issues (prepared-statement type override, missing JSONB OID serializer on Render).
+  // Safe: items come from our own server code, never from untrusted user input.
   const rows = await client`SELECT liked_items FROM user_profiles WHERE user_id = ${userId}`;
   const existing: any[] = Array.isArray(rows[0]?.liked_items) ? rows[0].liked_items : [];
-  // Normalize legacy string-scalar entries
   const normalized = existing.map((el: any) => (typeof el === "string" ? JSON.parse(el) : el));
-  // Deduplicate by url or id
   const deduped = normalized.filter((el: any) => el?.url !== dedupKey && el?.id !== dedupKey);
-  // Prepend new item (newest first)
   const newItems = [item, ...deduped];
-  // Use sql.typed(value, 114) — JSON type OID — instead of sql.json() (JSONB OID 3802).
-  // On some Render/Node environments the JSONB serializer for OID 3802 is not registered,
-  // causing a "Received an instance of Array" TypeError. OID 114 (json) always has its
-  // serializer registered (JSON.stringify) and postgres accepts json in jsonb columns.
-  await client`UPDATE user_profiles SET liked_items = ${client.typed(newItems, 114)} WHERE user_id = ${userId}`;
+  const jsonLiteral = JSON.stringify(newItems).replace(/'/g, "''");
+  const userIdSafe  = userId.replace(/'/g, "''");
+  await client.unsafe(`UPDATE user_profiles SET liked_items = '${jsonLiteral}'::jsonb WHERE user_id = '${userIdSafe}'`);
 }
 
 /** Remove a single liked item by its id or url dedup key */
 export async function removeLikedItem(userId: string, itemKey: string) {
-  // Two-step approach matching appendLikedItem — avoids the OID 3802 serializer issue.
   const rows = await client`SELECT liked_items FROM user_profiles WHERE user_id = ${userId}`;
   const existing: any[] = Array.isArray(rows[0]?.liked_items) ? rows[0].liked_items : [];
   const newItems = existing
     .map((el: any) => (typeof el === "string" ? JSON.parse(el) : el))
     .filter((el: any) => el?.url !== itemKey && el?.id !== itemKey);
-  await client`UPDATE user_profiles SET liked_items = ${client.typed(newItems, 114)} WHERE user_id = ${userId}`;
+  const jsonLiteral = JSON.stringify(newItems).replace(/'/g, "''");
+  const userIdSafe  = userId.replace(/'/g, "''");
+  await client.unsafe(`UPDATE user_profiles SET liked_items = '${jsonLiteral}'::jsonb WHERE user_id = '${userIdSafe}'`);
 }
 
 /** Fetch all liked items for a user, newest first */
