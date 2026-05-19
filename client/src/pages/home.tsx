@@ -281,7 +281,7 @@ function getUserId(): string {
   return id;
 }
 
-const CHIPS = ["For You", "Minimal", "Coastal", "Dark Academia", "Streetwear", "Trending"];
+const CHIPS = ["Fits", "Minimal", "Coastal", "Dark Academia", "Streetwear", "Trending"];
 
 // Map chip label → aesthetic value(s) in FEED_ITEMS
 const CHIP_AESTHETIC_MAP: Record<string, string[]> = {
@@ -305,7 +305,7 @@ const CHIP_AESTHETIC_MAP: Record<string, string[]> = {
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
-  const [activeChip, setActiveChip] = useState("For You");
+  const [activeChip, setActiveChip] = useState("Fits");
 
   // Gender-filter + vector-rank
   const rerank = useCallback(() => {
@@ -413,7 +413,7 @@ export default function HomePage() {
 
   // Derive visible feed from active chip
   const feedItems = useMemo(() => {
-    if (activeChip === "For You") return rankedItems;
+    if (activeChip === "Fits") return rankedItems;
     if (activeChip === "Trending") {
       // Match-tagged items first, then top-scored items, capped at 20
       const matches = rankedItems.filter(i => i.tag === "Match");
@@ -448,11 +448,11 @@ export default function HomePage() {
 
   // Dynamic chips — put user's top aesthetic first if available
   const chips = topAesthetic
-    ? ["For You", topAesthetic, ...CHIPS.filter(c => c !== "For You" && c !== topAesthetic).slice(0, 4)]
+    ? ["Fits", topAesthetic, ...CHIPS.filter(c => c !== "Fits" && c !== topAesthetic).slice(0, 4)]
     : CHIPS;
 
   // Section label under chips
-  const sectionLabel = activeChip === "For You" ? "For You"
+  const sectionLabel = activeChip === "Fits" ? "Fits"
     : activeChip === "Trending" ? "Trending Now"
     : activeChip;
 
@@ -486,10 +486,10 @@ export default function HomePage() {
         {/* Section label */}
         <div className="px-5 sm:px-8 flex items-center justify-between mb-0 pb-3">
           <span className="font-label text-[10px] text-foreground">{sectionLabel}</span>
-          {activeChip === "For You" && forYouOnboarded && (
+          {activeChip === "Fits" && forYouOnboarded && (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">Personalized</span>
           )}
-          {activeChip === "For You" && forYouOnboarded === false && (
+          {activeChip === "Fits" && forYouOnboarded === false && (
             <button
               onClick={() => setShowOnboarding(true)}
               className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-white font-medium"
@@ -497,14 +497,14 @@ export default function HomePage() {
               Set up →
             </button>
           )}
-          {activeChip !== "For You" && feedItems.length > 0 && (
+          {activeChip !== "Fits" && feedItems.length > 0 && (
             <span className="text-[10px] text-muted-foreground">{feedItems.length} item{feedItems.length !== 1 ? "s" : ""}</span>
           )}
         </div>
       </div>
 
-      {/* ── For You Grid (vector-personalized) ── */}
-      {activeChip === "For You" && (
+      {/* ── Fits Grid (vector-personalized) ── */}
+      {activeChip === "Fits" && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: "hsl(var(--border))" }}>
           {/* Not onboarded yet — show setup CTA + trending teaser */}
           {forYouOnboarded === false && (
@@ -571,7 +571,7 @@ export default function HomePage() {
 
           {/* Personalized cards */}
           {forYouOnboarded === true && !forYouLoading && forYouCards.map((item: any, idx: number) => {
-            const imageUrl = item.preview || item.image || "";
+            const imageUrl = item.image || "";
             const price = item.price?.priceAmount ?? item.price ?? null;
             const depopUrl = item.slug
               ? `https://www.depop.com/products/${item.slug}/`
@@ -625,12 +625,11 @@ export default function HomePage() {
       )}
 
       {/* ── Default Grid (non-For You chips) ── */}
-      {activeChip !== "For You" && (
+      {activeChip !== "Fits" && (
       <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: "hsl(var(--border))" }}>
         {feedItems.map((item, idx) => {
-          const card = depopCards.length > 0
-            ? depopCards[idx % depopCards.length]
-            : null;
+          // 1-to-1 mapping: never cycle/repeat — just show as many cards as we have
+          const card = depopCards.length > idx ? depopCards[idx] : null;
 
           if (!card) {
             return (
