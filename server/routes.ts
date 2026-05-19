@@ -2980,8 +2980,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
   // GET /api/depop-feed?aesthetics=<json array> — return cached Depop cards for home feed
   // Gender filter for home feed listings — mirrors the same logic in storage.ts
-  const FEED_FEMALE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear|dress|skirt|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit)\b/i;
-  const FEED_MALE_SIGNALS   = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|blazer|loafer|brogues|suit jacket)\b/i;
+  const FEED_FEMALE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear|dress|dresses|skirt|skirts|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit|floral|petite|heels?|stiletto|pumps?|ballet flat|wedge|kitten heel|crop top|halter|tube top|bustier|slip dress|wrap dress|pinafore|smock|prairie|feminine|lace top|ruffle|bow top|cardigan set|matching set|co-ord|kickpleat|kick pleat|peplum|spaghetti strap|off shoulder|one shoulder|asymmetric hem|babydoll|broderie|chiffon blouse|silk slip|lingerie|cami|nightgown|bikini|swimsuit|one-piece|sarong|palazzo|culottes)\b/i;
+  const FEED_MALE_SIGNALS   = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|oxford shirt|blazer|loafer|brogues|suit jacket|trousers|dress shirt|polo shirt|henley|rugby shirt|harrington|overshirt|flight jacket|varsity jacket|cargo pants|cargo shorts|board shorts|swim trunks|flannel shirt|denim jacket men|chelsea boots|derby shoes|brogue|desert boots|work boots)\b/i;
   function feedGenderOk(title: string, gender: string): boolean {
     if (!gender || gender === "both") return true;
     const hasFem  = FEED_FEMALE_SIGNALS.test(title);

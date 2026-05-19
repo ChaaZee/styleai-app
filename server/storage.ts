@@ -763,8 +763,8 @@ export function remapAestheticForGender(aesthetic: string, gender: string): stri
 }
 
 // Gender signals used to filter listing titles
-const FEMALE_TITLE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear|dress|skirt|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit)\b/i;
-const MALE_TITLE_SIGNALS   = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|oxford shirt|blazer|loafer|brogues|suit jacket)\b/i;
+const FEMALE_TITLE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear|dress|dresses|skirt|skirts|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit|floral|petite|heels?|stiletto|pumps?|ballet flat|wedge|kitten heel|crop top|halter|tube top|bustier|slip dress|wrap dress|pinafore|smock|prairie|feminine|lace top|ruffle|bow top|cardigan set|matching set|co-ord|kickpleat|kick pleat|peplum|spaghetti strap|off shoulder|one shoulder|asymmetric hem|babydoll|broderie|chiffon blouse|silk slip|lingerie|cami|nightgown|bikini|swimsuit|one-piece|sarong|palazzo|culottes|wide leg crop|flare jeans women|mom jeans women)\b/i;
+const MALE_TITLE_SIGNALS   = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|oxford shirt|blazer|loafer|brogues|suit jacket|trousers|dress shirt|tie|necktie|cufflinks|polo shirt|henley|rugby shirt|harrington|overshirt|flight jacket|varsity jacket|bomber men|coach jacket|track jacket men|cargo pants men|cargo shorts|board shorts|swim trunks|joggers men|sweatpants men|hoodie men|crewneck men|quarter zip|flannel shirt|workwear|denim jacket men|chelsea boots men|derby shoes|monk strap|brogue|desert boots|work boots men)\b/i;
 
 function genderPassesFilter(title: string, gender: string): boolean {
   if (gender === "both") return true;
