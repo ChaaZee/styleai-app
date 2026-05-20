@@ -24,6 +24,7 @@ app.use(cors({
 
 app.use(
   express.json({
+    limit: "10mb", // scan images are base64 JPEG ~700kb; interact payloads must be small
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },

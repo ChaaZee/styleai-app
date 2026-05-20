@@ -448,17 +448,20 @@ export default function ResultsPage() {
                           item: {
                             id: `piece_${scan.id}_${piece}`,
                             title: piece,
-                            image: scan.imageData || "",
+                            image: "", // don't send base64 imageData — too large (>100kb limit)
                             url: "",
                             _aesthetic: scan.aesthetic,
                           },
                         }),
                       })
-                        .then(() => {
-                          // Bust the history liked-items cache so next visit shows fresh data
-                          queryClient.invalidateQueries({ queryKey: ["/api/liked-items", userId] });
+                        .then((r) => {
+                          if (r.ok) {
+                            queryClient.invalidateQueries({ queryKey: ["/api/liked-items", userId] });
+                          } else {
+                            console.error("[like] server error", r.status);
+                          }
                         })
-                        .catch(() => {});
+                        .catch((e) => console.error("[like] fetch failed", e));
                     }
                   } else {
                     onUnlike(scan.aesthetic);
