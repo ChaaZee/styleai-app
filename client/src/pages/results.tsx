@@ -5,6 +5,7 @@ import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 import { useState, useEffect, useRef } from "react";
 import type { Scan } from "@shared/schema";
 import { onResultViewed, onResultSaved, onUnlike } from "@/lib/styleVector";
+import { getOrCreateUserId } from "@/lib/deviceId";
 
 // ── Clothing SVG illustrations ────────────────────────────────────────────────
 const ClothingIcons: Record<string, JSX.Element> = {
@@ -207,8 +208,7 @@ export default function ResultsPage() {
   // Pre-populate likedPieces from server so hearts persist when revisiting via history
   useEffect(() => {
     if (!scan) return;
-    const userId = localStorage.getItem("stitch_user_id");
-    if (!userId) return;
+    const userId = getOrCreateUserId();
     fetch(`/api/liked-items/${userId}`)
       .then(r => r.ok ? r.json() : { items: [] })
       .then(({ items }: { items: { id?: string }[] }) => {
@@ -435,7 +435,7 @@ export default function ResultsPage() {
                     const secondaryAesthetics = styleBreakdown.slice(1).map(s => s.label);
                     onResultSaved([scan.aesthetic, ...secondaryAesthetics]);
                     // Persist to liked_items so it shows in History → Liked
-                    const userId = localStorage.getItem("stitch_user_id") || "";
+                    const userId = getOrCreateUserId();
                     if (userId) {
                       fetch("/api/interact", {
                         method: "POST",

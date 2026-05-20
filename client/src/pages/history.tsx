@@ -3,16 +3,7 @@ import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { Scan } from "@shared/schema";
-import { getDeviceId } from "../lib/deviceId";
-
-function getUserId(): string {
-  let id = localStorage.getItem("stitch_user_id");
-  if (!id) {
-    id = "u_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    localStorage.setItem("stitch_user_id", id);
-  }
-  return id;
-}
+import { getDeviceId, getOrCreateUserId } from "../lib/deviceId";
 
 interface LikedItem {
   id: string;
@@ -30,7 +21,7 @@ export default function HistoryPage() {
   const [activeTab, setActiveTab] = useState<"scans" | "liked">("scans");
   const [deletingKeys, setDeletingKeys] = useState<Set<string>>(new Set());
   const deviceId = getDeviceId();
-  const userId = getUserId();
+  const userId = getOrCreateUserId();
   const queryClient = useQueryClient();
 
   const [deletingScanIds, setDeletingScanIds] = useState<Set<number>>(new Set());
