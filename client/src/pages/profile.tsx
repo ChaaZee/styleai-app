@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getOrCreateUserId } from "@/lib/deviceId";
 
 // ── Measurement SVG diagrams ─────────────────────────────────────────────────
 // Each diagram is a focused illustration on a simple body silhouette
@@ -332,6 +333,15 @@ export default function ProfilePage() {
 
   const handleSave = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    // Sync gender to server so depop-feed, for-you, and analyze all filter correctly
+    const userId = getOrCreateUserId();
+    if (profile.gender && ["male", "female", "both"].includes(profile.gender)) {
+      fetch(`/api/user-gender/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gender: profile.gender }),
+      }).catch(() => {});
+    }
     // Notify home feed and other listeners to refresh
     window.dispatchEvent(new CustomEvent("stitch_profile_updated"));
     setSaved(true);

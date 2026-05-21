@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import OnboardingModal from "../components/OnboardingModal";
+import { getOrCreateUserId } from "@/lib/deviceId";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface DepopItem {
@@ -11,16 +12,6 @@ interface DepopItem {
   slug?: string;
   brand_name?: string;
   _aesthetic?: string;
-}
-
-// ── User ID ───────────────────────────────────────────────────────────────────
-function getUserId(): string {
-  let id = localStorage.getItem("stitch_user_id");
-  if (!id) {
-    id = "u_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    localStorage.setItem("stitch_user_id", id);
-  }
-  return id;
 }
 
 // ── Reel Card ─────────────────────────────────────────────────────────────────
@@ -238,7 +229,7 @@ function FitCard({
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ForYouPage() {
-  const userId = getUserId();
+  const userId = getOrCreateUserId();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [items, setItems] = useState<DepopItem[]>([]);

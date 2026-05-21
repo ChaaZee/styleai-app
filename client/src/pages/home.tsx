@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { rankByVector, getTopAesthetics } from "@/lib/styleVector";
 import OnboardingModal from "@/components/OnboardingModal";
+import { getOrCreateUserId } from "@/lib/deviceId";
 
 // ── Clothing SVG illustrations (same set as discover) ───────────────────────
 const Icons: Record<string, JSX.Element> = {
@@ -271,15 +272,6 @@ const FEED_ITEMS: FeedItem[] = [
   { id: 135, label: "Slim Fit Suit",             icon: "jacket",    query: "slim fit suit business casual men",         aesthetic: "Business Casual",  gender: "male" },
 ];
 
-// ── Anonymous user ID (same as For You page) ─────────────────────────────────
-function getUserId(): string {
-  let id = localStorage.getItem("stitch_user_id");
-  if (!id) {
-    id = "u_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    localStorage.setItem("stitch_user_id", id);
-  }
-  return id;
-}
 
 const CHIPS = ["Fits", "Minimal", "Coastal", "Dark Academia", "Streetwear", "Trending"];
 
@@ -392,14 +384,23 @@ export default function HomePage() {
       retryTimer = setTimeout(() => fetchCards(0), 90_000);
     };
     window.addEventListener("stitch_depop_updated", onDepopUpdated);
+
+    // Re-fetch immediately when gender changes in profile
+    const onProfileUpdated = () => {
+      clearTimeout(retryTimer);
+      fetchCards(0); // immediate refresh with new gender filter
+    };
+    window.addEventListener("stitch_profile_updated", onProfileUpdated);
+
     return () => {
       clearTimeout(retryTimer);
       window.removeEventListener("stitch_depop_updated", onDepopUpdated);
+      window.removeEventListener("stitch_profile_updated", onProfileUpdated);
     };
   }, []);
 
   // ── For You: check onboarding + load personalized cards ─────────────────
-  const userId = getUserId();
+  const userId = getOrCreateUserId();
   useEffect(() => {
     fetch(`/api/user-profile/${userId}`)
       .then(r => r.json())

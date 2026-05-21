@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Upload, Sparkles, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { getDeviceId } from "../lib/deviceId";
+import { getDeviceId, getOrCreateUserId } from "../lib/deviceId";
 
 type UploadState = "idle" | "preview" | "analyzing" | "done";
 
@@ -76,8 +76,8 @@ export default function ScanPage() {
       const formData = new FormData();
       formData.append("image", resized, "photo.jpg");
       // Send userId so server can look up gender and remap aesthetics accordingly
-      const userId = localStorage.getItem("stitch_user_id") || "";
-      if (userId) formData.append("userId", userId);
+      const userId = getOrCreateUserId();
+      formData.append("userId", userId);
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "x-device-id": getDeviceId() },
