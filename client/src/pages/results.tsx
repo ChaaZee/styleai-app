@@ -185,9 +185,7 @@ export default function ResultsPage() {
   const search = useSearch();
   const queryClient = useQueryClient();
   const backTo = new URLSearchParams(search).get("from") === "history" ? "/history" : "/";
-  const [activeRetailer, setActiveRetailer] = useState("All");
-  const [activeBudget, setActiveBudget] = useState("All");
-  const [depopMode, setDepopMode] = useState(false);
+  const [depopMode] = useState(true); // always show Depop recommendations
   const [likedPieces, setLikedPieces] = useState<Record<string, boolean>>({});
   // depopGroups: { piece: string, listings: any[] }[]
   const [depopGroups, setDepopGroups] = useState<{ piece: string; listings: any[] }[]>([]);
@@ -309,27 +307,7 @@ export default function ResultsPage() {
   const colorPalette: string[] = (() => { try { return JSON.parse(scan.colorPalette || "[]"); } catch { return []; } })();
   const results: Product[] = (() => { try { return JSON.parse(scan.results || "[]"); } catch { return []; } })();
 
-  // Budget filter
-  const budgetFiltered = activeBudget === "Budget"
-    ? results.filter(r => r.price < 80)
-    : activeBudget === "Mid"
-      ? results.filter(r => r.price >= 80 && r.price < 200)
-      : activeBudget === "Premium"
-        ? results.filter(r => r.price >= 200)
-        : results;
 
-  const retailers = ["All", ...Array.from(new Set(results.map(r => r.retailer)))];
-  const budgetAndRetailerFiltered = depopMode
-    ? budgetFiltered
-    : activeRetailer === "All"
-      ? budgetFiltered
-      : budgetFiltered.filter(r => r.retailer === activeRetailer);
-
-  const outfitProducts = budgetAndRetailerFiltered.filter((p: any) => p.type === "outfit" || !p.type);
-  const similarProducts = budgetAndRetailerFiltered.filter((p: any) => p.type === "similar");
-  // If no split (legacy data), show all under outfit section
-  const hasSplit = outfitProducts.length > 0 && similarProducts.length > 0;
-  const filteredProducts = budgetAndRetailerFiltered;
 
   return (
     <div className="max-w-4xl mx-auto fade-up">
@@ -345,7 +323,7 @@ export default function ResultsPage() {
           />
           <div className="flex-1 min-w-0">
             <p className="text-[10px] text-muted-foreground">Scanned outfit · {scan.aesthetic}</p>
-            <p className="text-sm font-semibold text-foreground">{results.length} matches found</p>
+            <p className="text-sm font-semibold text-foreground">Shop on Depop</p>
           </div>
           <button
             onClick={() => setLocation(backTo)}
@@ -497,61 +475,8 @@ export default function ResultsPage() {
         </div>
       )}
 
-      {/* Budget toggle */}
-      <div className="px-5 sm:px-8 mb-3">
-        <div className="flex rounded-lg border border-border overflow-hidden bg-card">
-          {["All", "Budget", "Mid", "Premium"].map((b) => (
-            <button
-              key={b}
-              onClick={() => setActiveBudget(b)}
-              className={`flex-1 py-2 text-xs font-medium transition-all ${
-                activeBudget === b
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {b}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Retailer tabs */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar px-5 sm:px-8 pb-3">
-        {/* Depop tab — shown for thrift-friendly aesthetics */}
-        <button
-            key="depop"
-            onClick={() => { setDepopMode(true); setActiveRetailer("All"); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${
-              depopMode
-                ? "text-white border border-transparent"
-                : "bg-muted text-muted-foreground border border-border hover:text-foreground"
-            }`}
-            style={depopMode ? { backgroundColor: "#FF2300" } : {}}
-          >
-            <span className={depopMode ? "font-bold" : ""}>d</span>
-            Depop
-          </button>
-        {retailers.map((r) => (
-          <button
-            key={r}
-            onClick={() => { setActiveRetailer(r); setDepopMode(false); }}
-            data-testid={`filter-${r.toLowerCase()}`}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${
-              !depopMode && activeRetailer === r
-                ? "bg-foreground text-background"
-                : "bg-muted text-muted-foreground border border-border hover:text-foreground"
-            }`}
-          >
-            {r}{r === "All" ? ` (${results.length})` : ` (${results.filter(p => p.retailer === r).length})`}
-          </button>
-        ))}
-      </div>
-
-      {/* Product sections */}
-      {depopMode ? (
-        // Depop mode — real listings from Apify
-        <div className="px-5 sm:px-8 pb-4">
+      {/* Depop recommendations */}
+      <div className="px-5 sm:px-8 pb-4">
           {depopLoading && (
             <div className="flex flex-col gap-6">
               {depopPieces.map((piece) => (
@@ -646,36 +571,6 @@ export default function ResultsPage() {
             </div>
           )}
         </div>
-      ) : hasSplit ? (
-        // Split mode — Get the Look + Complete the Look
-        <div className="pb-4">
-          {/* Get the Look */}
-          <div className="px-5 sm:px-8 mb-4">
-            <p className="text-xs font-semibold text-foreground uppercase tracking-[0.08em] mb-2.5">Get the Look</p>
-            <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
-              {outfitProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </div>
-          {/* Complete the Look */}
-          <div className="px-5 sm:px-8">
-            <p className="text-xs font-semibold text-foreground uppercase tracking-[0.08em] mb-2.5">Complete the Look</p>
-            <div className="grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
-              {similarProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        // Legacy / fallback — single flat grid
-        <div className="px-5 sm:px-8 grid grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 pb-4">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
