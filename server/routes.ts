@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, upsertScannedPieces, getScannedPieces } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, upsertScannedPieces, getScannedPieces, tagListingGender, genderPassesFilter as listingGenderOk } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -2006,7 +2006,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       }
       const { default: pg } = await import("postgres");
       const c = pg(process.env.DATABASE_URL!, { ssl: "require" });
-      await c`UPDATE user_profiles SET gender = ${gender} WHERE user_id = ${userId}`;
+      // UPSERT so new users get a row with the correct gender, not just an UPDATE that hits 0 rows
+      await c`
+        INSERT INTO user_profiles (user_id, gender, interaction_count, liked_ids, skipped_ids, onboarded, liked_items)
+        VALUES (${userId}, ${gender}, 0, '{}', '{}', false, '[]')
+        ON CONFLICT (user_id) DO UPDATE SET gender = EXCLUDED.gender
+      `;
 
       // Re-seed taste vector with gender-appropriate embeddings so the feed updates immediately.
       // Pull the user's current onboarding aesthetics from the existing vector direction,
@@ -3047,17 +3052,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   ];
 
   // GET /api/depop-feed?aesthetics=<json array> — return cached Depop cards for home feed
-  // Gender filter for home feed listings — mirrors the same logic in storage.ts
-  const FEED_FEMALE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear|dress|dresses|skirt|skirts|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit|floral|petite|heels?|stiletto|pumps?|ballet flat|wedge|kitten heel|crop top|halter|tube top|bustier|slip dress|wrap dress|pinafore|smock|prairie|feminine|lace top|ruffle|bow top|cardigan set|matching set|co-ord|kickpleat|kick pleat|peplum|spaghetti strap|off shoulder|one shoulder|asymmetric hem|babydoll|broderie|chiffon blouse|silk slip|lingerie|cami|nightgown|bikini|swimsuit|one-piece|sarong|palazzo|culottes)\b/i;
-  const FEED_MALE_SIGNALS   = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|oxford shirt|blazer|loafer|brogues|suit jacket|trousers|dress shirt|polo shirt|henley|rugby shirt|harrington|overshirt|flight jacket|varsity jacket|cargo pants|cargo shorts|board shorts|swim trunks|flannel shirt|denim jacket men|chelsea boots|derby shoes|brogue|desert boots|work boots)\b/i;
-  function feedGenderOk(title: string, gender: string): boolean {
+  // Gender filter: use pre-tagged _gender field when available, fall back to title regex
+  function feedGenderOk(l: any, gender: string): boolean {
     if (!gender || gender === "both") return true;
-    const hasFem  = FEED_FEMALE_SIGNALS.test(title);
-    const hasMasc = FEED_MALE_SIGNALS.test(title);
-    const neutral = !hasFem && !hasMasc;
-    if (gender === "male")   return neutral || (hasMasc && !hasFem);
-    if (gender === "female") return neutral || (hasFem && !hasMasc);
-    return true;
+    const g = l._gender;
+    if (g === "both" || !g) return listingGenderOk(l.title || "", gender);
+    return g === gender;
   }
 
   app.get("/api/depop-feed", async (req, res) => {
@@ -3065,12 +3065,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     let aesthetics: string[] = [];
     try { aesthetics = JSON.parse(aestheticsRaw); } catch { aesthetics = []; }
 
-    // Resolve gender: prefer server-stored profile (authoritative) over param
+    // Resolve gender: DB is authoritative only when explicitly male/female.
+    // If DB says "both" or is missing, trust the client-sent param instead.
     let gender = genderParam || "both";
     if (userId) {
       try {
         const profile = await getUserProfile(userId);
-        if (profile && (profile as any).gender) gender = (profile as any).gender;
+        const dbGender = profile && (profile as any).gender;
+        if (dbGender === "male" || dbGender === "female") gender = dbGender;
       } catch {}
     }
 
@@ -3093,7 +3095,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const listings = results.flat().filter((l: any) => {
         const key = l.url || l.product_link || (l.image ? l.image.split('?')[0] : '');
         if (!key || seenUrls.has(key)) return false;
-        if (!feedGenderOk(l.title || "", gender)) return false;
+        if (!feedGenderOk(l, gender)) return false;
         seenUrls.add(key);
         return true;
       }).slice(0, 150); // cap at 150
