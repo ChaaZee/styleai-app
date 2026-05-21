@@ -147,6 +147,19 @@ export async function initDB() {
   await client`
     ALTER TABLE depop_cache ADD COLUMN IF NOT EXISTS permanent BOOLEAN NOT NULL DEFAULT FALSE
   `.catch(() => {});
+
+  // scanned_pieces — every clothing piece seen in a real scan, deduplicated by piece+aesthetic
+  // Used by seed-trending to know what real users are wearing on Depop
+  await client`
+    CREATE TABLE IF NOT EXISTS scanned_pieces (
+      piece        TEXT NOT NULL,
+      aesthetic    TEXT NOT NULL,
+      garment_type TEXT,
+      scan_count   INTEGER NOT NULL DEFAULT 1,
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (piece, aesthetic)
+    )
+  `;
 }
 
 export interface IStorage {
@@ -179,6 +192,47 @@ export function dedupeListings(listings: any[]): any[] {
     seen.add(key);
     return true;
   });
+}
+
+// ── Scanned pieces tracking ─────────────────────────────────────────────────
+// Upsert all key_pieces from a scan so seed-trending can target real user items.
+export async function upsertScannedPieces(
+  pieces: string[],
+  aesthetic: string,
+  garmentTypes: Record<string, string> = {}, // piece → garmentType, optional
+): Promise<void> {
+  if (!pieces.length) return;
+  for (const piece of pieces) {
+    const pieceSafe     = piece.replace(/'/g, "''");
+    const aestheticSafe = aesthetic.replace(/'/g, "''");
+    const gt            = (garmentTypes[piece] || null);
+    const gtVal         = gt ? `'${gt.replace(/'/g, "''")}'` : "NULL";
+    await client.unsafe(`
+      INSERT INTO scanned_pieces (piece, aesthetic, garment_type, scan_count, last_seen_at)
+      VALUES ('${pieceSafe}', '${aestheticSafe}', ${gtVal}, 1, NOW())
+      ON CONFLICT (piece, aesthetic)
+      DO UPDATE SET
+        scan_count   = scanned_pieces.scan_count + 1,
+        garment_type = COALESCE(EXCLUDED.garment_type, scanned_pieces.garment_type),
+        last_seen_at = NOW()
+    `);
+  }
+}
+
+// Return the most-scanned pieces, ordered by scan_count DESC.
+export async function getScannedPieces(limit = 200): Promise<{ piece: string; aesthetic: string; garmentType: string | null; scanCount: number }[]> {
+  const rows = await client`
+    SELECT piece, aesthetic, garment_type, scan_count
+    FROM scanned_pieces
+    ORDER BY scan_count DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(r => ({
+    piece:       r.piece,
+    aesthetic:   r.aesthetic,
+    garmentType: r.garment_type ?? null,
+    scanCount:   r.scan_count,
+  }));
 }
 
 // ─────────────────────────────────────────────

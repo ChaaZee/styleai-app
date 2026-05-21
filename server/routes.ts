@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, upsertScannedPieces, getScannedPieces } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import multer from "multer";
 import rateLimit from "express-rate-limit";
@@ -1883,9 +1883,19 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         ];
 
                 const trendQueries = fashionTerms.map(t => ({ query: t.toLowerCase(), aesthetic: getAesthetic(t), garmentType: undefined as string | undefined }));
-        const allQueries = [...curatedBase, ...trendQueries];
 
-        console.log(`[seed-trending] ${allQueries.length} queries (${fashionTerms.length} from Trends + ${curatedBase.length} curated)`);
+        // Real pieces from user scans — highest priority since these are what actual users wear
+        const scannedPieces = await getScannedPieces(200);
+        const scannedQueries = scannedPieces.map(p => ({
+          query:       p.piece.toLowerCase(),
+          aesthetic:   p.aesthetic,
+          garmentType: p.garmentType ?? undefined,
+        }));
+
+        // scannedQueries first so they get seeded before curated/trend list
+        const allQueries = [...scannedQueries, ...curatedBase, ...trendQueries];
+
+        console.log(`[seed-trending] ${allQueries.length} queries (${scannedQueries.length} from scans + ${fashionTerms.length} from Trends + ${curatedBase.length} curated)`);
 
         // Run sequentially with delay, 8 items each, tagged with garmentType
         let seeded = 0;
@@ -2133,6 +2143,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const profile = await getUserProfile(req.params.userId);
       if (!profile) return res.json({ exists: false, onboarded: false });
       res.json({ exists: true, onboarded: profile.onboarded, interactionCount: profile.interaction_count });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // GET /api/scanned-pieces — all pieces ever scanned, sorted by frequency
+  app.get("/api/scanned-pieces", async (_req, res) => {
+    try {
+      const pieces = await getScannedPieces(500);
+      res.json({ count: pieces.length, pieces });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -2579,6 +2599,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       });
 
       res.json({ scanId: scan.id });
+
+      // Track all key pieces for seed-trending (fire-and-forget, never blocks response)
+      if (analysis.keyPieces?.length) {
+        // Build garmentType map from garmentDepopQueries so pieces get categorised
+        const gtMap: Record<string, string> = {};
+        for (const { query, garmentType } of garmentDepopQueries) {
+          if (garmentType) gtMap[query] = garmentType;
+        }
+        upsertScannedPieces(analysis.keyPieces, analysis.aesthetic, gtMap).catch(() => {});
+      }
 
       // Post-analysis: serve Depop recommendations purely from the permanent cache.
       // No live scraping — pull by garmentType + aesthetic so results are always relevant.
