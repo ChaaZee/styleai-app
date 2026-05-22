@@ -165,6 +165,28 @@ function AppContent() {
     if (showQuiz) setLocation("/quiz");
   }, [showQuiz, setLocation]);
 
+  // Sync DB gender → localStorage on every app boot so getGenderPref() is always accurate
+  useEffect(() => {
+    try {
+      const userId = localStorage.getItem("stitch_user_id");
+      if (!userId) return;
+      fetch(`/api/user-profile/${userId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data?.gender || data.gender === "both") return; // don't overwrite with default
+          const raw = localStorage.getItem("stitch_profile") || "{}";
+          const profile = JSON.parse(raw);
+          if (profile.gender !== data.gender) {
+            profile.gender = data.gender;
+            localStorage.setItem("stitch_profile", JSON.stringify(profile));
+            // Tell home feed to re-read gender
+            window.dispatchEvent(new CustomEvent("stitch_profile_updated"));
+          }
+        })
+        .catch(() => {});
+    } catch {}
+  }, []);
+
   const [currentLocation] = useLocation();
   const isQuizRoute = currentLocation === "/quiz";
   const isDiscoverRoute = currentLocation.startsWith("/discover") || currentLocation.startsWith("/for-you");

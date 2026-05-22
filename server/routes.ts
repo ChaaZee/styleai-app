@@ -2154,7 +2154,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     try {
       const profile = await getUserProfile(req.params.userId);
       if (!profile) return res.json({ exists: false, onboarded: false });
-      res.json({ exists: true, onboarded: profile.onboarded, interactionCount: profile.interaction_count });
+      res.json({ exists: true, onboarded: profile.onboarded, interactionCount: profile.interaction_count, gender: profile.gender ?? "both" });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
