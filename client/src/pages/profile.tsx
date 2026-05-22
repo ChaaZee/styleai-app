@@ -4,6 +4,28 @@ import { ChevronLeft, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getOrCreateUserId } from "@/lib/deviceId";
 
+// Aesthetics that are female-coded — remap to neutral equivalent for male users
+const FEMALE_ONLY_AESTHETICS = new Set(["Coquette","Soft Girl","Cottagecore","Coastal Grandmother","E-Girl","Clean Girl","Balletcore","Romantic","Fairycore","Dark Feminine","Baddie"]);
+const FEMALE_AESTHETIC_REMAP: Record<string,string> = {
+  "Clean Girl": "Minimalist",
+  "Coastal Grandmother": "Old Money",
+  "Romantic": "Vintage",
+  "Soft Girl": "Y2K",
+  "Coquette": "Vintage",
+  "Fairycore": "Dark Academia",
+  "Balletcore": "Minimalist",
+  "Dark Feminine": "Grunge",
+  "Baddie": "Streetwear",
+  "Cottagecore": "Dark Academia",
+};
+
+function getGenderPrefFromStorage(): "male" | "female" | "both" {
+  try {
+    const p = JSON.parse(localStorage.getItem("stitch_profile") || "{}");
+    return p.gender ?? "both";
+  } catch { return "both"; }
+}
+
 // ── Measurement SVG diagrams ─────────────────────────────────────────────────
 // Each diagram is a focused illustration on a simple body silhouette
 // Accent colour matches Stitch primary: hsl(24 42% 60%) = #C8956A
@@ -268,7 +290,16 @@ function StyleDNASection() {
       if (raw) {
         const p = JSON.parse(raw);
         if (p.aesthetics?.length) {
-          setAesthetics(p.aesthetics);
+          const gender = getGenderPrefFromStorage();
+          // For male users: remap female-only aesthetics to their neutral equivalent
+          const filtered = (p.aesthetics as string[])
+            .map(a => gender === "male" && FEMALE_ONLY_AESTHETICS.has(a)
+              ? (FEMALE_AESTHETIC_REMAP[a] ?? null)
+              : a
+            )
+            .filter(Boolean)
+            .filter((a, i, arr) => arr.indexOf(a) === i) as string[]; // dedupe
+          setAesthetics(filtered);
           setHasQuiz(true);
         }
       }

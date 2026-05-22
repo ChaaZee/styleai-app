@@ -464,10 +464,16 @@ export default function HomePage() {
     return filtered.length > 0 ? filtered : rankedItems;
   }, [activeChip, rankedItems]);
 
-  // Personalised greeting
+  // Personalised greeting — filter female-only aesthetics for male users
   const [topAesthetic] = useState<string | null>(() => {
-    const tops = getTopAesthetics(1);
     if (!localStorage.getItem("stitch_quiz_done")) return null;
+    const gender = getGenderPref();
+    const tops = getTopAesthetics(5); // get more so we have fallbacks
+    for (const a of tops) {
+      if (gender !== "male" || !FEMALE_ONLY_CLIENT.has(a)) return a;
+      const remapped = VECTOR_TO_CACHE[a]; // use remap if available
+      if (remapped) return remapped;
+    }
     return tops[0] ?? null;
   });
 
