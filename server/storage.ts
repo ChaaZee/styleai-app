@@ -862,23 +862,45 @@ export const FEMALE_TITLE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|gi
 export const MALE_TITLE_SIGNALS = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|oxford shirt|blazer|loafer|brogues|suit jacket|trousers|dress shirt|tie|necktie|cufflinks|polo shirt|henley|rugby shirt|harrington|overshirt|flight jacket|varsity jacket|bomber men|coach jacket|track jacket men|cargo pants men|cargo shorts|board shorts|swim trunks|joggers men|sweatpants men|hoodie men|crewneck men|quarter zip|flannel shirt|workwear|denim jacket men|chelsea boots men|derby shoes|monk strap|brogue|desert boots|work boots men)\b/i;
 
 /**
+ * Extract all searchable text from a listing.
+ * Combines the stored title with words extracted from the URL slug —
+ * the slug always contains the full product name including gender keywords
+ * that get cut off from the 80-char title field.
+ * e.g. slug "username-hot-topic-womens-black-hoodie-ab12" → "hot topic womens black hoodie"
+ */
+function listingText(listing: any): string {
+  const title = listing.title || listing.name || "";
+  const url: string = listing.url || "";
+  const slugMatch = url.match(/\/products\/([^/?#]+)/i);
+  const slugWords = slugMatch ? slugMatch[1].replace(/-/g, " ") : "";
+  return `${title} ${slugWords}`;
+}
+
+/**
  * Tag a listing object with a _gender field: "male" | "female" | "both"
- * based on title signals. Mutates and returns the listing.
+ * based on title + URL slug signals. Mutates and returns the listing.
  */
 export function tagListingGender(listing: any): any {
-  const title = listing.title || listing.name || "";
-  const hasFem  = FEMALE_TITLE_SIGNALS.test(title);
-  const hasMasc = MALE_TITLE_SIGNALS.test(title);
+  const text = listingText(listing);
+  const hasFem  = FEMALE_TITLE_SIGNALS.test(text);
+  const hasMasc = MALE_TITLE_SIGNALS.test(text);
   if (hasFem && !hasMasc)  listing._gender = "female";
   else if (hasMasc && !hasFem) listing._gender = "male";
   else                         listing._gender = "both";  // neutral or ambiguous
   return listing;
 }
 
-export function genderPassesFilter(title: string, gender: string): boolean {
+export function genderPassesFilter(listing: any, gender: string): boolean {
   if (gender === "both") return true;
-  const hasFem  = FEMALE_TITLE_SIGNALS.test(title);
-  const hasMasc = MALE_TITLE_SIGNALS.test(title);
+  // Use pre-tagged _gender when available (already checked title + slug)
+  const g = listing._gender;
+  if (g === "male" || g === "female") {
+    return g === gender;
+  }
+  // Fallback: run regex on title + slug for untagged items
+  const text = typeof listing === "string" ? listing : listingText(listing);
+  const hasFem  = FEMALE_TITLE_SIGNALS.test(text);
+  const hasMasc = MALE_TITLE_SIGNALS.test(text);
   const isNeutral = !hasFem && !hasMasc;
   if (gender === "male")   return isNeutral || (hasMasc && !hasFem);
   if (gender === "female") return isNeutral || (hasFem && !hasMasc);
@@ -933,7 +955,7 @@ export async function getForYouRecommendations(
       const key = item.url || item.id;
       if (seen.has(key)) continue;
       seen.add(key);
-      if (!genderPassesFilter(item.title || "", gender)) continue;
+      if (!genderPassesFilter(item, gender)) continue;
       all.push({ ...item, _aesthetic: row.aesthetic });
       if (all.length >= limit + 1) break;
     }
@@ -973,7 +995,7 @@ export async function getAverageEmbeddingForAesthetics(aesthetics: string[], gen
   const filteredRows = (gender === "male" || gender === "female")
     ? rows.filter(row => {
         const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
-        const passCount = listings.filter((l: any) => genderPassesFilter(l.title || "", gender!)).length;
+        const passCount = listings.filter((l: any) => genderPassesFilter(l, gender!)).length;
         // Keep the row if >40% of its listings pass the gender filter
         return passCount / Math.max(listings.length, 1) >= 0.4;
       })

@@ -3056,7 +3056,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   function feedGenderOk(l: any, gender: string): boolean {
     if (!gender || gender === "both") return true;
     const g = l._gender;
-    if (g === "both" || !g) return listingGenderOk(l.title || "", gender);
+    if (g === "both" || !g) return listingGenderOk(l, gender);
     return g === gender;
   }
 

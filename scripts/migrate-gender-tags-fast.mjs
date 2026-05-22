@@ -12,10 +12,18 @@ const FEMALE_TITLE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|girlie|fe
 
 const MALE_TITLE_SIGNALS = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|oxford shirt|blazer|loafer|brogues|suit jacket|trousers|dress shirt|polo shirt|henley|rugby shirt|harrington|overshirt|flight jacket|varsity jacket|cargo pants|cargo shorts|board shorts|swim trunks|flannel shirt|denim jacket men|chelsea boots|derby shoes|brogue|desert boots|work boots|mens hoodie|mens tee|mens jacket|mens coat|mens jeans|mens trousers|mens shorts|mens shirt|mens suit|mens blazer|mens chinos)\b/i;
 
-function tagListingGender(listing) {
+function listingText(listing) {
   const title = listing.title || listing.name || "";
-  const hasFem  = FEMALE_TITLE_SIGNALS.test(title);
-  const hasMasc = MALE_TITLE_SIGNALS.test(title);
+  const url = listing.url || "";
+  const slugMatch = url.match(/\/products\/([^/?#]+)/i);
+  const slugWords = slugMatch ? slugMatch[1].replace(/-/g, " ") : "";
+  return `${title} ${slugWords}`;
+}
+
+function tagListingGender(listing) {
+  const text = listingText(listing);
+  const hasFem  = FEMALE_TITLE_SIGNALS.test(text);
+  const hasMasc = MALE_TITLE_SIGNALS.test(text);
   if (hasFem && !hasMasc)       listing._gender = "female";
   else if (hasMasc && !hasFem)  listing._gender = "male";
   else                           listing._gender = "both";
