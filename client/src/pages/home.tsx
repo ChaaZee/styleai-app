@@ -299,15 +299,17 @@ export default function HomePage() {
   const [, setLocation] = useLocation();
   const [activeChip, setActiveChip] = useState("Fits");
 
-  // Gender-filter + vector-rank
+  // Gender-filter + vector-rank (used for initial state only; updates go via setRankedItems)
   const rerank = useCallback(() => {
-    const genderPref = getGenderPref();
-    const filtered = genderPref === "both"
+    const g = getGenderPref();
+    const filtered = g === "both"
       ? FEED_ITEMS
-      : FEED_ITEMS.filter(item => item.gender === genderPref || item.gender === "both");
+      : FEED_ITEMS.filter(item => item.gender === g || item.gender === "both");
     return rankByVector(filtered);
   }, []);
 
+  // Track gender pref as state so depop-feed useEffect re-runs when it changes
+  const [genderPref, setGenderPref] = useState<"male" | "female" | "both">(getGenderPref);
   const [rankedItems, setRankedItems] = useState<FeedItem[]>(rerank);
   const [depopCards, setDepopCards] = useState<any[]>([]);
   const [forYouCards, setForYouCards] = useState<any[]>([]);
@@ -340,11 +342,25 @@ export default function HomePage() {
   // Female-only aesthetics — strip from depop-feed request for male users
   const FEMALE_ONLY_CLIENT = new Set(["Coquette","Soft Girl","Cottagecore","Coastal Grandmother","E-Girl","Clean Girl","Balletcore","Romantic","Fairycore"]);
 
+  // When profile updates (gender change), re-read gender pref into state → triggers re-fetch
+  useEffect(() => {
+    const onProfileUpdated = () => {
+      const newGender = getGenderPref();
+      setGenderPref(newGender);
+      // Also re-rank the FEED_ITEMS chips with new gender
+      const filtered = newGender === "both"
+        ? FEED_ITEMS
+        : FEED_ITEMS.filter(item => item.gender === newGender || item.gender === "both");
+      setRankedItems(rankByVector(filtered));
+    };
+    window.addEventListener("stitch_profile_updated", onProfileUpdated);
+    return () => window.removeEventListener("stitch_profile_updated", onProfileUpdated);
+  }, []);
+
   // Fetch cached Depop cards for home feed
-  // Passes top aesthetics, userId (for server-side gender lookup), and gender fallback
+  // Re-runs whenever genderPref changes (via state above)
   useEffect(() => {
     const rawTops = getTopAesthetics(3);
-    const genderPref = getGenderPref();
     // Normalise local vector aesthetic names to depop cache names, then gender-filter
     const tops = rawTops
       .map(a => VECTOR_TO_CACHE[a] ?? a)
@@ -385,19 +401,11 @@ export default function HomePage() {
     };
     window.addEventListener("stitch_depop_updated", onDepopUpdated);
 
-    // Re-fetch immediately when gender changes in profile
-    const onProfileUpdated = () => {
-      clearTimeout(retryTimer);
-      fetchCards(0); // immediate refresh with new gender filter
-    };
-    window.addEventListener("stitch_profile_updated", onProfileUpdated);
-
     return () => {
       clearTimeout(retryTimer);
       window.removeEventListener("stitch_depop_updated", onDepopUpdated);
-      window.removeEventListener("stitch_profile_updated", onProfileUpdated);
     };
-  }, []);
+  }, [genderPref]); // re-run whenever gender changes
 
   // ── For You: check onboarding + load personalized cards ─────────────────
   const userId = getOrCreateUserId();
