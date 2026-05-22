@@ -858,8 +858,11 @@ export function remapAestheticForGender(aesthetic: string, gender: string): stri
 // Gender detection: only look at explicit gender words in the title.
 // If the title says "women" or "men", tag it. Otherwise it's "both".
 // No brand signals, no garment-type inference — Depop always states the gender in the title when it's gendered.
-const EXPLICIT_FEMALE = /\b(women|womens|woman|womans|womena|ladies|lady|girls?|female|womenswear)\b/i;
-const EXPLICIT_MALE   = /\b(men|mens|man|male|boys?|menswear)\b/i;
+// Matches "women", "womens", "women's", "women’s", "woman", etc.
+// The apostrophe acts as a word boundary so \bwomen\b already catches "Women's",
+// but we also add explicit apostrophe forms to be airtight.
+const EXPLICIT_FEMALE = /\b(women[''’]?s?|woman|womans|womena|ladies|lady|girls?|female|womenswear)\b/i;
+const EXPLICIT_MALE   = /\b(men[''’]?s?|man|male|boys?|menswear)\b/i;
 // Keep these exported so retag script and client code still compile, but they are no longer used for filtering
 export const FEMALE_TITLE_SIGNALS = EXPLICIT_FEMALE;
 export const MALE_TITLE_SIGNALS   = EXPLICIT_MALE;

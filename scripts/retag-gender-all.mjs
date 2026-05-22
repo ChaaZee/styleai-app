@@ -10,8 +10,8 @@ const client = postgres(DATABASE_URL, { ssl: { rejectUnauthorized: false }, max:
 
 // Only explicit gender words in the title — no brands, no garment types.
 // Matches storage.ts tagListingGender exactly.
-const EXPLICIT_FEMALE = /\b(women|womens|woman|womans|womena|ladies|lady|girls?|female|womenswear)\b/i;
-const EXPLICIT_MALE   = /\b(men|mens|man|male|boys?|menswear)\b/i;
+const EXPLICIT_FEMALE = /\b(women[''\u2019]?s?|woman|womans|womena|ladies|lady|girls?|female|womenswear)\b/i;
+const EXPLICIT_MALE   = /\b(men[''\u2019]?s?|man|male|boys?|menswear)\b/i;
 
 function listingText(l) {
   const title = l.title || l.name || "";
