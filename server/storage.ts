@@ -964,7 +964,7 @@ export async function getForYouRecommendations(
   // Cosine similarity across ALL aesthetics/types — pure taste-based
   // For male users: exclude cache rows whose query contains female keywords
   const genderQueryFilter = gender === "male"
-    ? client`AND query !~* '\y(women|womens|womans|woman|ladies|girls?|female)\y'`
+    ? client`AND NOT (query ILIKE ANY(ARRAY['%women%','%womens%','%womans%','%woman%','%ladies%','%girls%','%female%']))`
     : client``;
   const rows = await client<{ listings: any[]; query: string; aesthetic: string }[]>`
     SELECT listings, query, aesthetic

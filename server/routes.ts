@@ -84,19 +84,28 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
     ? i.url
     : `https://www.depop.com/search/?q=${encodeURIComponent(searchQ)}`;
 
-  // Derive title from slug (authoritative — matches what Depop shows on the listing page)
+  // Build slug-derived title for style/aesthetic context
   // slug example: "956thriftfindz-ann-taylor-womens-red-skirt-ab12"
   const slugFromUrl = url.match(/\/products\/([^/?#]+)/i)?.[1] || i.slug || "";
-  let title = "";
+  let slugTitle = "";
   if (slugFromUrl) {
     const parts = slugFromUrl.split("-");
     const hasHash = parts.length > 1 && /^[a-f0-9]{4}$/i.test(parts[parts.length - 1]);
     // Drop first segment (seller username) and trailing hash
     const middle = parts.slice(1, hasHash ? -1 : undefined);
-    title = middle.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    slugTitle = middle.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
-  // Fall back to API-provided fields only if slug gave nothing
-  if (!title) title = i.title || i.description || i.name || "";
+  // Real Depop h1 title from API (e.g. "Levi's Women's Brown Trousers") — use as primary
+  // Combine with slug so gender words from EITHER source are captured for tagging
+  const realTitle = i.title || i.name || "";
+  let title = "";
+  if (realTitle && slugTitle) {
+    // Store real title as display; append slug words so gender signals aren't lost
+    title = `${realTitle} ${slugTitle}`;
+  } else {
+    title = realTitle || slugTitle;
+  }
+  if (!title) title = i.description || "";
   if (!title) title = searchQ.replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   // Reject non-clothing items: trading cards, toys, games, electronics, home goods, etc.
@@ -173,19 +182,25 @@ function normaliseDepopObject(item: any, idx: number, query: string) {
     ? `https://www.depop.com/products/${slug}/`
     : `https://www.depop.com/search/?q=${encodeURIComponent(query)}`;
 
-  // Title: slug is the authoritative source — it's how Depop generates the
-  // listing page title and always contains the full product name + gender.
-  // item.description is a free-text seller blurb, often truncated/irrelevant.
-  let title = "";
+  // Build slug-derived title for style/aesthetic context
+  let slugTitle = "";
   if (slug) {
     const parts = slug.split("-");
     // Drop first segment (username) and last (4-char alphanumeric hash)
     const hasHash = parts.length > 1 && /^[a-f0-9]{4}$/i.test(parts[parts.length - 1]);
     const middle = parts.slice(1, hasHash ? -1 : undefined);
-    title = middle.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    slugTitle = middle.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
-  // Only fall back to description/title if slug didn't produce anything
-  if (!title) title = item.title || item.description || "";
+  // Real Depop h1 title from API (e.g. "Levi's Women's Brown Trousers") — use as primary
+  // Combine with slug so gender words from EITHER source are captured for tagging
+  const realTitle = item.title || item.name || "";
+  let title = "";
+  if (realTitle && slugTitle) {
+    title = `${realTitle} ${slugTitle}`;
+  } else {
+    title = realTitle || slugTitle;
+  }
+  if (!title) title = item.description || "";
   if (!title) title = query.replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   // v3 price: pricing.original_price.price_breakdown.price.amount
