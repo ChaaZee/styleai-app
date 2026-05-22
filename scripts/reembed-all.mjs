@@ -23,22 +23,27 @@ async function embed(text) {
 }
 
 async function run() {
-  console.log("Loading rows…");
-  const rows = await client`SELECT query, listings FROM depop_cache WHERE jsonb_array_length(listings) > 0`;
-  console.log(`  ${rows.length} non-empty rows to embed`);
+  // Get just the query strings first (lightweight)
+  console.log("Loading query list…");
+  const queryRows = await client`SELECT query FROM depop_cache WHERE jsonb_array_length(listings) > 0`;
+  const queries = queryRows.map(r => r.query);
+  console.log(`  ${queries.length} non-empty rows to embed`);
 
   const CONCURRENCY = 8;
   let done = 0, failed = 0;
 
-  for (let i = 0; i < rows.length; i += CONCURRENCY) {
-    const slice = rows.slice(i, i + CONCURRENCY);
-    await Promise.all(slice.map(async row => {
+  for (let i = 0; i < queries.length; i += CONCURRENCY) {
+    const slice = queries.slice(i, i + CONCURRENCY);
+    await Promise.all(slice.map(async query => {
       try {
+        // Fetch one row at a time — avoids loading all 8k JSONB blobs at once
+        const [row] = await client`SELECT listings FROM depop_cache WHERE query = ${query}`;
+        if (!row) return;
         const titles = (row.listings || []).slice(0, 5).map(l => l.title).filter(Boolean).join(", ");
-        const text = `${row.query}: ${titles}`;
+        const text = `${query}: ${titles}`;
         const vec = await embed(text);
         const vecStr = `[${vec.join(",")}]`;
-        const q = row.query.replace(/'/g, "''");
+        const q = query.replace(/'/g, "''");
         await client.unsafe(`UPDATE depop_cache SET embedding = '${vecStr}'::vector WHERE query = '${q}'`);
         done++;
       } catch (e) {
@@ -46,7 +51,7 @@ async function run() {
         if (e?.status === 429) await new Promise(r => setTimeout(r, 8000));
       }
     }));
-    if (done % 400 === 0 || i === 0) console.log(`  ${done}/${rows.length} embedded, ${failed} failed…`);
+    if (done % 200 === 0) process.stdout.write(`  ${done}/${queries.length} embedded, ${failed} failed…\n`);
   }
 
   console.log(`\nDone! Embedded: ${done}, Failed: ${failed}`);
