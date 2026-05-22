@@ -856,6 +856,9 @@ export function remapAestheticForGender(aesthetic: string, gender: string): stri
 }
 
 // Gender signals used to filter listing titles
+// ── Explicit gender words — these always win over garment-type signals when both fire
+const EXPLICIT_FEMALE = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear)\b/i;
+const EXPLICIT_MALE   = /\b(men|mens|man|male|masculine|boys?|menswear)\b/i;
 // ── Female signals: explicit labels + garments that are near-exclusively womenswear
 export const FEMALE_TITLE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|girlie|female|feminine|womenswear|dress|dresses|skirt|skirts|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit|petite|heels?|stiletto|pumps?|ballet flat|wedge|kitten heel|crop top|halter|tube top|bustier|slip dress|wrap dress|pinafore|smock|prairie|lace top|ruffles?|bow top|cardigan set|matching set|co-ord|kickpleat|kick pleat|peplum|spaghetti strap|off shoulder|one shoulder|asymmetric hem|babydoll|broderie|chiffon blouse|silk slip|lingerie|cami|nightgown|bikini|swimsuit|one-piece|sarong|palazzo|culottes|wide leg crop|flare jeans women|mom jeans women|bardot|milkmaid|bralette|bodysuit|flowy|ditsy|smocked|tiered skirt|balloon sleeve|puff sleeve|frill|flutter sleeve|button front skirt|tennis skirt|micro skirt|tennis dress|shift dress|sheath dress|a-line|fit and flare|empire waist|sweetheart neck|strapless|tube dress|floral dress|gingham dress|linen dress|shirt dress|tea dress|swing dress|fairy dress|cottagecore dress|whimsigoth|kilt|kawaii|juniors?|junior size|victoria secret|victorias secret|edikted|cupshe|mistress rocks|free people|we the free|aritzia|lululemon women|loft women|the loft|justice girls?|fabletics women|chuu|nastygal|nasty gal|princess polly|showpo|urban outfitters women|revolve women|shein women|boohoo women|forever 21 women|h&m divided|asos women|topshop|zara women|anthropologie|reformation|abercrombie women|ae women|american eagle women)\b/i;
 // ── Male signals: explicit labels + garments that are near-exclusively menswear
@@ -886,7 +889,14 @@ export function tagListingGender(listing: any): any {
   const hasMasc = MALE_TITLE_SIGNALS.test(text);
   if (hasFem && !hasMasc)  listing._gender = "female";
   else if (hasMasc && !hasFem) listing._gender = "male";
-  else                         listing._gender = "both";  // neutral or ambiguous
+  else if (hasFem && hasMasc) {
+    // Both fire — explicit gender word wins (e.g. "womens blazer" → female)
+    const explicitFem  = EXPLICIT_FEMALE.test(text);
+    const explicitMasc = EXPLICIT_MALE.test(text);
+    if (explicitFem && !explicitMasc)       listing._gender = "female";
+    else if (explicitMasc && !explicitFem)  listing._gender = "male";
+    else                                    listing._gender = "both";
+  } else listing._gender = "both";  // neutral
   return listing;
 }
 
@@ -902,6 +912,14 @@ export function genderPassesFilter(listing: any, gender: string): boolean {
   const hasFem  = FEMALE_TITLE_SIGNALS.test(text);
   const hasMasc = MALE_TITLE_SIGNALS.test(text);
   const isNeutral = !hasFem && !hasMasc;
+  if (hasFem && hasMasc) {
+    // Conflict — explicit gender word breaks the tie
+    const explicitFem  = EXPLICIT_FEMALE.test(text);
+    const explicitMasc = EXPLICIT_MALE.test(text);
+    if (explicitFem && !explicitMasc) return gender === "female";
+    if (explicitMasc && !explicitFem) return gender === "male";
+    return true; // genuinely ambiguous — show to both
+  }
   if (gender === "male")   return isNeutral || (hasMasc && !hasFem);
   if (gender === "female") return isNeutral || (hasFem && !hasMasc);
   return true;
