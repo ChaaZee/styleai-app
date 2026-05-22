@@ -1416,22 +1416,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.post("/api/seed-wave", async (req, res) => {
     const { queries, limit = 8 } = req.body as { queries: { query: string; aesthetic: string; garmentType: string }[]; limit?: number };
     if (!queries?.length) return res.status(400).json({ error: "queries required" });
-    res.json({ started: true, total: queries.length });
-    // Run in background
-    (async () => {
-      let seeded = 0;
-      for (const { query, aesthetic, garmentType } of queries) {
-        const cached = await getDepopCache(query).catch(() => null);
-        if (cached) { seeded++; continue; }
-        const listings = await scrapeDepopDirect(query, limit).catch(() => []);
-        if (listings.length) {
-          await setDepopCache(query, listings, aesthetic, true, garmentType).catch(() => {});
-          seeded++;
-        }
-        await new Promise(r => setTimeout(r, 2000));
-      }
-      console.log(`[seed-wave] done: ${seeded}/${queries.length} seeded`);
-    })();
+    // Cache-only mode: no live scraping, just report what's already cached
+    const cached = await Promise.all(queries.map(async ({ query }) => ({
+      query,
+      hit: !!(await getDepopCache(query).catch(() => null)),
+    })));
+    const hits = cached.filter(c => c.hit).length;
+    console.log(`[seed-wave] cache-only mode: ${hits}/${queries.length} already cached`);
+    res.json({ started: false, cached: hits, total: queries.length, message: "cache-only mode — live scraping disabled" });
   });
 
   // Seed trending Depop cards from Google Trends fashion searches
@@ -2943,42 +2935,9 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         return res.json({ cached: true, groups });
       }
 
-      // Partial or no cache — try proxy scraper first (instant), then Apify
+      // Partial or no cache — serve cached results + aesthetic fallback for misses
       const uncached = cacheResults.filter(r => !r.listings);
       let runs: { query: string; runId: string; datasetId: string }[] = [];
-
-      // If proxy is available, scrape all uncached queries directly — fast, no polling needed
-      if (process.env.PROXY_URL && uncached.length) {
-        const proxyResults = await Promise.all(
-          uncached.map(async ({ query: q }) => {
-            try {
-              const listings = await scrapeDepopDirect(q, 6);
-              if (listings.length) {
-                await setDepopCache(q, listings, aesthetic).catch(() => {});
-                return {
-                  piece: q.includes(" ") ? q.split(" ").slice(1).join(" ") : q,
-                  listings,
-                };
-              }
-            } catch (e: any) {
-              console.warn(`[depop-search] proxy failed for "${q}": ${e.message}`);
-            }
-            return null;
-          })
-        );
-        const proxyGroups = proxyResults.filter((g): g is { piece: string; listings: any[] } => !!g);
-        if (proxyGroups.length) {
-          const allGroups = [
-            ...cacheResults.filter(r => r.listings).map(r => ({
-              piece: r.query.includes(" ") ? r.query.split(" ").slice(1).join(" ") : r.query,
-              listings: r.listings!,
-            })),
-            ...proxyGroups,
-          ].filter(g => g.listings.length > 0);
-          console.log(`[depop-search] proxy got ${proxyGroups.length}/${uncached.length} groups instantly`);
-          return res.json({ cached: true, groups: allGroups });
-        }
-      }
 
       if (token) {
         const runPromises = uncached.map(async ({ query: q }) => {
@@ -3018,12 +2977,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         }))
         .filter(g => g.listings.length > 0);
 
-      // --- Fallback: if Apify couldn't start runs for some queries, use aesthetic cache ---
+      // --- Fallback: all uncached queries use aesthetic cache (no live scraping) ---
       const queriesNeedingFallback = uncached
         .filter(r => !runs.find(run => run.query === r.query))
         .map(r => r.query);
 
-      if (queriesNeedingFallback.length > 0 && aesthetic) {
+      if (queriesNeedingFallback.length > 0) {
         console.log(`[depop] Apify unavailable for ${queriesNeedingFallback.length} queries — using aesthetic cache fallback for "${aesthetic}"`);
         // Pull a generous pool from the aesthetic permanent cache
         const pool = await getDepopCacheByAesthetic(aesthetic, 150);
