@@ -79,23 +79,25 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
   else if (i.picture) image = i.picture;
   image = image.replace(/\/P10\.jpg$/i, "/P0.jpg").replace(/\/P2\.jpg$/i, "/P0.jpg");
 
-  // Derive title: use explicit title/description, else humanise the slug
-  // slug example: "956thriftfindz-blue-polo-assn-polo-shirt" → remove leading username segment
-  let title = i.title || i.description || i.name || "";
-  if (!title && i.slug) {
-    const parts = (i.slug as string).split("-");
-    // First segment is typically the seller username — drop it if it looks alphanumeric-only
-    const dropFirst = /^[a-z0-9]+$/.test(parts[0]);
-    const words = dropFirst ? parts.slice(1) : parts;
-    title = words.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-  }
-  // Final fallback: capitalise the search query (e.g. "y2k low rise jeans" → "Y2K Low Rise Jeans")
-  if (!title) title = searchQ.replace(/\b\w/g, (c: string) => c.toUpperCase());
-
-  // Use real product URL if available, otherwise fall back to search
+  // Use real product URL first so we can extract the slug from it
   const url = (typeof i.url === "string" && i.url.startsWith("https://www.depop.com/products/"))
     ? i.url
     : `https://www.depop.com/search/?q=${encodeURIComponent(searchQ)}`;
+
+  // Derive title from slug (authoritative — matches what Depop shows on the listing page)
+  // slug example: "956thriftfindz-ann-taylor-womens-red-skirt-ab12"
+  const slugFromUrl = url.match(/\/products\/([^/?#]+)/i)?.[1] || i.slug || "";
+  let title = "";
+  if (slugFromUrl) {
+    const parts = slugFromUrl.split("-");
+    const hasHash = parts.length > 1 && /^[a-f0-9]{4}$/i.test(parts[parts.length - 1]);
+    // Drop first segment (seller username) and trailing hash
+    const middle = parts.slice(1, hasHash ? -1 : undefined);
+    title = middle.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  }
+  // Fall back to API-provided fields only if slug gave nothing
+  if (!title) title = i.title || i.description || i.name || "";
+  if (!title) title = searchQ.replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   // Reject non-clothing items: trading cards, toys, games, electronics, home goods, etc.
   const NON_CLOTHING_SIGNALS = [
@@ -111,7 +113,7 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
 
   return {
     id: idx,
-    title,
+    title,  // full slug-derived title, no length cap
     brand: i.brand || "",
     price: typeof i.price === "number" ? i.price : parseFloat(i.price) || 0,
     currency: i.currency || "USD",
@@ -171,14 +173,19 @@ function normaliseDepopObject(item: any, idx: number, query: string) {
     ? `https://www.depop.com/products/${slug}/`
     : `https://www.depop.com/search/?q=${encodeURIComponent(query)}`;
 
-  // Title: derive from slug (drop username prefix + trailing hash)
-  let title = item.description || item.title || "";
-  if (!title && slug) {
+  // Title: slug is the authoritative source — it's how Depop generates the
+  // listing page title and always contains the full product name + gender.
+  // item.description is a free-text seller blurb, often truncated/irrelevant.
+  let title = "";
+  if (slug) {
     const parts = slug.split("-");
-    // Drop first segment (username) and last (4-char hash)
-    const middle = parts.length > 2 ? parts.slice(1, -1) : parts.slice(1);
+    // Drop first segment (username) and last (4-char alphanumeric hash)
+    const hasHash = parts.length > 1 && /^[a-f0-9]{4}$/i.test(parts[parts.length - 1]);
+    const middle = parts.slice(1, hasHash ? -1 : undefined);
     title = middle.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
+  // Only fall back to description/title if slug didn't produce anything
+  if (!title) title = item.title || item.description || "";
   if (!title) title = query.replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   // v3 price: pricing.original_price.price_breakdown.price.amount
@@ -199,7 +206,7 @@ function normaliseDepopObject(item: any, idx: number, query: string) {
 
   return {
     id: idx,
-    title: title.slice(0, 80),
+    title,  // no length cap — full slug-derived title
     brand: item.brand_name || item.brand?.name || item.brandName || "",
     price,
     currency,
