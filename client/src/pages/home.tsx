@@ -1,6 +1,6 @@
 import React from "react";
 import { useLocation } from "wouter";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { rankByVector, getTopAesthetics } from "@/lib/styleVector";
 import OnboardingModal from "@/components/OnboardingModal";
 import { getOrCreateUserId } from "@/lib/deviceId";
@@ -317,6 +317,12 @@ export default function HomePage() {
   const [forYouOnboarded, setForYouOnboarded] = useState<boolean | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  // Pull-to-refresh state
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const PULL_THRESHOLD = 72; // px needed to trigger refresh
+
   // Re-rank on mount
   useEffect(() => {
     setRankedItems(rerank());
@@ -477,6 +483,41 @@ export default function HomePage() {
     return tops[0] ?? null;
   });
 
+  // Pull-to-refresh: reload the For You feed + re-rank
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setRankedItems(rerank());
+    if (forYouOnboarded) {
+      try {
+        const d = await fetch(`/api/for-you/${userId}?offset=0`).then(r => r.json());
+        setForYouCards(d.items || []);
+      } catch {}
+    }
+    setIsRefreshing(false);
+    setPullDistance(0);
+  }, [isRefreshing, rerank, forYouOnboarded, userId]);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isRefreshing) return;
+    // Only trigger if at the very top of the page
+    if (window.scrollY > 0) return;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    if (dy > 0) setPullDistance(Math.min(dy * 0.45, PULL_THRESHOLD + 20));
+  }, [isRefreshing]);
+
+  const onTouchEnd = useCallback(() => {
+    if (pullDistance >= PULL_THRESHOLD) {
+      handleRefresh();
+    } else {
+      setPullDistance(0);
+    }
+  }, [pullDistance, handleRefresh]);
+
   // User's name from profile
   const userName = (() => {
     try {
@@ -501,7 +542,41 @@ export default function HomePage() {
     : activeChip;
 
   return (
-    <div className="fade-up">
+    <div
+      className="fade-up"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      <div
+        style={{
+          height: pullDistance > 0 ? `${pullDistance}px` : isRefreshing ? "48px" : "0px",
+          overflow: "hidden",
+          transition: pullDistance === 0 ? "height 0.25s ease" : "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{
+          opacity: isRefreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1),
+          transform: isRefreshing ? "none" : `rotate(${(pullDistance / PULL_THRESHOLD) * 180}deg)`,
+          transition: isRefreshing ? "none" : "transform 0.1s",
+          color: "hsl(var(--primary))",
+        }}>
+          {isRefreshing ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 0.8s linear infinite" }}>
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12l7-7 7 7" />
+            </svg>
+          )}
+        </div>
+      </div>
+
       {/* Greeting + chips — contained */}
       <div className="max-w-4xl mx-auto">
         <div className="px-5 sm:px-8 pt-5 sm:pt-7 pb-3">
