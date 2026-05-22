@@ -32,7 +32,8 @@ function tagGender(l) {
 
 async function run() {
   console.log("Loading query list...");
-  const queryRows = await client`SELECT query FROM depop_cache WHERE jsonb_typeof(listings) = 'array' AND (listings::text != '[]')`;
+  // Include ALL non-empty rows regardless of whether listings is stored as jsonb array or string
+  const queryRows = await client`SELECT query FROM depop_cache WHERE listings IS NOT NULL AND listings::text NOT IN ('[]', 'null', '')`;
   const queries = queryRows.map(r => r.query);
   console.log(`  ${queries.length} rows to retag`);
 
@@ -43,11 +44,19 @@ async function run() {
     const slice = queries.slice(i, i + CONCURRENCY);
     await Promise.all(slice.map(async query => {
       try {
-        const [row] = await client`SELECT listings FROM depop_cache WHERE query = ${query}`;
+        const [row] = await client`SELECT listings::text as listings_text FROM depop_cache WHERE query = ${query}`;
         if (!row) return;
+        // Handle both jsonb array and jsonb string storage formats
+        let listings;
+        try {
+          const raw = row.listings_text;
+          listings = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (!Array.isArray(listings)) listings = JSON.parse(listings);
+        } catch { return; }
+        if (!Array.isArray(listings) || listings.length === 0) return;
 
         let anyChanged = false;
-        const retagged = row.listings.map(l => {
+        const retagged = listings.map(l => {
           const newGender = tagGender(l);
           if (newGender !== l._gender) {
             anyChanged = true;
