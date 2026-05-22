@@ -1,3 +1,4 @@
 name = "depop-proxy"
 main = "worker.js"
 compatibility_date = "2024-04-01"
+account_id = "4b57a154b2da146cea0e29cb21fbc12c"

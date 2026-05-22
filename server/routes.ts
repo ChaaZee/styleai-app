@@ -215,6 +215,52 @@ function normaliseDepopObject(item: any, idx: number, query: string) {
 let proxyRoundRobin = 0;
 
 async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
+  // ── Path 0: Direct fetch with real browser cookies (most reliable) ────────
+  const depopCookie = process.env.DEPOP_COOKIE;
+  const depopDeviceId = process.env.DEPOP_DEVICE_ID || "89954962-57bb-4300-bef7-91339e5f8281";
+  const depopSessionId = process.env.DEPOP_SESSION_ID || "7262fa1b-fdd7-43d4-adc5-222dacd93f5e";
+  if (depopCookie) {
+    const searchUrl = `https://www.depop.com/api/v3/search/products/?` +
+      `what=${encodeURIComponent(query)}&items_per_page=${limit}&country=us&currency=USD&from=in_country_search&include_like_count=true&force_fee_calculation=false`;
+    try {
+      const r = await fetch(searchUrl, {
+        method: "GET",
+        headers: {
+          "accept": "*/*",
+          "accept-language": "en-US,en;q=0.9",
+          "content-type": "application/json",
+          "cookie": depopCookie,
+          "depop-device-id": depopDeviceId,
+          "depop-session-id": depopSessionId,
+          "origin": "https://www.depop.com",
+          "referer": `https://www.depop.com/search/?q=${encodeURIComponent(query)}`,
+          "sec-ch-ua": '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"Windows"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+          "x-cached-sizes": "true",
+        },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (r.ok) {
+        const data = await r.json() as any;
+        const objects: any[] = data.objects || data.products || [];
+        if (objects.length > 0) {
+          console.log(`[depop-direct] success for "${query}" — ${objects.length} results`);
+          return objects.map((item: any, j: number) => normaliseDepopObject(item, j, query))
+            .filter((l: any) => l.image);
+        }
+      } else {
+        console.log(`[depop-direct] HTTP ${r.status} — falling through to worker`);
+      }
+    } catch (e: any) {
+      console.log(`[depop-direct] failed: ${e.message} — falling through to worker`);
+    }
+  }
+
   // ── Path 1: Cloudflare Worker (preferred) ─────────────────────────────────
   // Worker runs on CF edge, so CF won't block its requests to api.depop.com
   const workerUrl = process.env.WORKER_URL;
