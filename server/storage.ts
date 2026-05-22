@@ -911,15 +911,15 @@ export function tagListingGender(listing: any): any {
 
 export function genderPassesFilter(listing: any, gender: string): boolean {
   if (gender === "both") return true;
-  // Use pre-tagged _gender when available (already checked title + slug)
+  const text = typeof listing === "string" ? listing : listingText(listing);
+  // Brand signals are always authoritative — check first regardless of stored _gender tag
+  if (FEMALE_BRAND_SIGNALS.test(text)) return gender === "female";
+  // Use pre-tagged _gender when it's a definitive male/female tag
   const g = listing._gender;
   if (g === "male" || g === "female") {
     return g === gender;
   }
-  // Fallback: run regex on title + slug for untagged items
-  const text = typeof listing === "string" ? listing : listingText(listing);
-  // Female-only brand → block for male users
-  if (FEMALE_BRAND_SIGNALS.test(text)) return gender === "female";
+  // For untagged or "both" items: run full regex check
   const hasFem  = FEMALE_TITLE_SIGNALS.test(text);
   const hasMasc = MALE_TITLE_SIGNALS.test(text);
   const isNeutral = !hasFem && !hasMasc;

@@ -84,28 +84,18 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
     ? i.url
     : `https://www.depop.com/search/?q=${encodeURIComponent(searchQ)}`;
 
-  // Build slug-derived title for style/aesthetic context
-  // slug example: "956thriftfindz-ann-taylor-womens-red-skirt-ab12"
+  // Title: prefer real Depop product title from API (the actual h1 text, e.g. "Levi's Women's Brown Trousers").
+  // Fall back to slug-derived title. listingText() in storage.ts appends the URL slug at read-time
+  // for gender detection, so we don't need to store slug words in the title field.
   const slugFromUrl = url.match(/\/products\/([^/?#]+)/i)?.[1] || i.slug || "";
   let slugTitle = "";
   if (slugFromUrl) {
     const parts = slugFromUrl.split("-");
     const hasHash = parts.length > 1 && /^[a-f0-9]{4}$/i.test(parts[parts.length - 1]);
-    // Drop first segment (seller username) and trailing hash
     const middle = parts.slice(1, hasHash ? -1 : undefined);
     slugTitle = middle.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
-  // Real Depop h1 title from API (e.g. "Levi's Women's Brown Trousers") — use as primary
-  // Combine with slug so gender words from EITHER source are captured for tagging
-  const realTitle = i.title || i.name || "";
-  let title = "";
-  if (realTitle && slugTitle) {
-    // Store real title as display; append slug words so gender signals aren't lost
-    title = `${realTitle} ${slugTitle}`;
-  } else {
-    title = realTitle || slugTitle;
-  }
-  if (!title) title = i.description || "";
+  let title = i.title || i.name || slugTitle || i.description || "";
   if (!title) title = searchQ.replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   // Reject non-clothing items: trading cards, toys, games, electronics, home goods, etc.
@@ -182,25 +172,15 @@ function normaliseDepopObject(item: any, idx: number, query: string) {
     ? `https://www.depop.com/products/${slug}/`
     : `https://www.depop.com/search/?q=${encodeURIComponent(query)}`;
 
-  // Build slug-derived title for style/aesthetic context
+  // Title: prefer real Depop product title from API. Fall back to slug-derived.
   let slugTitle = "";
   if (slug) {
     const parts = slug.split("-");
-    // Drop first segment (username) and last (4-char alphanumeric hash)
     const hasHash = parts.length > 1 && /^[a-f0-9]{4}$/i.test(parts[parts.length - 1]);
     const middle = parts.slice(1, hasHash ? -1 : undefined);
     slugTitle = middle.map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
-  // Real Depop h1 title from API (e.g. "Levi's Women's Brown Trousers") — use as primary
-  // Combine with slug so gender words from EITHER source are captured for tagging
-  const realTitle = item.title || item.name || "";
-  let title = "";
-  if (realTitle && slugTitle) {
-    title = `${realTitle} ${slugTitle}`;
-  } else {
-    title = realTitle || slugTitle;
-  }
-  if (!title) title = item.description || "";
+  let title = item.title || item.name || slugTitle || item.description || "";
   if (!title) title = query.replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   // v3 price: pricing.original_price.price_breakdown.price.amount
