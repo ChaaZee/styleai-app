@@ -855,18 +855,14 @@ export function remapAestheticForGender(aesthetic: string, gender: string): stri
   return MALE_AESTHETIC_REMAP[aesthetic] ?? aesthetic;
 }
 
-// Gender signals used to filter listing titles
-// ── Explicit gender words — these always win over garment-type signals when both fire
-const EXPLICIT_FEMALE = /\b(women|womens|woman|womans|womena|ladies|lady|girls?|female|feminine|womenswear)\b/i;
-const EXPLICIT_MALE   = /\b(men|mens|man|male|masculine|boys?|menswear)\b/i;
-// ── Brands that are exclusively or near-exclusively womenswear
-//    Listed here so they can be extended without touching the main regex
-const FEMALE_BRAND_SIGNALS =
-  /\b(aerie|brandy melville|lululemon|alo yoga|alo|kate spade|loft|the loft|ann taylor|beyond yoga|fashion nova|white house black market|whbm|j\.? jill|eileen fisher|talbots|tularosa|anthropologie|free people|we the free|reformation|aritzia|revolve|madewell women|everlane women|vince camuto|reiss women|banana republic women|express women|bcbg|bcbgmaxazria|diane von furstenberg|dvf|alice olivia|alice \+ olivia|rebecca taylor|joie|velvet by graham|velvet clothing|equipment silk|theory women|frame women|intermix|rag bone women|club monaco women|veronica beard|veronica beard|ulla johnson|ba&sh|ba sh|sezane|rouje|realisation par|realisation|ganni|ganni|staud|cult gaia|zimmermann|camilla|significant other|significant other|lpa|l\.l\.bean women|johnny was|anthropologie|fp movement|free people movement|edikted|cupshe|mistress rocks|chuu|nastygal|nasty gal|princess polly|showpo|lulusfashion|lulus|lovestitch|storets|chicwish|with jean|city chic|yours clothing|evans|dorothy perkins|warehouse women|oasis fashion|river island women|quiz clothing|boohoo|boohoo women|missguided|plt|pretty little thing|shein women|romwe|zaful|forever 21|h&m divided|topshop|dorothy perkins|phase eight|boden women|pure collection|laura ashley|per una|bonmarche|kaleidoscope|matalan women|george women|tu women|mantaray women|fatface women|seasalt women|white stuff women|fat face|joules women|cath kidston|weird fish|frugi|jojo maman|next women|m&s women|m and s women|marks spencer women|marks and spencer women|monsoon women|accessorize|hobbs women|whistles women|reiss women|coast women|ghost women|finery london|l k bennett|lk bennett|jigsaw women|karen millen|kaliko|anne klein|charter club|jones new york|liz claiborne|dana buchman|st john women|st\.? john|escada|escada sport|max mara|max mara weekend|marina rinaldi|elena miro|persona by marina|olsen|tiger of sweden women|marimekko women|noa noa|part two|inwear|kaffe|fransa|soaked in luxury|only women|vero moda|selected femme|pieces women|jacqueline de yong|b\.young|moss copenhagen|ichi women|object women|noisy may|pernille corydon|baum und pferdgarten|stine goya|samsoe samsoe women|filippa k women|cos women|arket women|monki|weekday women|& other stories|other stories|acne studios women|toteme|toteme|remain|stand studio|gestuz|rotate|by malene birger|second female|holzweiler women|wood wood women|soulland women|won hundred women|rains women|ksubi women|nude lucy|friend of audrey|country road women|witchery|seed heritage women|camilla marc|sass bide|scanlan theodore|alice mccall|talulah|bec bridge|bec and bridge|kivari|sovere|significant other|faithfull the brand|SIR|sir the label|lulu lemonde|lulu lemon|athleta|sweaty betty|varley|splits59|spiritual gangster|spiritual gangster women|threads 4 thought women|vuori women|outdoor voices women|girlfriend collective)\b/i;
-// ── Female signals: explicit labels + garments that are near-exclusively womenswear
-export const FEMALE_TITLE_SIGNALS = /\b(women|womens|woman|womans|womena|ladies|lady|girls?|girlie|female|feminine|womenswear|dress|dresses|skirt|skirts|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit|petite|heels?|stiletto|pumps?|ballet flat|wedge|kitten heel|crop top|halter|tube top|bustier|slip dress|wrap dress|pinafore|smock|prairie|lace top|ruffles?|bow top|cardigan set|matching set|co-ord|kickpleat|kick pleat|peplum|spaghetti strap|off shoulder|one shoulder|asymmetric hem|babydoll|broderie|chiffon blouse|silk slip|lingerie|cami|nightgown|bikini|swimsuit|one-piece|sarong|palazzo|culottes|wide leg crop|flare jeans women|mom jeans women|bardot|milkmaid|bralette|bodysuit|flowy|ditsy|smocked|tiered skirt|balloon sleeve|puff sleeve|frill|flutter sleeve|button front skirt|tennis skirt|micro skirt|tennis dress|shift dress|sheath dress|a-line|fit and flare|empire waist|sweetheart neck|strapless|tube dress|floral dress|gingham dress|linen dress|shirt dress|tea dress|swing dress|fairy dress|cottagecore dress|whimsigoth|kilt|kawaii|juniors?|junior size|victoria secret|victorias secret|edikted|cupshe|mistress rocks|free people|we the free|aritzia|lululemon women|loft women|the loft|justice girls?|fabletics women|chuu|nastygal|nasty gal|princess polly|showpo|urban outfitters women|revolve women|shein women|boohoo women|forever 21 women|h&m divided|asos women|topshop|zara women|anthropologie|reformation|abercrombie women|ae women|american eagle women)\b/i;
-// ── Male signals: explicit labels + garments that are near-exclusively menswear
-export const MALE_TITLE_SIGNALS = /\b(men|mens|man|male|masculine|boys?|menswear|chinos|oxford shirt|blazer|loafer|brogues|suit jacket|trousers|dress shirt|tie|necktie|cufflinks|polo shirt|henley|rugby shirt|harrington|overshirt|flight jacket|varsity jacket|bomber men|coach jacket|track jacket men|cargo pants men|cargo shorts|board shorts|swim trunks|joggers men|sweatpants men|hoodie men|crewneck men|quarter zip|flannel shirt|workwear|denim jacket men|chelsea boots men|derby shoes|monk strap|brogue|desert boots|work boots men)\b/i;
+// Gender detection: only look at explicit gender words in the title.
+// If the title says "women" or "men", tag it. Otherwise it's "both".
+// No brand signals, no garment-type inference — Depop always states the gender in the title when it's gendered.
+const EXPLICIT_FEMALE = /\b(women|womens|woman|womans|womena|ladies|lady|girls?|female|womenswear)\b/i;
+const EXPLICIT_MALE   = /\b(men|mens|man|male|boys?|menswear)\b/i;
+// Keep these exported so retag script and client code still compile, but they are no longer used for filtering
+export const FEMALE_TITLE_SIGNALS = EXPLICIT_FEMALE;
+export const MALE_TITLE_SIGNALS   = EXPLICIT_MALE;
 
 /**
  * Extract all searchable text from a listing.
@@ -889,51 +885,26 @@ function listingText(listing: any): string {
  */
 export function tagListingGender(listing: any): any {
   const text = listingText(listing);
-  // Female-only brand → always female regardless of other signals
-  if (FEMALE_BRAND_SIGNALS.test(text)) {
-    listing._gender = "female";
-    return listing;
-  }
-  const hasFem  = FEMALE_TITLE_SIGNALS.test(text);
-  const hasMasc = MALE_TITLE_SIGNALS.test(text);
-  if (hasFem && !hasMasc)  listing._gender = "female";
-  else if (hasMasc && !hasFem) listing._gender = "male";
-  else if (hasFem && hasMasc) {
-    // Both fire — explicit gender word wins (e.g. "womens blazer" → female)
-    const explicitFem  = EXPLICIT_FEMALE.test(text);
-    const explicitMasc = EXPLICIT_MALE.test(text);
-    if (explicitFem && !explicitMasc)       listing._gender = "female";
-    else if (explicitMasc && !explicitFem)  listing._gender = "male";
-    else                                    listing._gender = "both";
-  } else listing._gender = "both";  // neutral
+  // Only use explicit gender words in the title — no brands, no garment types.
+  // If the title says "women" or "men", tag it. Otherwise both.
+  const hasFem  = EXPLICIT_FEMALE.test(text);
+  const hasMasc = EXPLICIT_MALE.test(text);
+  if (hasFem && !hasMasc)       listing._gender = "female";
+  else if (hasMasc && !hasFem)  listing._gender = "male";
+  else                          listing._gender = "both";  // ambiguous or neutral
   return listing;
 }
 
 export function genderPassesFilter(listing: any, gender: string): boolean {
   if (gender === "both") return true;
   const text = typeof listing === "string" ? listing : listingText(listing);
-  // Brand signals are always authoritative — check first regardless of stored _gender tag
-  if (FEMALE_BRAND_SIGNALS.test(text)) return gender === "female";
-  // Use pre-tagged _gender when it's a definitive male/female tag
-  const g = listing._gender;
-  if (g === "male" || g === "female") {
-    return g === gender;
-  }
-  // For untagged or "both" items: run full regex check
-  const hasFem  = FEMALE_TITLE_SIGNALS.test(text);
-  const hasMasc = MALE_TITLE_SIGNALS.test(text);
-  const isNeutral = !hasFem && !hasMasc;
-  if (hasFem && hasMasc) {
-    // Conflict — explicit gender word breaks the tie
-    const explicitFem  = EXPLICIT_FEMALE.test(text);
-    const explicitMasc = EXPLICIT_MALE.test(text);
-    if (explicitFem && !explicitMasc) return gender === "female";
-    if (explicitMasc && !explicitFem) return gender === "male";
-    return true; // genuinely ambiguous — show to both
-  }
-  if (gender === "male")   return isNeutral || (hasMasc && !hasFem);
-  if (gender === "female") return isNeutral || (hasFem && !hasMasc);
-  return true;
+  // Only explicit gender words decide — no brands, no garment types.
+  const hasFem  = EXPLICIT_FEMALE.test(text);
+  const hasMasc = EXPLICIT_MALE.test(text);
+  if (hasFem && hasMasc) return true;  // title has both (e.g. "unisex mens womens") — show to all
+  if (hasFem)  return gender === "female";
+  if (hasMasc) return gender === "male";
+  return true;  // no gender word — neutral, show to everyone
 }
 
 /**
