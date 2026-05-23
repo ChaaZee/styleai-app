@@ -66,7 +66,7 @@ const SEED_QUERIES = [
 ];
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
-const sql = postgres(DB_URL, { ssl: "require" });
+const sql = postgres(DB_URL, { ssl: { rejectUnauthorized: false }, prepare: false });
 
 async function getCached(query) {
   const rows = await sql`SELECT query FROM depop_cache WHERE query = ${query}`;
