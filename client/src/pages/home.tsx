@@ -677,11 +677,40 @@ export default function HomePage() {
             ))
           )}
 
+          {/* ── Affiliate card — always first ─────────────────────────────── */}
+          {forYouOnboarded === true && !forYouLoading && (
+            <a
+              href="https://sovrn.co/ccalx03"
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              className="relative bg-background hover:bg-muted/30 transition-colors cursor-pointer block group overflow-hidden"
+            >
+              <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Sponsored</div>
+              <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
+                <img
+                  src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&q=80"
+                  alt="Shop fashion"
+                  className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
+                />
+              </div>
+              <div className="px-3 pb-3 pt-2">
+                <p className="font-label text-[9px] text-muted-foreground mb-0.5 uppercase tracking-widest" style={{ fontSize: "9px" }}>Featured</p>
+                <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">Discover more styles on Depop</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-primary font-semibold">Shop Now</p>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0 ml-auto">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                  </svg>
+                </div>
+              </div>
+            </a>
+          )}
+
           {/* Personalized cards */}
           {forYouOnboarded === true && !forYouLoading && forYouCards.map((item: any, idx: number) => {
-            // ── Affiliate card — inserted every 8 cards ──────────────────────
-            const AFFILIATE_URL = "https://sovrn.co/ccalx03";
-            const showAffiliate = idx > 0 && idx % 8 === 0;
+            const showAffiliate = false; // handled above now
             const imageUrl = item.image || "";
             const price = item.price?.priceAmount ?? item.price ?? null;
             // Prefer the stored product URL, then slug fallback, never the search fallback
@@ -692,37 +721,8 @@ export default function HomePage() {
               : `https://www.depop.com/search/?q=${encodeURIComponent(item.title || "")}`;
 
             return (
-              <React.Fragment key={item.id || idx}>
-              {showAffiliate && (
-                <a
-                  href={AFFILIATE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer sponsored"
-                  className="relative bg-background hover:bg-muted/30 transition-colors cursor-pointer block group overflow-hidden"
-                >
-                  <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Sponsored</div>
-                  <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
-                    <img
-                      src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&q=80"
-                      alt="Shop fashion"
-                      className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
-                    />
-                  </div>
-                  <div className="px-3 pb-3 pt-2">
-                    <p className="font-label text-[9px] text-muted-foreground mb-0.5 uppercase tracking-widest" style={{ fontSize: "9px" }}>Featured</p>
-                    <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">Discover more styles on Depop</p>
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-primary font-semibold">Shop Now</p>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0 ml-auto">
-                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                        <polyline points="15 3 21 3 21 9"/>
-                        <line x1="10" y1="14" x2="21" y2="3"/>
-                      </svg>
-                    </div>
-                  </div>
-                </a>
-              )}
               <a
+                key={item.id || idx}
                 href={depopUrl}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -754,7 +754,6 @@ export default function HomePage() {
                   </div>
                 </div>
               </a>
-              </React.Fragment>
             );
           })}
 
