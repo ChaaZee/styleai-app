@@ -16,7 +16,7 @@ declare module "http" {
 // CORS — allow only the production domain and localhost in dev
 app.use(cors({
   origin: process.env.NODE_ENV === "production"
-    ? ["https://styleai-app-i25n.onrender.com"]
+    ? ["https://styleai-app-i25n.onrender.com", "https://shopstitch.app", "https://www.shopstitch.app"]
     : true, // allow all in dev
   methods: ["GET", "POST", "DELETE"],
   allowedHeaders: ["Content-Type", "x-device-id"],
