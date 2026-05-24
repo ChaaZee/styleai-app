@@ -688,14 +688,14 @@ export default function HomePage() {
               <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Sponsored</div>
               <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
                 <img
-                  src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&q=80"
-                  alt="Shop fashion"
+                  src="/affiliate-product.jpg"
+                  alt="Pacsun Harrison Cutoff Baggy Carpenter Jean Shorts Brown"
                   className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                 />
               </div>
               <div className="px-3 pb-3 pt-2">
                 <p className="font-label text-[9px] text-muted-foreground mb-0.5 uppercase tracking-widest" style={{ fontSize: "9px" }}>Featured</p>
-                <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">Discover more styles on Depop</p>
+                <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">Pacsun Harrison Cutoff Baggy Carpenter Jean Shorts Brown</p>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-primary font-semibold">Shop Now</p>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0 ml-auto">
