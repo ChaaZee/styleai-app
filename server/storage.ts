@@ -1,8 +1,41 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// storage.ts — Database layer for StyleAI.
+//
+// Mental model for a Python dev:
+//   - `drizzle` is a typed query-builder ORM, similar in spirit to SQLAlchemy
+//     Core. We use it for the simpler CRUD on scans / wardrobe / discover_cards.
+//   - `postgres` (the npm package, exposed here as `client`) is the underlying
+//     async driver — analogous to `psycopg2` or `asyncpg`. `client\`...\``
+//     is a tagged template literal: parameters inside `${}` are sent as bind
+//     parameters, not string interpolation, so they're safe from SQL injection.
+//     It's the JS equivalent of `await conn.execute("SELECT ... %s", (val,))`.
+//   - We use raw SQL via `client\`...\`` instead of Drizzle ORM for the
+//     `depop_cache` table because:
+//       (a) we need pgvector ops (`embedding <=> $1::vector`) which Drizzle
+//           doesn't have first-class support for, and
+//       (b) we hit a postgres.js bug where JSONB array parameters wouldn't
+//           serialize on some Render/Node environments — raw SQL with
+//           `JSON.stringify(...)` sidesteps that entirely.
+//
+// Major sections in this file:
+//   1. DB client setup + initDB() (runs CREATE TABLE IF NOT EXISTS at boot).
+//   2. Depop cache helpers (raw SQL).
+//   3. OpenAI embedding helper + vector cache lookups.
+//   4. Drizzle-based storage object for scans / wardrobe / discover_cards.
+//   5. User profile / taste vector helpers (cosine similarity over pgvector).
+//   6. Gender filtering (regex-based) + aesthetic remapping.
+//   7. Discover / Wardrobe / History recommendation helpers.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, desc, and, lt, sql } from "drizzle-orm";
 import OpenAI from "openai";
 
+// Optional OpenAI client — only used to generate text embeddings for vector
+// search. If the env var is missing we silently skip embedding and fall back
+// to keyword-based cache lookups elsewhere. Like `openai_client = None`
+// in Python with a guard before every call.
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
@@ -22,6 +55,9 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 
+// Connection pool. `max: 10` is the pool size (like psycopg2 ThreadedConnectionPool).
+// `ssl` follows Render/Heroku conventions — production needs TLS but we don't
+// validate the cert (their certs are self-signed at the connection level).
 const client = postgres(process.env.DATABASE_URL, {
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
   max: 10,
@@ -32,9 +68,15 @@ const client = postgres(process.env.DATABASE_URL, {
   // 'Received an instance of Array' TypeError in Bind() for JSONB array parameters.
   prepare: false,
 });
+// `db` is the Drizzle ORM wrapper around the raw `client`. Use `db` for typed
+// queries (`db.select().from(scans)`) and `client` for raw tagged templates.
 const db = drizzle(client);
 
-// Create tables if they don't exist
+// Create tables if they don't exist. Idempotent — safe to call on every boot.
+// Each subsequent ALTER TABLE ADD COLUMN IF NOT EXISTS acts as a tiny inline
+// migration: older deployments that pre-date these columns get them on next boot.
+// Roughly equivalent to running Alembic's `upgrade --autogenerate` in Python,
+// except hand-rolled.
 export async function initDB() {
   await client`
     CREATE TABLE IF NOT EXISTS scans (
@@ -72,7 +114,12 @@ export async function initDB() {
     CREATE INDEX IF NOT EXISTS depop_cache_aesthetic_garment_idx ON depop_cache(aesthetic, garment_type)
   `;
 
-  // pgvector: semantic search on cache query strings
+  // pgvector: semantic search on cache query strings.
+  // `vector(1536)` matches the OpenAI text-embedding-3-small output dimension.
+  // The ivfflat index with cosine ops makes `embedding <=> query::vector`
+  // (cosine distance) fast at scale; `lists = 100` is a tuning knob —
+  // higher = faster queries but slower writes. Catches are because the
+  // pgvector extension may not be installed on local dev databases.
   await client`CREATE EXTENSION IF NOT EXISTS vector`.catch(() => {});
   await client`ALTER TABLE depop_cache ADD COLUMN IF NOT EXISTS embedding vector(1536)`.catch(() => {});
   await client`
@@ -182,8 +229,14 @@ export interface IStorage {
 }
 
 // ── Depop cache helpers (raw SQL, bypasses Drizzle schema) ──────────────────
+// We use raw SQL (the `client\`...\`` tagged-template syntax) instead of
+// Drizzle for this table because Drizzle doesn't ship first-class pgvector
+// support, AND because of the postgres.js JSONB-array serializer bug noted
+// at the top of this file. Raw SQL with stringified JSON dodges both issues.
 
-// Deduplicate listings by URL — keeps first occurrence
+// Deduplicate listings by URL — keeps first occurrence.
+// Same idea as `seen = set(); [x for x in xs if (k := key(x)) not in seen and not seen.add(k)]`
+// in modern Python, just spelled differently.
 export function dedupeListings(listings: any[]): any[] {
   const seen = new Set<string>();
   return listings.filter(l => {
@@ -195,7 +248,17 @@ export function dedupeListings(listings: any[]): any[] {
 }
 
 // ── Scanned pieces tracking ─────────────────────────────────────────────────
-// Upsert all key_pieces from a scan so seed-trending can target real user items.
+// Records every clothing piece detected in a user scan, deduped by (piece, aesthetic).
+// Used by the seed-trending pipeline so the Depop cache is biased toward what
+// real users actually wear. The `garmentTypes` map is optional metadata for
+// each piece → "tops" | "bottoms" | "shoes" etc.
+//
+// SECURITY NOTE: this function uses `client.unsafe(...)` (raw string SQL,
+// no bind params) with manual single-quote escaping. The reason is the same
+// JSONB-bind bug as elsewhere. Inputs here come from our own server code
+// (Gemini output we already control), never from raw user input, so SQL
+// injection isn't a realistic concern — but if you ever wire this up to a
+// user-supplied string, switch back to `client\`...\`` template parameters.
 export async function upsertScannedPieces(
   pieces: string[],
   aesthetic: string,
@@ -220,6 +283,9 @@ export async function upsertScannedPieces(
 }
 
 // Return the most-scanned pieces, ordered by scan_count DESC.
+// Returns a list of typed dicts (TypeScript objects) — like a Python list
+// of dataclass instances. The DB columns use snake_case; we map to camelCase
+// here at the boundary.
 export async function getScannedPieces(limit = 200): Promise<{ piece: string; aesthetic: string; garmentType: string | null; scanCount: number }[]> {
   const rows = await client`
     SELECT piece, aesthetic, garment_type, scan_count
@@ -269,6 +335,17 @@ const BRAND_WORDS = new Set([
   "vintage","y2k","90s","80s","70s","2000s","00s","retro",
 ]);
 
+// Strip brand names and sizes from `query` so the resulting embedding is
+// dominated by garment type + color + aesthetic. Without this, two queries
+// for the same item ("nike air force 1" vs "supreme air force 1") would
+// embed very differently because the brand word dwarfs the garment word.
+//
+// Pipeline (chained like Python's `.lower().replace(...).split()`):
+//   1. lowercase + replace anything non-alphanumeric with a space
+//   2. split on whitespace into tokens
+//   3. drop single-character tokens and any token in BRAND_WORDS
+//   4. drop size tokens (xs/s/m/l/xl/xxl/<digits>)
+//   5. rejoin; fall back to original lowercased query if everything got stripped
 export function normalizeForEmbedding(query: string): string {
   const words = query.toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")  // strip punctuation
@@ -282,6 +359,11 @@ export function normalizeForEmbedding(query: string): string {
 // ─────────────────────────────────────────────
 // EMBEDDING HELPER — calls OpenAI text-embedding-3-small
 // ─────────────────────────────────────────────
+// Returns a 1536-dim float vector for the input text, or null if anything
+// goes wrong (no API key, network error, etc.). All callers handle null by
+// falling back to keyword search. Equivalent to:
+//   openai.embeddings.create(model="text-embedding-3-small", input=text)
+//                          .data[0].embedding
 export async function getEmbedding(text: string): Promise<number[] | null> {
   if (!openaiClient) return null;
   try {
@@ -304,6 +386,15 @@ export async function getEmbedding(text: string): Promise<number[] | null> {
 // closest to the garment description from Gemini,
 // filtered by aesthetic + garment_type first.
 // Falls back to getDepopCacheByType if no embeddings available.
+//
+// Algorithm:
+//   1. Embed `description` via OpenAI -> a 1536-dim vector.
+//   2. Run `ORDER BY embedding <=> $1::vector` — the `<=>` operator is
+//      pgvector's cosine distance. Smaller = more similar.
+//   3. Re-rank to push rows whose query string contains a colorHint word
+//      to the front (vector similarity gets the garment type right; this
+//      nudge gets the color right).
+//   4. Flatten and dedupe the resulting listings.
 // ─────────────────────────────────────────────
 export async function getDepopCacheByEmbedding(
   description: string,
@@ -376,6 +467,14 @@ export async function getDepopCacheByEmbedding(
   return getDepopCacheByType(aesthetic, garmentType, limit, colorHint || description);
 }
 
+// Exact-query cache lookup. Returns null on miss (or stale, or imageless rows).
+// The `permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours'` clause
+// gives us two cache tiers:
+//   - permanent rows (seed-trending) never expire
+//   - one-off scrape results expire after 24h so the cache stays fresh
+//
+// The `client\`...\`` tagged-template form turns `${query}` into a bind
+// parameter ($1), like psycopg2's `cur.execute("WHERE query = %s", (q,))`.
 export async function getDepopCache(query: string): Promise<any[] | null> {
   const rows = await client`
     SELECT listings, permanent FROM depop_cache
@@ -406,6 +505,18 @@ export async function getDepopCacheSince(query: string, since: Date): Promise<an
   return listings;
 }
 
+// Upsert a depop_cache row.
+// Steps:
+//   1. Tag each listing with a `_gender` field via tagListingGender.
+//   2. Dedupe by URL.
+//   3. (Best effort) compute an OpenAI embedding for the query string.
+//   4. INSERT ... ON CONFLICT (query) DO UPDATE — upsert with a merge:
+//      - `permanent OR existing permanent` (sticky once permanent)
+//      - `COALESCE(new, old)` for aesthetic/garment_type/embedding so we
+//        never lose existing metadata when re-scraping.
+// Behaves like Python:
+//   with conn.cursor() as cur:
+//       cur.execute("INSERT INTO ... ON CONFLICT (query) DO UPDATE ...")
 export async function setDepopCache(query: string, listings: any[], aesthetic?: string, permanent = false, garmentType?: string): Promise<void> {
   const tagged = listings.map(tagListingGender);
   const deduped = dedupeListings(tagged);
@@ -462,7 +573,18 @@ function scoreByColor(title: string, colors: string[]): number {
   return colors.filter(c => t.includes(c)).length;
 }
 
-// Fetch cached listings by aesthetic + garment_type for smart post-analysis recommendations
+// Fetch cached listings by aesthetic + garment_type for smart post-analysis recommendations.
+// Pure keyword/ILIKE-based — used as a fallback when getDepopCacheByEmbedding
+// can't run (no OpenAI key) or returns too few results.
+//
+// Strategy (gets progressively looser):
+//   Step 1: rows whose query key contains the color AND a garment subterm
+//           (e.g. color="blue" + "jeans" specifically — avoids blue skirts).
+//   Step 2: rows whose query key contains the color only.
+//   Step 3: rows matching the specific garment keyword (e.g. "tee" or "jeans").
+//   Step 4: pure random fill within the aesthetic+garment_type.
+// Final pass re-sorts the merged pool by how many color words appear in
+// each listing's title, so the best color matches float to the top.
 export async function getDepopCacheByType(aesthetic: string, garmentType: string, limit = 6, colorHint = ""): Promise<any[]> {
   const colors = extractColors(colorHint);
   const seen = new Set<number>();
@@ -577,6 +699,11 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
   return all.slice(0, limit);
 }
 
+// Random sample of listings across the whole aesthetic. Used for the home feed
+// when we want variety, not personalization. `ORDER BY RANDOM()` is the
+// equivalent of Python's `random.sample(...)` but done in SQL so we don't
+// have to pull 500 rows just to pick 50. The final Fisher–Yates shuffle is
+// in JS to mix the order across cache rows.
 export async function getDepopCacheByAesthetic(aesthetic: string, limit = 50): Promise<any[]> {
   // Use RANDOM() so we sample across all 500+ rows, not just the newest ones
   const rowLimit = Math.ceil(limit / 4) + 4;
@@ -602,6 +729,12 @@ export async function getDepopCacheByAesthetic(aesthetic: string, limit = 50): P
   return all.slice(0, limit);
 }
 
+// ─────────────────────────────────────────────
+// `storage` object: typed Drizzle-based CRUD for scans / wardrobe /
+// discover_cards. Think of it as a Python class with methods, except
+// expressed as a single object literal. Each method maps to one SQL
+// operation behind the scenes.
+// ─────────────────────────────────────────────
 export const storage: IStorage = {
   async createScan(scan) {
     const [row] = await db.insert(scans).values(scan).returning();
@@ -666,12 +799,18 @@ export const storage: IStorage = {
       .limit(1);
     return rows.length > 0;
   },
+  // Atomic SQL increment: `UPDATE discover_cards SET likes_count = likes_count + 1`.
+  // `sql\`${col} + 1\`` is Drizzle's escape hatch into raw SQL fragments —
+  // similar to SQLAlchemy's `column.op('+')(1)` or `func.x + 1`.
   async incrementCardLikes(id: number) {
     await db
       .update(discoverCards)
       .set({ likesCount: sql`${discoverCards.likesCount} + 1` })
       .where(eq(discoverCards.id, id));
   },
+  // Daily-refresh maintenance: drop discover cards older than N days that
+  // have zero likes. Returns how many we deleted. `Date.now()` returns the
+  // current epoch in ms (Python: `int(time.time() * 1000)`).
   async pruneStaleCards(olderThanDays: number) {
     const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
     const deleted = await db
@@ -697,8 +836,16 @@ export const storage: IStorage = {
 // ─────────────────────────────────────────────
 // USER PROFILE / TASTE VECTOR FUNCTIONS
 // ─────────────────────────────────────────────
+// The "taste vector" is a 1536-dim float vector that represents what a user
+// likes. It starts as the average of embeddings from their onboarding
+// aesthetic picks, then evolves via a weighted running average each time
+// they like/save/skip an item (see routes.ts /api/interact). Recommendations
+// are then nearest-neighbour lookups via pgvector's `<=>` cosine distance.
 
-/** Fetch a user's taste vector and metadata */
+/** Fetch a user's taste vector and metadata.
+ *  Note: we explicitly `taste_vector::text` so the driver gives us the raw
+ *  "[0.1,0.2,...]" string format. We parse it on demand instead of letting
+ *  pgvector serialize it (saves a round trip and avoids OID weirdness). */
 export async function getUserProfile(userId: string) {
   const rows = await client<{
     user_id: string;
@@ -714,7 +861,11 @@ export async function getUserProfile(userId: string) {
   return rows[0] ?? null;
 }
 
-/** Create or update a user profile with a new taste vector */
+/** Create or update a user profile with a new taste vector.
+ *  Split into "INSERT if missing, UPDATE if exists" because postgres.js's
+ *  type inference choked on the combined ON CONFLICT path when vector +
+ *  text[] columns were involved. Liked/skipped IDs are appended in
+ *  separate small UPDATEs for the same reason. */
 export async function upsertUserProfile(
   userId: string,
   tasteVector: number[],
@@ -763,7 +914,20 @@ export async function upsertUserProfile(
   }
 }
 
-/** Append a full liked item object to the liked_items JSONB array */
+/** Append a full liked item object to the liked_items JSONB array.
+ *
+ *  Why the convoluted two-step "fetch JSON, merge in JS, write back as
+ *  inline SQL literal" pattern?
+ *    - The natural shape would be `liked_items = liked_items || $1::jsonb`
+ *      to append, then we'd bind `$1` as JSONB.
+ *    - That hits the postgres.js JSONB-OID bug on Render/Node where the
+ *      driver omits the JSONB serializer and throws "Received an instance
+ *      of Array".
+ *    - So we read the existing array, dedupe in JS, JSON.stringify the
+ *      result, and embed it directly into the SQL string via `client.unsafe`.
+ *    - We escape single quotes in the JSON literal AND in userId to keep
+ *      the inline SQL safe. Inputs come from our own server code, never
+ *      from raw user input. */
 export async function appendLikedItem(userId: string, item: {
   id: string;
   title: string;
@@ -805,7 +969,9 @@ export async function appendLikedItem(userId: string, item: {
   }
 }
 
-/** Remove a single liked item by its id or url dedup key */
+/** Remove a single liked item by its id or url dedup key.
+ *  Same fetch-merge-write pattern as appendLikedItem, for the same JSONB
+ *  serializer-bug reason. */
 export async function removeLikedItem(userId: string, itemKey: string) {
   const rows = await client`SELECT liked_items FROM user_profiles WHERE user_id = ${userId}`;
   const existing: any[] = Array.isArray(rows[0]?.liked_items) ? rows[0].liked_items : [];
@@ -817,7 +983,11 @@ export async function removeLikedItem(userId: string, itemKey: string) {
   await client.unsafe(`UPDATE user_profiles SET liked_items = '${jsonLiteral}'::jsonb WHERE user_id = '${userIdSafe}'`);
 }
 
-/** Fetch all liked items for a user, newest first */
+/** Fetch all liked items for a user, newest first.
+ *  Newest-first is enforced at write time in appendLikedItem (we prepend).
+ *  The `el is string ? JSON.parse(el) : el` step is defensive: a previous
+ *  double-serialization bug stored some entries as JSON strings instead of
+ *  objects; this normalises them on read. */
 export async function getLikedItems(userId: string): Promise<any[]> {
   const rows = await client`
     SELECT liked_items FROM user_profiles WHERE user_id = ${userId}
@@ -830,12 +1000,17 @@ export async function getLikedItems(userId: string): Promise<any[]> {
 }
 
 // ── Gender-gated aesthetics ──────────────────────────────────────────────────
-// Aesthetics that should never appear for male users
+// `Set` in JS is the same as Python's `set` — O(1) `has` lookup.
+// Aesthetics that should never appear for male users (these are inherently
+// femme-coded styles; a male user picking them is likely an onboarding mistake).
 export const FEMALE_ONLY_AESTHETICS = new Set([
   "Coquette", "Soft Girl", "Cottagecore", "Coastal Grandmother", "E-Girl",
   "Clean Girl", "Balletcore", "Romantic", "Fairycore",
 ]);
-// Remap: if Gemini returns a female-only aesthetic for a male user, use this instead
+// Remap: if Gemini returns a female-only aesthetic for a male user, use this
+// instead. Picked by hand for "closest masculine equivalent" — e.g. Clean
+// Girl → Minimalist, Coquette → Old Money, E-Girl → Grunge.
+// Equivalent to a Python `Dict[str, str]`.
 export const MALE_AESTHETIC_REMAP: Record<string, string> = {
   "Clean Girl":          "Minimalist",
   "Coquette":            "Old Money",
@@ -858,9 +1033,18 @@ export function remapAestheticForGender(aesthetic: string, gender: string): stri
 // Gender detection: only look at explicit gender words in the title.
 // If the title says "women" or "men", tag it. Otherwise it's "both".
 // No brand signals, no garment-type inference — Depop always states the gender in the title when it's gendered.
-// Matches "women", "womens", "women's", "women’s", "woman", etc.
+// Matches "women", "womens", "women's", "women's", "woman", etc.
 // The apostrophe acts as a word boundary so \bwomen\b already catches "Women's",
 // but we also add explicit apostrophe forms to be airtight.
+//
+// Regex breakdown:
+//   \b          word boundary
+//   women       literal
+//   [''’]?      optional apostrophe (straight ASCII or two flavours of curly)
+//   s?          optional plural / possessive 's'
+//   |woman|...  alternations for each variant spelling
+//   /i          case-insensitive
+// In Python this would be: re.compile(r"\b(...)\b", re.IGNORECASE)
 const EXPLICIT_FEMALE = /\b(women[''’]?s?|woman|womans|womena|ladies|lady|girls?|female|womenswear)\b/i;
 const EXPLICIT_MALE   = /\b(men[''’]?s?|man|male|boys?|menswear)\b/i;
 // Keep these exported so retag script and client code still compile, but they are no longer used for filtering
@@ -898,6 +1082,13 @@ export function tagListingGender(listing: any): any {
   return listing;
 }
 
+// Returns true if a listing should be shown to a user with the given gender
+// preference. Decision rules (in order):
+//   - gender="both" → always allow.
+//   - title has both gender words (rare; "unisex mens womens") → allow all.
+//   - title has only female word → only female users.
+//   - title has only male word → only male users.
+//   - no gender word at all → neutral, allow everyone.
 export function genderPassesFilter(listing: any, gender: string): boolean {
   if (gender === "both") return true;
   const text = typeof listing === "string" ? listing : listingText(listing);
@@ -914,6 +1105,16 @@ export function genderPassesFilter(listing: any, gender: string): boolean {
  * Get personalized For You recommendations for a user.
  * Finds depop_cache items whose embeddings are closest to the user's taste vector.
  * Excludes already-liked and skipped items. Filters by gender preference.
+ *
+ * The core SQL is:
+ *   SELECT ... FROM depop_cache
+ *   WHERE embedding IS NOT NULL AND permanent = TRUE
+ *     AND query != ALL(excluded::text[])  -- exclude already-seen
+ *   ORDER BY embedding <=> $taste_vector::vector  -- cosine distance, smallest first
+ *   LIMIT N OFFSET M
+ *
+ * We pull `fetchMultiple * limit` rows so we have headroom for gender
+ * filtering — male users may discard 60-80% of rows, so we 6x the pull.
  */
 export async function getForYouRecommendations(
   userId: string,
@@ -976,6 +1177,14 @@ export async function getForYouRecommendations(
 /**
  * Average a batch of existing embeddings from cache rows matching given aesthetics.
  * Used to seed a user's taste vector from onboarding picks.
+ *
+ * Steps:
+ *   1. (If gender is set) filter out aesthetics the user shouldn't see.
+ *   2. Sample up to N rows per aesthetic with permanent=true.
+ *   3. Drop rows where <40% of listings pass the gender filter — these are
+ *      probably mis-tagged (e.g. a "Y2K" row that's actually all womenswear).
+ *   4. Sum the embedding vectors and divide by row count to get an average.
+ *      Equivalent to numpy: `np.mean(np.array(vectors), axis=0)`.
  */
 export async function getAverageEmbeddingForAesthetics(aesthetics: string[], gender?: string): Promise<number[] | null> {
   if (!aesthetics.length) return null;
@@ -1029,6 +1238,9 @@ export async function getAverageEmbeddingForAesthetics(aesthetics: string[], gen
 /**
  * Get discover cards ordered by similarity to a user's taste vector.
  * Falls back to likes_count ordering if user has no taste vector.
+ * The `1 - (embedding <=> $1::vector) AS taste_score` expression converts
+ * cosine *distance* (0 = identical) to a *similarity* score (1 = identical)
+ * for client display.
  */
 export async function getDiscoverCardsByTaste(userId: string): Promise<any[]> {
   const profile = await getUserProfile(userId);
@@ -1051,6 +1263,8 @@ export async function getDiscoverCardsByTaste(userId: string): Promise<any[]> {
 /**
  * "Shop the Look" — given a discover card's aesthetic + key pieces,
  * find real Depop cache listings using semantic search.
+ * For each piece (up to 4), runs one getDepopCacheByEmbedding lookup with
+ * the inferred garment type. Returns one group per piece for client display.
  */
 export async function getShopTheLookItems(
   aesthetic: string,
@@ -1067,7 +1281,9 @@ export async function getShopTheLookItems(
   return results;
 }
 
-// Infer garment type from piece string (reuse logic from routes)
+// Infer garment type from a piece name. Same idea as `inferGarmentType`
+// in routes.ts — kept duplicated rather than imported so storage.ts has no
+// circular dep on routes.ts. Regex-based classifier with a fallback to "tops".
 function inferGarmentType(piece: string): string {
   const p = piece.toLowerCase();
   if (/jean|pant|trouser|cargo|short|skirt|legging/.test(p)) return "bottoms";
@@ -1082,10 +1298,15 @@ function inferGarmentType(piece: string): string {
 // ─────────────────────────────────────────────
 
 /**
- * Given a user's wardrobe items, find what's missing:
- * 1. Embed each owned item's name+category
- * 2. Find depop_cache rows that are FAR from all owned items
- *    but close to the user's taste vector → genuine gaps
+ * Given a user's wardrobe items, find what's missing.
+ *
+ * Heuristic: count how many items the user owns per garment category;
+ * any category with <2 owned items is a "gap". Then pull taste-matched
+ * Depop listings whose garment_type is in those gap categories.
+ *
+ * Originally this used vector-distance to *individual* wardrobe items, but
+ * counting categories is simpler, faster, and gives users obvious wins
+ * (e.g. "you have no outerwear — try these jackets").
  */
 export async function getWardrobeGapRecommendations(
   userId: string,
@@ -1144,6 +1365,10 @@ export async function getWardrobeGapRecommendations(
  * Given a scan's aesthetic + style breakdown, find other scans
  * with similar aesthetic using cosine similarity on discover_cards embeddings.
  * Returns the top N most similar cards to show as "similar outfits".
+ *
+ * Vector source: we embed the string `"<aesthetic> <tag1> <tag2> ..."` so the
+ * search isn't purely aesthetic-name-matching; tags add nuance (e.g. two
+ * "Streetwear" outfits with "minimal" vs "loud" tags will rank differently).
  */
 export async function getSimilarDiscoverCards(
   aesthetic: string,
@@ -1176,6 +1401,9 @@ export async function getSimilarDiscoverCards(
 // ─────────────────────────────────────────────
 // UTILITY — embed and store a single discover_card
 // Called after card creation to populate the embedding column.
+// "Fire and forget": failures are warnings, not exceptions, because the
+// embedding is a nice-to-have for vector search but not required for the
+// card to function.
 // ─────────────────────────────────────────────
 export async function embedDiscoverCard(id: number, aesthetic: string, tags: string[], keyPieces: string[]): Promise<void> {
   if (!openaiClient) return;

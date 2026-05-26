@@ -1,26 +1,62 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// routes.ts — All HTTP endpoints for the StyleAI server.
+//
+// Mental model for a Python dev: this file is roughly the equivalent of a Flask
+// `app.py` or a FastAPI `router.py`. Each `app.get(...)` / `app.post(...)` call
+// below is the JS/Express equivalent of a `@app.route("/path", methods=["..."])`
+// decorator in Python. The handler is the second argument (a function), and
+// `req` / `res` are like Flask's `request` / `response` objects — but `res`
+// must be called explicitly (`res.json(...)`) rather than returned.
+//
+// Big picture of what's in this file:
+//   1. Middleware setup: rate limiter (express-rate-limit) and file upload
+//      handler (multer — Express's equivalent of Flask's `request.files`).
+//   2. Mock product catalogs + Unsplash image helpers (legacy MVP fallback).
+//   3. Depop scraping logic: hits api.depop.com via Cloudflare Worker / proxy
+//      list, with Apify as a fallback. Results are cached in Postgres.
+//   4. Gemini prompts + schemas: define the structured JSON shape we want
+//      back from Gemini for outfit analysis (two passes: garment detection
+//      then aesthetic classification).
+//   5. Reddit auto-seeding for the Discover feed.
+//   6. `registerRoutes(...)`: the function that wires every endpoint to
+//      the Express app. This is the heart of the API.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import type { Express } from "express";
 import type { Server } from "http";
+// Pulls in DB helpers from storage.ts — analogous to importing a Python
+// service module (e.g. `from storage import get_user, set_cache, ...`).
 import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, upsertScannedPieces, getScannedPieces, tagListingGender, genderPassesFilter as listingGenderOk } from "./storage";
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import multer from "multer";
-import rateLimit from "express-rate-limit";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai"; // Gemini client (like `google.generativeai` in Python)
+import multer from "multer";           // Multipart/form-data parser (Python equivalent: Werkzeug's `request.files` or FastAPI's `UploadFile`)
+import rateLimit from "express-rate-limit"; // Per-IP throttling middleware (Python equivalent: `flask-limiter`)
 import cors from "cors";
 
 // ── Rate limiter: 10 analysis requests per IP per minute ─────────────────────
+// Like decorating a Flask route with `@limiter.limit("10 per minute")`.
+// The returned `analyzeLimiter` is a middleware function we attach to the
+// /api/analyze route specifically (see further down).
 const analyzeLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 60 * 1000,           // 60 seconds — the sliding window for counting requests.
+  max: 10,                       // Reject the 11th request from any single IP within that window.
+  standardHeaders: true,         // Send `RateLimit-*` headers so the client knows its quota.
+  legacyHeaders: false,          // Skip the older `X-RateLimit-*` headers (deprecated).
   message: { error: "Too many requests — please wait a moment before trying again." },
 });
 
+// Whitelist of image MIME types we'll accept on uploads. Anything else (PDF,
+// HEIC, octet-stream, etc.) is rejected up-front by the multer file filter.
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+// `upload` is the multer instance — think of it as a configured file-upload
+// middleware. We use `upload.single("image")` on routes that expect a single
+// file field named "image" (like Flask's `request.files["image"]`).
 const upload = multer({
-  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB — client resizes to 1024px before upload
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB cap — client resizes to 1024px before upload, so this is plenty.
   fileFilter: (_req, file, cb) => {
+    // multer calls this callback for each uploaded file; we approve or reject.
     if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      cb(null, true);
+      cb(null, true); // Convention: (error, accept). null error + true = accept the file.
     } else {
       cb(new Error("Only JPEG, PNG, WebP, and GIF images are allowed."));
     }
@@ -29,7 +65,10 @@ const upload = multer({
 
 // Mock product results for MVP (replace with Skimlinks affiliate API)
 
-// Maps a product name to relevant Unsplash search keywords
+// Maps a product name (e.g. "Doc Martens", "Slim Chino Trousers") to a stable
+// Unsplash photo URL. Used as a fallback image when we don't have a real
+// product image. Like a Python dict-of-tuples lookup: walk the list, return
+// the first photo whose keyword appears in the name.
 function buildImageKeywords(name: string): string {
   const n = name.toLowerCase();
   const map: [string[], string][] = [
@@ -70,6 +109,13 @@ function buildImageKeywords(name: string): string {
 }
 
 // ── Depop helpers ───────────────────────────────────────────────────
+// `normaliseDepopItem` takes one raw item from the Apify Depop scraper and
+// converts it to our internal listing shape: { id, title, brand, price,
+// currency, size, image, url }. Different scrapers return slightly different
+// JSON shapes (image_url vs imageUrl vs images[]), so this function picks
+// the first one that actually has data and normalises the result.
+// Returns `null` if the item is clearly non-clothing (trading cards, toys,
+// etc.) so the caller can filter them out.
 function normaliseDepopItem(i: any, idx: number, searchQ: string) {
   let image = "";
   if (Array.isArray(i.image_url)) image = i.image_url.find((u: string) => u?.length) || "";
@@ -126,6 +172,11 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
 // Hits api.depop.com directly, bypassing Cloudflare via a residential proxy IP.
 // Falls back to Apify if PROXY_URL is not set.
 // Parse PROXY_LIST env var — lines or commas of "ip:port:user:pass" or "ip:port"
+//
+// In Python this would be roughly:
+//   raw = os.environ.get("PROXY_LIST", "")
+//   for line in raw.replace(",", "\n").splitlines(): ...
+// Each entry becomes a fully-formed http:// URL with URL-encoded creds.
 function getProxyList(): string[] {
   const raw = process.env.PROXY_LIST || "";
   if (!raw) return [];
@@ -148,7 +199,10 @@ function getProxyList(): string[] {
 }
 
 // Shared normaliser for Depop API response items
-// Handles both v2 (objects[]) and v3 (products[]) response shapes
+// Handles both v2 (objects[]) and v3 (products[]) response shapes.
+// Similar in spirit to normaliseDepopItem above, but this one handles the
+// raw Depop *API* response (which has different keys: `preview` dict,
+// `pricing.original_price...`, `sizes` array) vs the Apify scraper output.
 function normaliseDepopObject(item: any, idx: number, query: string) {
   // v3: preview is a dict of size->url; v2: preview_pictures or pictures array
   let image = "";
@@ -211,9 +265,18 @@ function normaliseDepopObject(item: any, idx: number, query: string) {
   };
 }
 
-// Simple round-robin counter for proxy selection
+// Simple round-robin counter for proxy selection (mutable module-level state;
+// the equivalent of a `proxy_round_robin = 0` global in a Python module).
+// Each successful proxy use bumps this so the next call hits a different IP.
 let proxyRoundRobin = 0;
 
+// Try every path we have to reach Depop's product search API.
+// Order of attempts (each falls through to the next on failure):
+//   Path 0: Direct fetch with real browser cookies pasted into env vars.
+//           Most reliable when fresh — looks like a logged-in browser.
+//   Path 1: Cloudflare Worker (hosted on CF edge, so CF doesn't block it).
+//   Path 2: Residential proxy list — round-robin up to 3 attempts.
+// Throws if all paths fail; the caller catches and falls back to Apify.
 async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   // ── Path 0: Direct fetch with real browser cookies (most reliable) ────────
   const depopCookie = process.env.DEPOP_COOKIE;
@@ -360,7 +423,10 @@ async function scrapeDepopDirect(query: string, limit = 6): Promise<any[]> {
   throw lastError || new Error("All proxies failed");
 }
 
-// Run a single Depop search: check cache first, else hit Apify + store result
+// Run a single Depop search: check cache first, else hit Apify + store result.
+// This is the single entry point we use everywhere we want listings for a
+// given query string. Roughly equivalent to a `@lru_cache`-wrapped Python
+// function, except the cache lives in Postgres so it survives restarts.
 async function fetchDepopListings(
   query: string,
   aesthetic: string,
@@ -393,7 +459,9 @@ async function fetchDepopListings(
       }
     }
 
-    // 2b. Fall back to Apify if proxy failed or not set
+    // 2b. Fall back to Apify if proxy failed or not set.
+    // Apify is async: we POST to start a "run", then poll until it succeeds,
+    // then fetch the dataset of items. Whole flow can take ~30–60s.
     if (!listings.length && token) {
       const runRes = await fetch(
         `https://api.apify.com/v2/acts/piotrv1001~depop-listings-scraper/runs?token=${token}`,
@@ -414,7 +482,9 @@ async function fetchDepopListings(
       const datasetId: string = runData.data?.defaultDatasetId;
       if (!runId) return [];
 
-      // Poll until done (max 90s)
+      // Poll until done (max 90s). Like Python's:
+      //   while time.time() - start < 90:
+      //       time.sleep(4); status = requests.get(...).json()["status"]
       const start = Date.now();
       while (Date.now() - start < 90_000) {
         await new Promise(r => setTimeout(r, 4_000));
@@ -450,12 +520,16 @@ async function fetchDepopListings(
   }
 }
 
-// Generates an Amazon affiliate search URL for a product
+// Generates an Amazon affiliate search URL for a product.
+// We earn a small commission when users buy through `tag=styleaiapp-20`.
 function amazonUrl(productName: string, brand: string): string {
   const query = encodeURIComponent(`${brand} ${productName}`);
   return `https://www.amazon.com/s?k=${query}&tag=styleaiapp-20`;
 }
 
+// Legacy MVP product catalog — used as a fallback when Gemini doesn't return
+// any product recommendations. Each aesthetic key maps to ~4-6 curated picks.
+// Equivalent to a Python `Dict[str, List[dict]]` of hand-written sample data.
 function generateMockResults(aesthetic: string) {
   const aestheticProducts: Record<string, any[]> = {
     // ── MINIMALIST & CLEAN ──
@@ -831,6 +905,17 @@ function generateMockResults(aesthetic: string) {
 }
 
 // ─── Gemini response schema (structured output — no regex parsing needed) ───
+// `responseSchema` tells Gemini to return JSON conforming to this shape, so
+// we never have to scrape natural-language output. Think of these schemas as
+// Python TypedDicts / Pydantic models — they constrain the LLM's response.
+//
+// We use TWO passes because they have different cost/quality tradeoffs:
+//   PASS 1 (GARMENT_SCHEMA, gemini-2.5-flash-lite): cheap & fast — just
+//          enumerates visible garments objectively, no aesthetic judgement.
+//   PASS 2 (ANALYSIS_SCHEMA, gemini-2.5-flash): smarter — uses the Pass 1
+//          inventory as grounding and assigns the aesthetic label.
+// Two-pass beats single-pass because Pass 2 has concrete garment facts to
+// reason over instead of having to do detection + classification in one shot.
 // ─── Pass 1: Garment detection schema ────────────────────────────────────────
 const GARMENT_SCHEMA = {
   type: SchemaType.OBJECT,
@@ -883,11 +968,19 @@ const GARMENT_SCHEMA = {
   required: ["garments", "overallPalette", "layering", "perceivedGender"],
 };
 
+// System instruction = "persona" sent to Gemini before the user prompt.
+// Like the `system` role in an OpenAI chat completion. We tell Pass 1 to be
+// a literal observer (no aesthetic judgement) so Pass 2 has clean grounding.
 const GARMENT_SYSTEM_INSTRUCTION = `You are a precise fashion analyst. Your job is to inventory every visible garment and accessory in an outfit image.
 Be exhaustive and specific. List every item you can see — including items that are partially visible.
 Focus on factual observation: what you literally see. No interpretation of style or aesthetic yet — that comes later.
 Be specific with names: not "pants" but "wide-leg corduroy trousers". Not "shoes" but "lug-sole platform boots".`;
 
+// Pass 2 response schema — the full outfit analysis.
+// Fields like `aesthetic` use an `enum` to constrain Gemini to our known
+// 41-aesthetic taxonomy (so it can't invent a new label like "Y4K").
+// `outfitRecs` and `similarRecs` produce two distinct kinds of product picks:
+// "get the look" replicas vs "complete the look" complements.
 const ANALYSIS_SCHEMA = {
   type: SchemaType.OBJECT,
   description: "Fashion aesthetic analysis of an outfit image",
@@ -1059,6 +1152,11 @@ const ANALYSIS_SCHEMA = {
 };
 
 // ─── System instruction — 35-category style taxonomy + calibration rules ───
+// This is the "persona + rulebook" for Pass 2. It's long because Gemini
+// needs concrete disambiguation rules (e.g. "Y2K vs 70s-80s Retro: platforms
+// alone don't mean Y2K") to be consistent across users. Treat this like the
+// schema documentation — when you change the taxonomy or the disambiguation
+// logic, update both this string AND the enum above so they stay in sync.
 const SYSTEM_INSTRUCTION = `You are Stitch, an expert fashion stylist and aesthetic analyst specialising in visual outfit classification.
 
 GENDER-INCLUSIVE CLASSIFICATION:
@@ -1169,6 +1267,9 @@ Both sets: real brands, specific names (not "jeans" but "Washed Barrel-Fit Jeans
 // ── Gemini retry helper ───────────────────────────────────────────────────────
 // Retries on 503 / 429 / RESOURCE_EXHAUSTED up to maxAttempts times with
 // exponential backoff. Keeps the user on the loading screen throughout.
+// `fn: () => Promise<T>` is a generic "thunk": a no-arg function returning a
+// promise of any type T. In Python this would be `Callable[[], Awaitable[T]]`.
+// We only retry transient errors (overload, quota); 4xx user errors throw immediately.
 async function geminiWithRetry<T>(
   fn: () => Promise<T>,
   maxAttempts = 3,
@@ -1216,7 +1317,9 @@ const SUBREDDIT_MAP: { sub: string; aesthetic: string }[] = [
   { sub: "fashionadvice",         aesthetic: "Coastal" },
 ];
 
-// Fetch top image posts from a subreddit (no auth needed for read-only)
+// Fetch top image posts from a subreddit (no auth needed for read-only).
+// Uses Reddit's anonymous JSON endpoint — same data as adding `.json` to
+// any subreddit URL in a browser. Filters out non-image links and NSFW posts.
 async function fetchSubredditImages(
   sub: string,
   limit = 3,
@@ -1252,7 +1355,14 @@ async function fetchSubredditImages(
   return images;
 }
 
-// Core analysis + store function (module-level)
+// Core analysis + store function (module-level).
+// Used by both the auto-seed-from-Reddit flow AND the daily refresh cron.
+// Flow:
+//   1. Download image bytes and base64-encode for Gemini.
+//   2. Gate check: ask Gemini Lite "is this actually an outfit photo?"
+//      to filter out memes, product shots, illustrations etc.
+//   3. Pass 1 (garment inventory) → Pass 2 (aesthetic classification).
+//   4. Insert into discover_cards and trigger background embedding.
 // Returns null if the image is not a real outfit photo (meme, product shot, no person, etc.)
 async function analyzeAndStore(
   imageUrl: string,
@@ -1362,6 +1472,10 @@ async function analyzeAndStore(
 }
 
 // ── Auto-seed on startup ─────────────────────────────────────────────────────
+// If the discover_cards table is empty when the server boots, pull a couple of
+// top-of-month posts from each subreddit in SUBREDDIT_MAP, run them through
+// analyzeAndStore, and populate the Discover feed. Best-effort: errors are
+// logged but don't crash startup.
 export async function triggerSeedIfEmpty() {
   try {
     const existing = await storage.discoverCardCount();
@@ -1399,10 +1513,16 @@ export async function triggerSeedIfEmpty() {
   }
 }
 
+// `registerRoutes` is called once at server startup. It runs DB migrations
+// (initDB) and then attaches every endpoint handler to the Express app.
+// Think of this as the body of a Flask `create_app()` factory — everything
+// inside this function is one-time wiring that happens at boot.
 export async function registerRoutes(httpServer: Server, app: Express) {
-  await initDB();
+  await initDB(); // CREATE TABLE IF NOT EXISTS ... for all our tables. See storage.ts.
 
-  // Auto-seed trending cards on startup (background, non-blocking)
+  // Auto-seed trending cards on startup (background, non-blocking).
+  // `setTimeout(fn, 10_000)` is JS's `time.sleep(10)`-then-run equivalent,
+  // but non-blocking — the server keeps accepting requests during the delay.
   if (process.env.APIFY_TOKEN) {
     setTimeout(() => {
       fetch(`http://localhost:${process.env.PORT || 5000}/api/seed-trending`)
@@ -1410,9 +1530,15 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }, 10_000); // wait 10s for server to fully start
   }
 
-  // POST /api/seed-wave — seed a custom list of queries with garmentType tags
-  // Body: { queries: [{ query, aesthetic, garmentType }], limit? }
-  // Runs in background like seed-trending, skips already-cached queries
+  /**
+   * POST /api/seed-wave
+   * Accept a custom batch of search queries and check (without scraping) which
+   * are already in the Depop cache. Returns a hit/miss report.
+   *
+   * Body: { queries: [{ query, aesthetic, garmentType }], limit? }
+   *
+   * Like Flask: @app.route("/api/seed-wave", methods=["POST"])
+   */
   app.post("/api/seed-wave", async (req, res) => {
     const { queries, limit = 8 } = req.body as { queries: { query: string; aesthetic: string; garmentType: string }[]; limit?: number };
     if (!queries?.length) return res.status(400).json({ error: "queries required" });
@@ -1426,9 +1552,18 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     res.json({ started: false, cached: hits, total: queries.length, message: "cache-only mode — live scraping disabled" });
   });
 
-  // Seed trending Depop cards from Google Trends fashion searches
-  // GET /api/seed-trending — fires in background, returns immediately
-  // GET /api/seed-trending?wait=1 — waits for completion (use from cron)
+  /**
+   * GET /api/seed-trending
+   * Seeds the Depop cache from three sources:
+   *   1. Pieces real users have scanned (`scanned_pieces` table) — highest priority.
+   *   2. The big `curatedBase` array below: 25 queries × 16 aesthetics = 400 queries.
+   *   3. Live Google Trends RSS for fashion (category 185), mapped to aesthetics.
+   * Runs every query through fetchDepopListings with permanent=true so rows
+   * never expire. By default fires in the background and returns immediately;
+   * pass ?wait=1 (used by cron) to block until done.
+   *
+   * Like Flask: @app.route("/api/seed-trending", methods=["GET"])
+   */
   app.get("/api/seed-trending", async (req, res) => {
     if (!process.env.WORKER_URL && !process.env.PROXY_URL && !process.env.APIFY_TOKEN) return res.json({ error: "No scraper configured" });
     const wait = req.query.wait === "1";
@@ -1963,7 +2098,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
   // One-time: delete cached rows with empty titles so they get re-fetched with slug-derived titles
   // Cache stats — counts rows, listings, breakdown by aesthetic and permanent flag
-  // POST /api/backfill-embeddings — one-time backfill of vector embeddings for all cache rows
+
+  /**
+   * POST /api/backfill-embeddings
+   * Walks every depop_cache row with NULL embedding, generates an OpenAI
+   * text-embedding-3-small vector for the query string, and stores it.
+   * One-time admin endpoint to enable vector search on existing rows.
+   * Returns immediately and runs the backfill in the background.
+   *
+   * Like Flask: @app.route("/api/backfill-embeddings", methods=["POST"])
+   */
   app.post("/api/backfill-embeddings", async (req, res) => {
     if (!process.env.OPENAI_API_KEY) {
       return res.status(400).json({ error: "OPENAI_API_KEY not set" });
@@ -2007,9 +2151,17 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   // FOR YOU — Personalized recommendations
   // ─────────────────────────────────────────────
 
-  // POST /api/onboarding
-  // Seeds a user's taste vector from their aesthetic picks.
-  // Body: { userId: string, aesthetics: string[] }
+  /**
+   * POST /api/onboarding
+   * Seeds a user's taste vector from their initial aesthetic picks.
+   * For each picked aesthetic we pull ~50 cached listings, average their
+   * embeddings, and store that as the user's starting taste_vector. The
+   * For You feed then ranks by cosine similarity to this vector.
+   *
+   * Body: { userId: string, aesthetics: string[], gender?: "male"|"female"|"both" }
+   *
+   * Like Flask: @app.route("/api/onboarding", methods=["POST"])
+   */
   app.post("/api/onboarding", async (req, res) => {
     try {
       const { userId, aesthetics, gender } = req.body as { userId: string; aesthetics: string[]; gender?: string };
@@ -2036,7 +2188,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // PATCH /api/user-gender/:userId — update gender preference and re-seed taste vector
+  /**
+   * PATCH /api/user-gender/:userId
+   * Updates a user's gender preference (male/female/both) and re-seeds their
+   * taste vector with gender-appropriate cached embeddings so the feed
+   * updates immediately. UPSERTs so brand-new users also get a row.
+   *
+   * Body: { gender: "male"|"female"|"both" }
+   *
+   * Like Flask: @app.route("/api/user-gender/<user_id>", methods=["PATCH"])
+   */
   app.patch("/api/user-gender/:userId", async (req, res) => {
     try {
       const { gender } = req.body as { gender: string };
@@ -2074,10 +2235,20 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/interact
-  // Updates a user's taste vector based on a like, save, or skip action.
-  // Body: { userId: string, itemId: string, action: "like"|"save"|"skip", query: string }
-  // The query is the depop_cache query key for the item (used to fetch its embedding)
+  /**
+   * POST /api/interact
+   * Records a like/save/skip on a single Depop item and updates the user's
+   * taste vector using a weighted running average:
+   *   taste_vector = (taste_vector * n + item_embedding * weight) / (n + |weight|)
+   * Then normalizes the result to unit length so cosine similarity stays stable.
+   *
+   * Weights: save=+3 (strong positive), like=+1, skip=-0.5 (mild negative).
+   *
+   * Body: { userId, itemId, action: "like"|"save"|"skip", query, item? }
+   * `query` is the depop_cache query key — we fetch its embedding to update the vector.
+   *
+   * Like Flask: @app.route("/api/interact", methods=["POST"])
+   */
   app.post("/api/interact", async (req, res) => {
     try {
       const { userId, itemId, action, query } = req.body as {
@@ -2133,17 +2304,23 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         // No existing vector — use item embedding directly (scaled by weight)
         newVector = itemEmbedding.map(v => v * Math.abs(weight));
       } else {
-        // Update running weighted average
-        // taste_vector = (taste_vector * n + item_embedding * weight) / (n + |weight|)
+        // Update running weighted average:
+        //   taste_vector = (taste_vector * n + item_embedding * weight) / (n + |weight|)
+        // Postgres stores vectors as the text "[0.1,0.2,...]"; we strip the
+        // brackets and parse to floats — like Python's
+        //   [float(x) for x in s.strip("[]").split(",")]
         const currentVec = profile.taste_vector.slice(1, -1).split(",").map(Number);
         const n = profile.interaction_count || 1;
         const totalWeight = n + Math.abs(weight);
+        // `.map((v, i) => ...)` is the JS equivalent of a Python list
+        // comprehension with index: `[f(v, i) for i, v in enumerate(xs)]`.
         newVector = currentVec.map((v, i) =>
           (v * n + itemEmbedding![i] * weight) / totalWeight
         );
       }
 
-      // Normalize the vector to unit length (keeps cosine similarity stable)
+      // Normalize the vector to unit length (keeps cosine similarity stable).
+      // `.reduce((sum, v) => sum + v*v, 0)` == Python `sum(v*v for v in xs)`.
       const magnitude = Math.sqrt(newVector.reduce((sum, v) => sum + v * v, 0));
       if (magnitude > 0) newVector = newVector.map(v => v / magnitude);
 
@@ -2162,8 +2339,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/for-you/:userId?offset=0
-  // Returns personalized Depop recommendations for a user.
+  /**
+   * GET /api/for-you/:userId?offset=0
+   * Returns 20 personalized Depop recommendations ranked by cosine similarity
+   * to the user's taste vector. Excludes already-liked/skipped items and
+   * applies the user's gender filter. Returns 404 if the user hasn't onboarded.
+   *
+   * Like Flask: @app.route("/api/for-you/<user_id>", methods=["GET"])
+   */
   app.get("/api/for-you/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
@@ -2182,7 +2365,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/user-profile/:userId — check if user exists + is onboarded
+  /**
+   * GET /api/user-profile/:userId
+   * Lightweight existence check — used by the client to decide whether to
+   * show the onboarding flow. Returns {exists, onboarded, interactionCount, gender}.
+   *
+   * Like Flask: @app.route("/api/user-profile/<user_id>", methods=["GET"])
+   */
   app.get("/api/user-profile/:userId", async (req, res) => {
     try {
       const profile = await getUserProfile(req.params.userId);
@@ -2193,7 +2382,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/scanned-pieces — all pieces ever scanned, sorted by frequency
+  /**
+   * GET /api/scanned-pieces
+   * Returns the top 500 garment pieces that real users have had analysed,
+   * sorted by scan_count DESC. Used by the seed-trending pipeline so the
+   * Depop cache is biased toward what actual users wear.
+   *
+   * Like Flask: @app.route("/api/scanned-pieces", methods=["GET"])
+   */
   app.get("/api/scanned-pieces", async (_req, res) => {
     try {
       const pieces = await getScannedPieces(500);
@@ -2203,7 +2399,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/liked-items/:userId — returns all liked/saved Depop items for history tab
+  /**
+   * GET /api/liked-items/:userId
+   * Returns every Depop item the user has liked or saved, newest first.
+   * Powers the History / Saved tab in the client.
+   *
+   * Like Flask: @app.route("/api/liked-items/<user_id>", methods=["GET"])
+   */
   app.get("/api/liked-items/:userId", async (req, res) => {
     try {
       const items = await getLikedItems(req.params.userId);
@@ -2213,7 +2415,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // DELETE /api/liked-items/:userId — remove a single liked item by its key (url or id)
+  /**
+   * DELETE /api/liked-items/:userId
+   * Removes a single liked item from the user's saved list.
+   *
+   * Body: { itemKey: string }  // either the depop URL or the item id
+   *
+   * Like Flask: @app.route("/api/liked-items/<user_id>", methods=["DELETE"])
+   */
   app.delete("/api/liked-items/:userId", async (req, res) => {
     try {
       const { itemKey } = req.body as { itemKey: string };
@@ -2225,6 +2434,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  /**
+   * GET /api/cache-stats
+   * Admin/observability endpoint. Reports the row count + total listing count
+   * in the depop_cache, broken down by aesthetic and permanent-flag status.
+   * Useful for sanity-checking how full the cache is.
+   *
+   * Like Flask: @app.route("/api/cache-stats", methods=["GET"])
+   */
   app.get("/api/cache-stats", async (req, res) => {
     try {
       const { default: pg } = await import("postgres");
@@ -2253,6 +2470,15 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  /**
+   * GET /api/fix-cache-titles
+   * One-shot repair endpoint. Walks every depop_cache row and either:
+   *   (a) deletes the row if all listings have no image (so the next scrape
+   *       refills it), or
+   *   (b) backfills a slug-derived title if every listing is missing a title.
+   *
+   * Like Flask: @app.route("/api/fix-cache-titles", methods=["GET"])
+   */
   app.get("/api/fix-cache-titles", async (req, res) => {
     try {
       // Re-normalise in place: for each cached row, re-run normaliseDepopItem to fill titles
@@ -2286,7 +2512,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Test proxy scraper directly
+  /**
+   * GET /api/debug-proxy?q=<query>
+   * Diagnostics: try the first 3 proxies in PROXY_LIST against the real Depop
+   * search API and return per-proxy status/latency. Used to verify proxies
+   * are alive without poking the rest of the app.
+   *
+   * Like Flask: @app.route("/api/debug-proxy", methods=["GET"])
+   */
   app.get("/api/debug-proxy", async (req, res) => {
     const q = (req.query.q as string) || "streetwear cargo pants";
     const proxyList = getProxyList();
@@ -2330,7 +2563,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     res.json({ ok: false, totalProxies: proxyList.length, results });
   });
 
-  // Test Cloudflare Worker proxy
+  /**
+   * GET /api/debug-worker?q=<query>
+   * Diagnostics: hit the Cloudflare Worker proxy and report status + latency.
+   *
+   * Like Flask: @app.route("/api/debug-worker", methods=["GET"])
+   */
   app.get("/api/debug-worker", async (req, res) => {
     const q = (req.query.q as string) || "vintage dress";
     const workerUrl = process.env.WORKER_URL;
@@ -2357,7 +2595,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Test direct Depop API access (no proxy) — to check if Render can hit it directly
+  /**
+   * GET /api/debug-depop-direct?q=<query>
+   * Diagnostics: hit api.depop.com directly with no proxy. Mostly useful to
+   * confirm Render/whatever host is being blocked by Cloudflare.
+   *
+   * Like Flask: @app.route("/api/debug-depop-direct", methods=["GET"])
+   */
   app.get("/api/debug-depop-direct", async (req, res) => {
     const q = (req.query.q as string) || "hoodie";
     const url = `https://webapi.depop.com/api/v3/search/products/?what=${encodeURIComponent(q)}&sort=relevance&items_per_page=3&country=us&currency=USD&include_like_count=true`;
@@ -2381,7 +2625,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Temp: test Apify token + actor from server
+  /**
+   * GET /api/debug-apify
+   * Diagnostics: verifies that APIFY_TOKEN works by starting a tiny 2-item
+   * scrape and returning the raw Apify response.
+   *
+   * Like Flask: @app.route("/api/debug-apify", methods=["GET"])
+   */
   app.get("/api/debug-apify", async (req, res) => {
     const token = process.env.APIFY_TOKEN;
     if (!token) return res.json({ error: "No APIFY_TOKEN env var" });
@@ -2402,7 +2652,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Debug: check what getDepopCacheByType actually returns
+  /**
+   * GET /api/debug-cache-type?aesthetic=X&garmentType=Y&colorHint=Z&limit=N
+   * Diagnostics: inspect what getDepopCacheByEmbedding (or the keyword
+   * fallback) returns for the given parameters. Prints titles so you can
+   * verify the right kind of items come back.
+   *
+   * Like Flask: @app.route("/api/debug-cache-type", methods=["GET"])
+   */
   app.get("/api/debug-cache-type", async (req, res) => {
     const aesthetic = (req.query.aesthetic as string) || "Y2K";
     const garmentType = (req.query.garmentType as string) || "bottoms";
@@ -2423,7 +2680,21 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     });
   });
 
-  // Analyze outfit image with Gemini Flash
+  /**
+   * POST /api/analyze
+   * Accepts a multipart form upload (image file + optional userId via body,
+   * deviceId via x-device-id header). Runs the two-pass Gemini analysis
+   * (garment detection → aesthetic classification), generates per-garment
+   * Depop query strings, saves the scan to the DB, returns { scanId },
+   * and kicks off background cache-warming.
+   *
+   * Middleware chain (executed in order — like Flask `before_request` hooks):
+   *   1. analyzeLimiter — throttle to 10 per IP per minute.
+   *   2. upload.single("image") — parse multipart and put file on `req.file`,
+   *      similar to Flask's `request.files["image"]`.
+   *
+   * Like Flask: @app.route("/api/analyze", methods=["POST"])
+   */
   app.post("/api/analyze", analyzeLimiter, upload.single("image"), async (req, res) => {
     try {
       const file = req.file;
@@ -2462,7 +2733,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       // Build specific Depop search queries from Pass 1 garment data
       // e.g. { item: "Wide-leg trousers", color: "tan", fabric: "corduroy", fit: "wide-leg" }
       //   → "tan corduroy wide-leg trousers"
-      // Map detected item names to garment_type categories
+      // Map detected item names to garment_type categories.
+      // This is the same logic as `inferGarmentType` in storage.ts; we inline
+      // it here so the analyse handler doesn't have to import it. Roughly
+      // equivalent to a Python `if/elif/elif` chain on `re.search()` results.
       function inferGarmentType(item: string): string {
         const i = item.toLowerCase();
         if (/dress|gown|romper|jumpsuit/.test(i)) return "dresses";
@@ -2486,6 +2760,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         "Vintage": "vintage", "Y2K": "y2k",
       };
 
+      // Turns a verbose Gemini description into a short Depop-native query.
+      // Depop sellers tag items with short phrases ("y2k low rise jeans"),
+      // so we need to strip noise (fabric blends, "sleeve"-ish words) and
+      // prepend an aesthetic prefix. Resulting query is capped at 5 words.
       function stripToDepopQuery(verbose: string, aesthetic: string): string {
         let v = verbose.toLowerCase().trim();
         // Remove repeated adjacent words ("denim denim" -> "denim")
@@ -2509,6 +2787,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         return result.replace(/\b(\w+) \1\b/g, "$1").split(" ").slice(0, 5).join(" ");
       }
 
+      // Combines color + fabric + item into a verbose phrase then runs it
+      // through stripToDepopQuery. Skips accessories/non-clothing because
+      // those rarely give useful Depop search results. Returns up to 4
+      // {query, garmentType} pairs, one per detected garment.
       function buildGarmentQueries(garments: any[], aesthetic = ""): { query: string; garmentType: string }[] {
         // Skip accessories and non-clothing items for Depop search
         const skipTypes = /hat|bag|purse|sunglasses|glasses|watch|jewelry|necklace|ring|earring|bracelet|belt|sock|perfume|scarf|glove|ball|volleyball|football|basketball|helmet|phone|bottle|prop/i;
@@ -2544,6 +2826,9 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       ].join("\n");
 
       // ── PASS 2: Aesthetic classification using detected garments ──────────
+      // We feed the Pass 1 garment summary back into Pass 2 as text — this
+      // is "chain-of-thought via separate calls", giving Pass 2 a clean
+      // factual baseline so it doesn't have to redo detection.
       const classificationModel = genAI.getGenerativeModel({
         model: "gemini-2.5-flash",
         systemInstruction: SYSTEM_INSTRUCTION,
@@ -2577,7 +2862,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           }));
       const garmentDepopQueries = aestheticGarmentQueries;
 
-      // Build products from Gemini's split recommendations
+      // Build products from Gemini's split recommendations.
+      // Pass 2 returns two arrays: outfitRecs ("get the look") and similarRecs
+      // ("complete the look"). We tag each with a `type` so the client can
+      // render them in separate carousels.
       const mapRecs = (recs: any[], type: string, startId: number) =>
         (recs || []).map((rec: any, i: number) => ({
           id: startId + i,
@@ -2657,6 +2945,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       // Post-analysis: serve Depop recommendations purely from the permanent cache.
       // No live scraping — pull by garmentType + aesthetic so results are always relevant.
+      // This is "fire and forget" — the IIFE (Immediately Invoked Function
+      // Expression, `(async () => { ... })()`) runs in the background after
+      // res.json() has already returned to the client. Equivalent to
+      // `asyncio.create_task(...)` in Python.
       if (garmentDepopQueries.length) {
         const aesthetic = analysis.aesthetic;
         const queries = garmentDepopQueries.slice(0, 4);
@@ -2682,21 +2974,39 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Get scans — filtered by device if x-device-id header present
+  /**
+   * GET /api/scans
+   * List all scans, or only this device's scans if the x-device-id header is
+   * present. The list query excludes `image_data` to keep payloads small —
+   * use GET /api/scans/:id for the full image.
+   *
+   * Like Flask: @app.route("/api/scans", methods=["GET"])
+   */
   app.get("/api/scans", async (req, res) => {
     const deviceId = req.headers["x-device-id"] as string | undefined;
     const allScans = await storage.getScans(deviceId || undefined);
     res.json(allScans);
   });
 
-  // Get single scan
+  /**
+   * GET /api/scans/:id
+   * Return one scan with its full base64 image_data attached.
+   * 404 if the id doesn't exist.
+   *
+   * Like Flask: @app.route("/api/scans/<int:id>", methods=["GET"])
+   */
   app.get("/api/scans/:id", async (req, res) => {
     const scan = await storage.getScan(Number(req.params.id));
     if (!scan) return res.status(404).json({ error: "Scan not found" });
     res.json(scan);
   });
 
-  // Delete a scan
+  /**
+   * DELETE /api/scans/:id
+   * Removes the scan row from the DB.
+   *
+   * Like Flask: @app.route("/api/scans/<int:id>", methods=["DELETE"])
+   */
   app.delete("/api/scans/:id", async (req, res) => {
     try {
       await storage.deleteScan(Number(req.params.id));
@@ -2706,13 +3016,27 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Get wardrobe
+  /**
+   * GET /api/wardrobe
+   * Returns every saved wardrobe item (manually uploaded by the user),
+   * newest first.
+   *
+   * Like Flask: @app.route("/api/wardrobe", methods=["GET"])
+   */
   app.get("/api/wardrobe", async (req, res) => {
     const items = await storage.getWardrobeItems();
     res.json(items);
   });
 
-  // Add wardrobe item
+  /**
+   * POST /api/wardrobe
+   * Saves a new wardrobe item with its image (stored as a data URL).
+   *
+   * Multipart body: image file + { name, category, brand?, color?, aesthetic? }
+   * Middleware: upload.single("image") — like Flask's `request.files["image"]`.
+   *
+   * Like Flask: @app.route("/api/wardrobe", methods=["POST"])
+   */
   app.post("/api/wardrobe", upload.single("image"), async (req, res) => {
     try {
       const file = req.file;
@@ -2728,7 +3052,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Delete wardrobe item
+  /**
+   * DELETE /api/wardrobe/:id
+   * Removes a wardrobe row.
+   *
+   * Like Flask: @app.route("/api/wardrobe/<int:id>", methods=["DELETE"])
+   */
   app.delete("/api/wardrobe/:id", async (req, res) => {
     await storage.deleteWardrobeItem(Number(req.params.id));
     res.json({ ok: true });
@@ -2736,7 +3065,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
   // ── Discover feed ─────────────────────────────────────────────────────────────────
 
-  // GET /api/discover?userId=xxx — returns cards ordered by taste vector if userId given
+  /**
+   * GET /api/discover?userId=xxx
+   * Returns Discover feed cards. If userId is present, cards are ranked by
+   * cosine similarity to that user's taste vector; otherwise newest first.
+   *
+   * Like Flask: @app.route("/api/discover", methods=["GET"])
+   */
   app.get("/api/discover", async (req, res) => {
     try {
       const userId = req.query.userId as string | undefined;
@@ -2753,7 +3088,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/discover/trending — top liked cards (for surfacing to new users)
+  /**
+   * GET /api/discover/trending?limit=N
+   * Returns the top N most-liked Discover cards. Capped at 50.
+   * Used for new users who don't have a taste vector yet.
+   *
+   * Like Flask: @app.route("/api/discover/trending", methods=["GET"])
+   */
   app.get("/api/discover/trending", async (req, res) => {
     try {
       const limit = Math.min(Number(req.query.limit) || 20, 50);
@@ -2764,7 +3105,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/discover/shop-the-look?aesthetic=X&pieces=piece1,piece2 — real Depop items per piece
+  /**
+   * GET /api/discover/shop-the-look?aesthetic=X&pieces=piece1,piece2
+   * For a given Discover card, return real Depop listings matching each
+   * key piece. Normalises Gemini's variant aesthetic names (e.g. "E-Girl /
+   * Alt" → "E-Girl") onto the 16 aesthetics we actually cache.
+   *
+   * Like Flask: @app.route("/api/discover/shop-the-look", methods=["GET"])
+   */
   app.get("/api/discover/shop-the-look", async (req, res) => {
     try {
       const rawAesthetic = (req.query.aesthetic as string) || "";
@@ -2801,7 +3149,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/wardrobe/gap-recommendations/:userId — taste-matched items for missing garment types
+  /**
+   * GET /api/wardrobe/gap-recommendations/:userId
+   * Finds garment categories the user owns fewer than 2 of, then recommends
+   * taste-matched cached Depop items for those missing types.
+   *
+   * Like Flask: @app.route("/api/wardrobe/gap-recommendations/<user_id>", methods=["GET"])
+   */
   app.get("/api/wardrobe/gap-recommendations/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
@@ -2820,7 +3174,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/discover/:id/similar?aesthetic=X&tags=a,b — similar discover cards by embedding
+  /**
+   * GET /api/discover/:id/similar?aesthetic=X&tags=a,b
+   * Returns up to 4 other Discover cards most similar (by embedding cosine
+   * distance) to the supplied aesthetic + tags, excluding the given id.
+   *
+   * Like Flask: @app.route("/api/discover/<int:id>/similar", methods=["GET"])
+   */
   app.get("/api/discover/:id/similar", async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -2838,7 +3198,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-    // POST /api/discover/:id/like — increment likes_count for a card
+  /**
+   * POST /api/discover/:id/like
+   * Atomically increments likes_count on the card. Used so popular cards
+   * surface in the trending endpoint and survive the daily prune.
+   *
+   * Like Flask: @app.route("/api/discover/<int:id>/like", methods=["POST"])
+   */
   app.post("/api/discover/:id/like", async (req, res) => {
     try {
       const id = Number(req.params.id);
@@ -2850,7 +3216,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // DELETE /api/discover/reset — wipe all cards and re-seed fresh
+  /**
+   * DELETE /api/discover/reset
+   * Admin: wipes all Discover cards and kicks off a fresh background seed
+   * from Reddit. Useful when the prompt/taxonomy changes and old cards have
+   * stale labels.
+   *
+   * Like Flask: @app.route("/api/discover/reset", methods=["DELETE"])
+   */
   app.delete("/api/discover/reset", async (_req, res) => {
     try {
       await storage.clearDiscoverCards();
@@ -2862,7 +3235,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/discover/seed — initial seed from Reddit (idempotent, uses month/top)
+  /**
+   * POST /api/discover/seed
+   * Idempotent initial Reddit seed. If we already have ≥60 cards, no-ops.
+   * Otherwise pulls 2 top-of-month posts per subreddit, runs them through
+   * analyzeAndStore, and reports successes/errors.
+   *
+   * Like Flask: @app.route("/api/discover/seed", methods=["POST"])
+   */
   app.post("/api/discover/seed", async (_req, res) => {
     try {
       const existing = await storage.discoverCardCount();
@@ -2892,11 +3272,23 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/depop-search — check cache first, kick off Apify runs if needed
-  // Body: { queries: string[], aesthetic: string }
-  // Returns immediately with { cached: true, groups } OR { cached: false, runs: [{query,runId,datasetId}] }
+  /**
+   * POST /api/depop-search
+   * Front-end calls this with a list of Depop queries (one per key piece).
+   * Behaviour:
+   *   - Full cache hit → returns { cached: true, groups } instantly.
+   *   - Partial / no cache → starts Apify runs for the missing queries and
+   *     returns { cached: false, runs: [...] } so the client can poll
+   *     /api/depop-poll. If Apify is unavailable, falls back to scoring
+   *     items from the aesthetic-wide cache.
+   *
+   * Body: { queries: string[], aesthetic: string }
+   *
+   * Like Flask: @app.route("/api/depop-search", methods=["POST"])
+   */
   // Helper: given a piece name + pool of listings, return the best-matching subset
-  // by scoring how many words in the piece appear in the listing title
+  // by scoring how many words in the piece appear in the listing title.
+  // Same shape as a Python: `sorted(pool, key=lambda l: score(l.title), reverse=True)[:limit]`.
   function matchListingsForPiece(piece: string, pool: any[], limit = 6): any[] {
     const words = piece.toLowerCase().split(/\s+/).filter(w => w.length > 2);
     const scored = pool.map(l => {
@@ -2915,7 +3307,9 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const token = process.env.APIFY_TOKEN;
 
     try {
-      // Check cache for all queries in parallel
+      // Check cache for all queries in parallel.
+      // `Promise.all(...)` is the JS equivalent of `asyncio.gather(...)`:
+      // run every query lookup concurrently and wait for them all to finish.
       const cacheResults = await Promise.all(queries.map(async q => ({
         query: q,
         listings: await getDepopCache(q),
@@ -3058,8 +3452,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     { query: "coquette ballet flats", aesthetic: "Coquette" },
   ];
 
-  // GET /api/depop-feed?aesthetics=<json array> — return cached Depop cards for home feed
-  // Gender filter: use pre-tagged _gender field when available, fall back to title regex
+  /**
+   * GET /api/depop-feed?aesthetics=<json array>&userId=&gender=
+   * Builds the home feed: pulls up to 50 listings per aesthetic (3 aesthetics
+   * max), dedupes across aesthetics by URL, filters by gender. If no cache
+   * exists yet, kicks off background seeding for the default query set.
+   *
+   * Like Flask: @app.route("/api/depop-feed", methods=["GET"])
+   */
+  // Gender filter: use pre-tagged _gender field when available, fall back to title regex.
+  // The `_gender` field is added by storage.tagListingGender at write time.
   function feedGenderOk(l: any, gender: string): boolean {
     if (!gender || gender === "both") return true;
     const g = l._gender;
@@ -3131,7 +3533,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/depop-poll?runs=<json>&aesthetic=<str> — poll runs, cache + return on success
+  /**
+   * GET /api/depop-poll?runs=<json>&aesthetic=<str>
+   * Client polls this every couple seconds after /api/depop-search returned
+   * { cached: false, runs }. Once every Apify run has status SUCCEEDED we
+   * fetch the dataset, cache the listings, and return them in `groups`.
+   *
+   * Like Flask: @app.route("/api/depop-poll", methods=["GET"])
+   */
   app.get("/api/depop-poll", async (req, res) => {
     const { runs: runsRaw = "[]", aesthetic = "" } = req.query as Record<string, string>;
     const runs: { query: string; runId: string; datasetId: string }[] = JSON.parse(runsRaw);
@@ -3176,8 +3585,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // GET /api/depop-ready/:scanId
-  // Returns { ready: true, groups } immediately from permanent cache.
+  /**
+   * GET /api/depop-ready/:scanId
+   * Called by the client right after /api/analyze returns. Reads the scan's
+   * saved depopQueries, semantic-searches the permanent cache via vector
+   * embeddings (cosine similarity on the query strings), and returns
+   * { ready: true, groups: [{ piece, listings }, ...] }. Always serves from
+   * cache — no live scraping in the user-visible path so it stays instant.
+   *
+   * Like Flask: @app.route("/api/depop-ready/<int:scan_id>", methods=["GET"])
+   */
   app.get("/api/depop-ready/:scanId", async (req, res) => {
     const scanId = parseInt(req.params.scanId, 10);
     if (isNaN(scanId)) return res.status(400).json({ error: "Invalid scanId" });
@@ -3285,7 +3702,15 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/discover/refresh — pull HOT posts + prune stale zero-liked cards
+  /**
+   * POST /api/discover/refresh
+   * Manual trigger for the daily refresh: prune stale cards (>30 days old,
+   * 0 likes) and pull 2 hot posts per subreddit. The cron at the bottom of
+   * this file calls runDailyRefresh() automatically — this endpoint exposes
+   * it for ad-hoc runs.
+   *
+   * Like Flask: @app.route("/api/discover/refresh", methods=["POST"])
+   */
   app.post("/api/discover/refresh", async (_req, res) => {
     try {
       const { added, pruned, errors } = await runDailyRefresh();
@@ -3297,6 +3722,9 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 }
 
 // ── Daily refresh logic (hot sort + prune) ────────────────────────────────────
+// Pulls 2 fresh "hot" posts per subreddit, runs them through analyzeAndStore,
+// and prunes cards older than 30 days with 0 likes. Called manually via
+// /api/discover/refresh and automatically by startDailyRefreshCron() below.
 async function runDailyRefresh(): Promise<{ added: number; pruned: number; errors: string[] }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("Gemini API key not configured");
@@ -3326,6 +3754,13 @@ async function runDailyRefresh(): Promise<{ added: number; pruned: number; error
 }
 
 // ── Start daily refresh cron (runs once per day while server is alive) ────────
+// JS doesn't have a built-in cron, so we self-schedule with setTimeout.
+// The pattern below is a "trampolined" recursive timer: every time `tick`
+// finishes, it schedules itself again for 24h out. Equivalent in Python:
+//   def tick():
+//       run_daily_refresh()
+//       threading.Timer(INTERVAL, tick).start()
+//   threading.Timer(3600, tick).start()  # first run after 1h
 export function startDailyRefreshCron() {
   const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
   console.log("[cron] Daily discover refresh scheduled (every 24h)");
