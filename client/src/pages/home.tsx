@@ -58,6 +58,28 @@ const Icons: Record<string, JSX.Element> = {
   ),
 };
 
+// ── Nexbie affiliate shoe cards ──────────────────────────────────────────────
+const NEXBIE_CARDS = [
+  {
+    title: "Leisure Path 3D Printed Casual Sneakers",
+    price: "$129.00",
+    image: "https://cdn.shopify.com/s/files/1/0770/2197/0651/files/leisure-path-3d-printed-casual-sneakers.jpg?v=1777443961",
+    link: "https://www.awin1.com/cread.php?awinmid=125854&awinaffid=2861005&ued=https%3A%2F%2Fshoes.nexbie.com%2Fproducts%2Fleisure-path-3d-printed-casual-sneakers%3Fvariant%3D47944730345691",
+  },
+  {
+    title: "Cloud Spark 3D Printed Sneakers",
+    price: "$139.00",
+    image: "https://cdn.shopify.com/s/files/1/0770/2197/0651/files/19_e855f1bb-e113-4eae-a5ad-e4de33d27fd0.jpg?v=1767581929",
+    link: "https://www.awin1.com/cread.php?awinmid=125854&awinaffid=2861005&ued=https%3A%2F%2Fshoes.nexbie.com%2Fproducts%2Fcloud-spark-3d-printed-sneakers%3Fvariant%3D48012419334363",
+  },
+  {
+    title: "Aeroraise 3D Printed Sneakers",
+    price: "$159.00",
+    image: "https://cdn.shopify.com/s/files/1/0770/2197/0651/files/orange-3d-printed-sneakers.webp?v=1777431698",
+    link: "https://www.awin1.com/cread.php?awinmid=125854&awinaffid=2861005&ued=https%3A%2F%2Fshoes.nexbie.com%2Fproducts%2Faeroraise-3d-printed-sneakers%3Fvariant%3D48057165381851",
+  },
+];
+
 // ── Depop badge ──────────────────────────────────────────────────────────────
 function DepopBadge() {
   return (
@@ -654,6 +676,38 @@ export default function HomePage() {
               </div>
             </div>
           </a>
+
+          {/* ── Nexbie affiliate cards — positions 2, 3, 4 ─────────────── */}
+          {NEXBIE_CARDS.map((card) => (
+            <a
+              key={card.link}
+              href={card.link}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              className="relative bg-background hover:bg-muted/30 transition-colors cursor-pointer block group overflow-hidden"
+            >
+              <div className="absolute top-2.5 left-2.5 z-10 text-[9px] px-2 py-0.5 rounded-full bg-foreground/80 text-background font-medium backdrop-blur-sm">Sponsored</div>
+              <div className="w-full aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
+                <img
+                  src={card.image}
+                  alt={card.title}
+                  className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
+                />
+              </div>
+              <div className="px-3 pb-3 pt-2">
+                <p className="font-label text-[9px] text-muted-foreground mb-0.5 uppercase tracking-widest" style={{ fontSize: "9px" }}>Nexbie</p>
+                <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">{card.title}</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-primary font-semibold">Shop Now</p>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0 ml-auto">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                  </svg>
+                </div>
+              </div>
+            </a>
+          ))}
 
           {/* Not onboarded yet — show setup CTA + trending teaser */}
           {forYouOnboarded === false && (

@@ -130,6 +130,34 @@ function PieceCard({
   );
 }
 
+// ── Nexbie affiliate shoe cards ──────────────────────────────────────────────
+const NEXBIE_CARDS = [
+  {
+    title: "Leisure Path 3D Printed Casual Sneakers",
+    price: "$129.00",
+    image: "https://cdn.shopify.com/s/files/1/0770/2197/0651/files/leisure-path-3d-printed-casual-sneakers.jpg?v=1777443961",
+    link: "https://www.awin1.com/cread.php?awinmid=125854&awinaffid=2861005&ued=https%3A%2F%2Fshoes.nexbie.com%2Fproducts%2Fleisure-path-3d-printed-casual-sneakers%3Fvariant%3D47944730345691",
+  },
+  {
+    title: "Cloud Spark 3D Printed Sneakers",
+    price: "$139.00",
+    image: "https://cdn.shopify.com/s/files/1/0770/2197/0651/files/19_e855f1bb-e113-4eae-a5ad-e4de33d27fd0.jpg?v=1767581929",
+    link: "https://www.awin1.com/cread.php?awinmid=125854&awinaffid=2861005&ued=https%3A%2F%2Fshoes.nexbie.com%2Fproducts%2Fcloud-spark-3d-printed-sneakers%3Fvariant%3D48012419334363",
+  },
+  {
+    title: "Aeroraise 3D Printed Sneakers",
+    price: "$159.00",
+    image: "https://cdn.shopify.com/s/files/1/0770/2197/0651/files/orange-3d-printed-sneakers.webp?v=1777431698",
+    link: "https://www.awin1.com/cread.php?awinmid=125854&awinaffid=2861005&ued=https%3A%2F%2Fshoes.nexbie.com%2Fproducts%2Faeroraise-3d-printed-sneakers%3Fvariant%3D48057165381851",
+  },
+];
+
+const FOOTWEAR_RE = /\b(shoes?|sneakers?|boots?|sandals?|footwear|loafers?|heels?|trainers?|kicks)\b/i;
+
+function hasFootwear(items: string[]): boolean {
+  return items.some((s) => typeof s === "string" && FOOTWEAR_RE.test(s));
+}
+
 function ProductCard({ product }: { product: any }) {
   const [imgError, setImgError] = useState(false);
   const hasImage = product.image && product.image.length > 0 && !imgError;
@@ -472,6 +500,40 @@ export default function ResultsPage() {
             </div>
             <ExternalLink size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
           </a>
+        </div>
+      )}
+
+      {/* Sponsored Shoes — Nexbie affiliate (only when footwear is detected) */}
+      {hasFootwear(keyPieces) && (
+        <div className="px-5 sm:px-8 pb-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="font-label text-[10px] text-foreground tracking-widest">SPONSORED SHOES</p>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-foreground/80 text-background font-medium">Nexbie</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {NEXBIE_CARDS.map((card) => (
+              <a
+                key={card.link}
+                href={card.link}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 transition-colors group cursor-pointer relative"
+              >
+                <div className="absolute top-2 left-2 z-10 text-[9px] px-1.5 py-0.5 rounded-full bg-background/90 border border-border text-foreground font-semibold">
+                  Sponsored
+                </div>
+                <div
+                  className="aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                  style={{ backgroundImage: `url('${card.image}')` }}
+                />
+                <div className="p-2">
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">Nexbie</p>
+                  <p className="text-[10px] font-semibold text-foreground leading-tight line-clamp-2 mb-0.5">{card.title}</p>
+                  <p className="text-[10px] text-primary font-semibold">{card.price}</p>
+                </div>
+              </a>
+            ))}
+          </div>
         </div>
       )}
 
