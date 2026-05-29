@@ -154,7 +154,8 @@ const NEXBIE_CARDS = [
 
 const FOOTWEAR_RE = /\b(shoes?|sneakers?|boots?|sandals?|footwear|loafers?|heels?|trainers?|kicks)\b/i;
 
-function hasFootwear(items: string[]): boolean {
+function hasFootwear(items: unknown): boolean {
+  if (!Array.isArray(items)) return false;
   return items.some((s) => typeof s === "string" && FOOTWEAR_RE.test(s));
 }
 
@@ -237,11 +238,12 @@ export default function ResultsPage() {
     const userId = getOrCreateUserId();
     fetch(`/api/liked-items/${userId}`)
       .then(r => r.ok ? r.json() : { items: [] })
-      .then(({ items }: { items: { id?: string }[] }) => {
+      .then((data: { items?: { id?: string }[] } | null) => {
+        const items = Array.isArray(data?.items) ? data!.items! : [];
         const prefix = `piece_${scan.id}_`;
         const restored: Record<string, boolean> = {};
         items.forEach(item => {
-          if (item.id && item.id.startsWith(prefix)) {
+          if (item?.id && typeof item.id === "string" && item.id.startsWith(prefix)) {
             const pieceName = item.id.slice(prefix.length);
             restored[pieceName] = true;
           }
@@ -259,15 +261,21 @@ export default function ResultsPage() {
     if (!scan || vectorFiredRef.current) return;
     const timer = setTimeout(() => {
       vectorFiredRef.current = true;
-      const styleBreakdown: { label: string }[] = JSON.parse(scan.styleBreakdown || "[]");
-      const aesthetics = [
-        scan.aesthetic,
-        ...styleBreakdown.map((s) => s.label),
-      ].filter(Boolean) as string[];
-      onResultViewed(aesthetics);
+      try {
+        let parsed: unknown = [];
+        try { parsed = JSON.parse(scan.styleBreakdown || "[]"); } catch { parsed = []; }
+        const styleBreakdown = Array.isArray(parsed) ? parsed : [];
+        const aesthetics = [
+          scan.aesthetic,
+          ...styleBreakdown.map((s: any) => s?.label),
+        ].filter(Boolean) as string[];
+        onResultViewed(aesthetics);
+      } catch (e) {
+        console.error("[results] vector signal failed", e);
+      }
     }, 2000);
     return () => clearTimeout(timer);
-  }, [scan]);
+  }, [scan?.id]);
 
   // Reset depop fetch guard whenever the scan changes (e.g. navigating history)
   useEffect(() => {
@@ -281,7 +289,11 @@ export default function ResultsPage() {
     if (!depopMode || !scan || depopFetchedRef.current) return;
     depopFetchedRef.current = true;
 
-    const pieces: string[] = JSON.parse(scan.keyPieces || "[]");
+    let pieces: string[] = [];
+    try {
+      const parsed = JSON.parse(scan.keyPieces || "[]");
+      if (Array.isArray(parsed)) pieces = parsed.filter((p): p is string => typeof p === "string");
+    } catch { pieces = []; }
     setDepopLoading(true);
     setDepopError(null);
     setDepopGroups([]);
@@ -295,7 +307,10 @@ export default function ResultsPage() {
         if (cancelled) return;
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        const groups: { piece: string; listings: any[] }[] = data.groups || [];
+        const rawGroups = Array.isArray(data?.groups) ? data.groups : [];
+        const groups: { piece: string; listings: any[] }[] = rawGroups
+          .filter((g: any) => g && typeof g.piece === "string")
+          .map((g: any) => ({ piece: g.piece, listings: Array.isArray(g.listings) ? g.listings : [] }));
         if (groups.length > 0) {
           setDepopGroups(groups);
         } else {
@@ -309,7 +324,7 @@ export default function ResultsPage() {
     })();
 
     return () => { cancelled = true; };
-  }, [depopMode, scan]);
+  }, [depopMode, scan?.id]);
 
   if (isLoading) {
     return (
@@ -598,27 +613,31 @@ export default function ResultsPage() {
                     <ExternalLink size={9} className="text-muted-foreground group-hover/label:text-primary transition-colors mt-px" />
                   </a>
                   <div className="grid grid-cols-4 gap-2">
-                    {group.listings.map((item) => (
-                      <a
-                        key={item.id}
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 transition-colors group cursor-pointer"
-                      >
-                        <div
-                          className="aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
-                          style={{ backgroundImage: `url('${item.image}')` }}
-                        />
-                        <div className="p-1.5">
-                          <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium truncate">
-                            {item.brand || "Depop"}{item.size ? ` · ${item.size}` : ""}
-                          </p>
-                          <p className="text-[10px] font-semibold text-foreground leading-tight line-clamp-2 mb-0.5">{item.title}</p>
-                          <p className="text-[10px] text-primary font-semibold">${item.price.toFixed(0)}</p>
-                        </div>
-                      </a>
-                    ))}
+                    {(Array.isArray(group.listings) ? group.listings : []).map((item: any, idx: number) => {
+                      const priceNum = typeof item?.price === "number" ? item.price : parseFloat(item?.price);
+                      const priceStr = Number.isFinite(priceNum) ? `$${priceNum.toFixed(0)}` : "";
+                      return (
+                        <a
+                          key={item?.id ?? idx}
+                          href={item?.url || "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 transition-colors group cursor-pointer"
+                        >
+                          <div
+                            className="aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500"
+                            style={{ backgroundImage: `url('${item?.image || ""}')` }}
+                          />
+                          <div className="p-1.5">
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium truncate">
+                              {item?.brand || "Depop"}{item?.size ? ` · ${item.size}` : ""}
+                            </p>
+                            <p className="text-[10px] font-semibold text-foreground leading-tight line-clamp-2 mb-0.5">{item?.title || ""}</p>
+                            {priceStr && <p className="text-[10px] text-primary font-semibold">{priceStr}</p>}
+                          </div>
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
