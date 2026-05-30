@@ -2312,8 +2312,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   });
 
   /**
-   * GET /api/for-you/:userId?offset=0
-   * Returns 20 personalized Depop recommendations ranked by cosine similarity
+   * GET /api/for-you/:userId?offset=0&limit=20
+   * Returns personalized Depop recommendations ranked by cosine similarity
    * to the user's taste vector. Excludes already-liked/skipped items and
    * applies the user's gender filter. Returns 404 if the user hasn't onboarded.
    *
@@ -2323,13 +2323,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     try {
       const { userId } = req.params;
       const offset = parseInt((req.query.offset as string) || "0", 10);
+      const limit = Math.min(parseInt((req.query.limit as string) || "20", 10) || 20, 100);
 
       const profile = await getUserProfile(userId);
       if (!profile || !profile.onboarded) {
         return res.status(404).json({ error: "user_not_onboarded", onboarded: false });
       }
 
-      const { items, hasMore } = await getForYouRecommendations(userId, 20, offset);
+      const { items, hasMore } = await getForYouRecommendations(userId, limit, offset);
       res.json({ items, hasMore, interactionCount: profile.interaction_count });
     } catch (e: any) {
       console.error("[for-you]", e);

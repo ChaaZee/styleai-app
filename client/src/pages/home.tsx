@@ -455,7 +455,7 @@ export default function HomePage() {
           } catch {}
           // Load personalized cards
           setForYouLoading(true);
-          return fetch(`/api/for-you/${userId}?offset=0`)
+          return fetch(`/api/for-you/${userId}?offset=0&limit=60`)
             .then(r => r.json())
             .then(d => {
               setForYouCards(d.items || []);
@@ -471,7 +471,7 @@ export default function HomePage() {
     setShowOnboarding(false);
     setForYouOnboarded(true);
     setForYouLoading(true);
-    fetch(`/api/for-you/${userId}?offset=0`)
+    fetch(`/api/for-you/${userId}?offset=0&limit=60`)
       .then(r => r.json())
       .then(d => { setForYouCards(d.items || []); setForYouLoading(false); })
       .catch(() => setForYouLoading(false));
@@ -512,7 +512,7 @@ export default function HomePage() {
     setRankedItems(rerank());
     if (forYouOnboarded) {
       try {
-        const d = await fetch(`/api/for-you/${userId}?offset=0`).then(r => r.json());
+        const d = await fetch(`/api/for-you/${userId}?offset=0&limit=60`).then(r => r.json());
         setForYouCards(d.items || []);
       } catch {}
     }
@@ -646,7 +646,7 @@ export default function HomePage() {
 
       {/* ── Fits Grid (vector-personalized) ── */}
       {activeChip === "Fits" && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: "hsl(var(--border))" }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-px" style={{ background: "hsl(var(--border))" }}>
 
           {/* ── Affiliate card — always first, always visible ───────────── */}
           <a
@@ -712,7 +712,7 @@ export default function HomePage() {
           {/* Not onboarded yet — show setup CTA + trending teaser */}
           {forYouOnboarded === false && (
             <>
-              <div className="col-span-2 md:col-span-3 bg-background px-5 py-4 flex items-center justify-between border-b border-border/40">
+              <div className="col-span-2 md:col-span-4 bg-background px-5 py-4 flex items-center justify-between border-b border-border/40">
                 <p className="text-muted-foreground text-xs" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                   Personalise your feed
                 </p>
@@ -812,7 +812,7 @@ export default function HomePage() {
 
           {/* Empty state after load */}
           {forYouOnboarded === true && !forYouLoading && forYouCards.length === 0 && (
-            <div className="col-span-2 md:col-span-3 flex flex-col items-center justify-center py-16 gap-3 bg-background">
+            <div className="col-span-2 md:col-span-4 flex flex-col items-center justify-center py-16 gap-3 bg-background">
               <p className="text-muted-foreground text-sm" style={{ fontFamily: "'DM Sans', sans-serif" }}>No results yet.</p>
               <button onClick={() => setShowOnboarding(true)} className="text-primary text-sm underline" style={{ fontFamily: "'Jost', sans-serif" }}>Retune taste</button>
             </div>
@@ -822,7 +822,7 @@ export default function HomePage() {
 
       {/* ── Default Grid (non-For You chips) ── */}
       {activeChip !== "Fits" && (
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-px" style={{ background: "hsl(var(--border))" }}>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-px" style={{ background: "hsl(var(--border))" }}>
         {feedItems.map((item, idx) => {
           // 1-to-1 mapping: never cycle/repeat — just show as many cards as we have
           const card = depopCards.length > idx ? depopCards[idx] : null;
