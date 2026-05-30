@@ -83,11 +83,14 @@ def load_existing_urls(conn):
     can skip any listing whose URL is already stored (prevents duplicates).
     """
     cur = conn.cursor()
+    # Guard against rows where listings is not a JSON array (e.g. null or object)
+    # jsonb_typeof checks the type before calling jsonb_array_elements to avoid crashes
     cur.execute("""
         SELECT listing->>'url'
         FROM depop_cache,
         jsonb_array_elements(listings) AS listing
-        WHERE listing->>'url' IS NOT NULL
+        WHERE jsonb_typeof(listings) = 'array'
+          AND listing->>'url' IS NOT NULL
     """)
     rows = cur.fetchall()
     cur.close()
