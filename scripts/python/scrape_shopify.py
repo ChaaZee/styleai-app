@@ -75,6 +75,24 @@ HEADERS = {
 }
 
 
+def load_existing_urls(conn):
+    """
+    Load all product URLs already in the cache into a set for O(1) lookup.
+    We extract the 'url' field from every listing object in every row so we
+    can skip any listing whose URL is already stored (prevents duplicates).
+    """
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT listing->>'url'
+        FROM depop_cache,
+        jsonb_array_elements(listings) AS listing
+        WHERE listing->>'url' IS NOT NULL
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    return set(row[0] for row in rows)  # a set of URL strings
+
+
 def fetch_shopify_products(domain, limit=50):
     """
     Fetch products from a Shopify store's public /products.json endpoint.
@@ -254,8 +272,10 @@ def upsert_to_db(conn, rows):
             print(f"  [DRY RUN] Would upsert: {listings[0]['title']}...")
             continue
 
-        # Upsert: insert the row, or if it exists append new listings to the JSONB array
-        # The || operator in Postgres merges two JSONB arrays
+        # Upsert: insert the row, or if it exists append new listings to the JSONB array.
+        # The || operator in Postgres merges two JSONB arrays.
+        # Duplicates were already filtered out via existing_urls before we got here;
+        # the ON CONFLICT append remains as a safety net for truly new listings.
         cur.execute("""
             INSERT INTO depop_cache (query, listings, aesthetic, garment_type, permanent, created_at)
             VALUES (%s, %s::jsonb, %s, %s, true, NOW())
@@ -283,6 +303,11 @@ def main():
     conn = psycopg2.connect(DB_URL, sslmode="require")
     print("✓ Connected to database\n")
 
+    # Load every URL already in the cache ONCE up front so we can skip
+    # listings we've already stored (prevents duplicate entries).
+    existing_urls = load_existing_urls(conn)
+    print(f"✓ Loaded {len(existing_urls)} existing URLs from cache\n")
+
     total_inserted = 0
 
     for store in SHOPIFY_STORES:
@@ -307,6 +332,13 @@ def main():
         for raw in raw_products:
             result = parse_product(raw, aesthetic, gender)
             if result:
+                # Dedup check: skip any listing whose URL is already in the
+                # cache (or already seen earlier in this run).
+                listing = result["listing"]
+                if listing["url"] in existing_urls:
+                    print(f"    ⟳ Already in cache, skipping: {listing['title']}")
+                    continue
+                existing_urls.add(listing["url"])  # add so we don't dupe within this run
                 parsed.append(result)
 
         print(f"  Parsed {len(parsed)} valid products")

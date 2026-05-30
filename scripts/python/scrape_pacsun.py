@@ -76,6 +76,24 @@ def make_headers(referer="https://www.pacsun.com/"):
     }
 
 
+def load_existing_urls(conn):
+    """
+    Load all product URLs already in the cache into a set for O(1) lookup.
+    We extract the 'url' field from every listing object in every row so we
+    can skip any listing whose URL is already stored (prevents duplicates).
+    """
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT listing->>'url'
+        FROM depop_cache,
+        jsonb_array_elements(listings) AS listing
+        WHERE listing->>'url' IS NOT NULL
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    return set(row[0] for row in rows)  # a set of URL strings
+
+
 def get_product_urls_from_search(query):
     """
     Fetch the Pacsun search results page for a query and extract product page URLs.
@@ -170,6 +188,8 @@ def upsert_to_db(conn, query_key, aesthetic, garment_type, gender, listings):
     """
     Insert a batch of Pacsun listings into the depop_cache table.
     Uses ON CONFLICT to append to existing rows rather than overwrite.
+    Duplicates were already filtered out via existing_urls before we got here;
+    the ON CONFLICT append remains as a safety net for truly new listings.
     """
     if not listings:
         return
@@ -210,6 +230,11 @@ def main():
     conn = psycopg2.connect(DB_URL, sslmode="require")
     print("✓ Connected to database\n")
 
+    # Load every URL already in the cache ONCE up front so we can skip
+    # listings we've already stored (prevents duplicate entries).
+    existing_urls = load_existing_urls(conn)
+    print(f"✓ Loaded {len(existing_urls)} existing URLs from cache\n")
+
     total_inserted = 0
 
     for search_term, aesthetic, garment_type, gender in SEARCH_QUERIES:
@@ -242,6 +267,13 @@ def main():
                     "_gender": gender,
                     "_source": "pacsun",
                 }
+                # Dedup check: skip any listing whose URL is already in the
+                # cache (or already seen earlier in this run).
+                if listing["url"] in existing_urls:
+                    print(f"    ⟳ Already in cache, skipping: {listing['title']}")
+                    time.sleep(DELAY_SECS)
+                    continue
+                existing_urls.add(listing["url"])  # add so we don't dupe within this run
                 listings.append(listing)
                 print(f"    ✓ {details['title']} — {details['price']}")
 

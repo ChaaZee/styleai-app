@@ -132,10 +132,13 @@ def detect_gender(listing):
 
 
 # ── DEPOP API ─────────────────────────────────────────────────────────────────
-def fetch_depop(query, limit):
+def fetch_depop(query, limit, existing_urls):
     """
     Hits the Depop search API and returns a list of normalised listing dicts.
     Returns empty list on failure.
+
+    existing_urls is a set of product URLs already in the cache; any listing
+    whose URL is already present is skipped so we never store a duplicate.
     """
     url = "https://www.depop.com/api/v3/search/products/"
     headers = {
@@ -192,6 +195,12 @@ def fetch_depop(query, limit):
         }
         # Only keep listings that have an image and URL
         if listing["image"] and listing["url"]:
+            # Dedup check: skip any listing whose URL is already in the
+            # cache (or already seen earlier in this run).
+            if listing["url"] in existing_urls:
+                print(f"  ⟳ Already in cache, skipping: {listing['title']}")
+                continue
+            existing_urls.add(listing["url"])  # add so we don't dupe within this run
             listing["_gender"] = detect_gender(listing)
             listings.append(listing)
     return listings
@@ -202,13 +211,34 @@ def get_connection():
     """Opens a connection to Supabase Postgres."""
     return psycopg2.connect(DB_URL, sslmode="require")
 
+def load_existing_urls(conn):
+    """
+    Load all product URLs already in the cache into a set for O(1) lookup.
+    We extract the 'url' field from every listing object in every row so we
+    can skip any listing whose URL is already stored (prevents duplicates).
+    """
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT listing->>'url'
+        FROM depop_cache,
+        jsonb_array_elements(listings) AS listing
+        WHERE listing->>'url' IS NOT NULL
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    return set(row[0] for row in rows)  # a set of URL strings
+
 def is_cached(cursor, query):
     """Returns True if this query already has listings in the cache."""
     cursor.execute("SELECT 1 FROM depop_cache WHERE query = %s", (query,))
     return cursor.fetchone() is not None
 
 def save_to_cache(cursor, query, listings, aesthetic, garment_type):
-    """Inserts or updates a cache row with the fetched listings."""
+    """
+    Inserts or updates a cache row with the fetched listings.
+    Duplicate listings are filtered out via existing_urls before they reach
+    here; the ON CONFLICT clause remains as a safety net.
+    """
     cursor.execute("""
         INSERT INTO depop_cache (query, listings, aesthetic, permanent, garment_type, created_at)
         VALUES (%s, %s::jsonb, %s, true, %s, NOW())
@@ -229,6 +259,12 @@ def main():
     print(f"\n🪡  Stitch Seed Script — {len(SEED_QUERIES)} queries, {ITEMS_PER_QUERY} items each\n")
     conn = get_connection()
     cursor = conn.cursor()
+
+    # Load every URL already in the cache ONCE up front so we can skip
+    # listings we've already stored (prevents duplicate entries).
+    existing_urls = load_existing_urls(conn)
+    print(f"✓ Loaded {len(existing_urls)} existing URLs from cache\n")
+
     seeded = skipped = failed = 0
 
     for entry in SEED_QUERIES:
@@ -244,7 +280,7 @@ def main():
 
         print(f"  ⬇  fetch  \"{query}\" ... ", end="", flush=True)
         try:
-            listings = fetch_depop(query, ITEMS_PER_QUERY)
+            listings = fetch_depop(query, ITEMS_PER_QUERY, existing_urls)
             if not listings:
                 print("0 results")
                 failed += 1
