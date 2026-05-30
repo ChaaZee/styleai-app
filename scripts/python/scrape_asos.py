@@ -1,26 +1,32 @@
 """
-scrape_asos.py — Fetch products from ASOS and insert into Stitch cache
+scrape_asos.py — Fetch products from ASOS by category and insert into Stitch cache
 ===========================================================================
 
 HOW TO USE:
     1. pip install requests psycopg2-binary
     2. Get fresh cookies from your browser:
-         - Go to asos.com in Chrome
+         - Go to asos.com in Chrome and browse around for a minute
          - Press F12 → Network tab → Fetch/XHR
-         - Search for a product (e.g. "hoodie")
-         - Click any asos.com request → Headers → copy the "cookie:" value
+         - Click any asos.com request → Headers → copy the full "cookie:" value
          - Paste it below as COOKIE
-    3. Run:  python scripts/python/scrape_asos.py
+    3. Edit CATEGORIES below to control what to fetch
+    4. Run:  python scripts/python/scrape_asos.py
 
-WHY COOKIES ARE NEEDED:
-    ASOS uses Cloudflare bot protection. Without real browser cookies,
-    the response comes back empty (0 bytes). Like Pacsun, this must be
-    run locally, NOT from the Render server.
+HOW TO FIND CATEGORY IDs:
+    1. Go to asos.com and click into any clothing category
+       (e.g. Men → Hoodies & Sweatshirts)
+    2. Look at the URL — the number after "cid=" IS the category ID
+       Example: https://www.asos.com/us/men/hoodies-sweatshirts/cat/?cid=4172
+                                                                        ^^^^
+                                                                        ID = 4172
+    3. Add that ID + its aesthetic/garment_type/gender to CATEGORIES below
 
-ASOS STRUCTURE:
-    ASOS renders products server-side inside a __NEXT_DATA__ JSON blob
-    embedded in the HTML. We extract that JSON to get clean product data
-    without needing to parse messy HTML.
+HOW IT WORKS:
+    Instead of searching by keyword, we fetch entire ASOS categories using
+    their category page URL with pagination. Each page returns up to 72 items.
+    We loop through pages until we hit MAX_ITEMS_PER_CATEGORY.
+
+    Must be run locally (your home IP + cookies) — NOT from the Render server.
 
 IMPORTANT:
     Don't commit your cookie string to GitHub!
@@ -35,7 +41,7 @@ import time
 
 
 # ── PASTE YOUR COOKIE STRING HERE ─────────────────────────────────────────────
-# Get from: asos.com → DevTools → any request → Headers → cookie:
+# Get from: asos.com → DevTools (F12) → Network → any request → Headers → cookie:
 COOKIE = ""  # <-- paste here
 
 
@@ -43,28 +49,51 @@ COOKIE = ""  # <-- paste here
 DB_URL = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
 
 
-# ── SEARCH QUERIES ────────────────────────────────────────────────────────────
-# (search_term, aesthetic, garment_type, gender)
-SEARCH_QUERIES = [
-    ("mens oversized hoodie",     "Streetwear",  "tops",      "male"),
-    ("mens cargo trousers",       "Streetwear",  "bottoms",   "male"),
-    ("mens graphic tee",          "Streetwear",  "tops",      "male"),
-    ("mens bomber jacket",        "Streetwear",  "outerwear", "male"),
-    ("womens oversized hoodie",   "Coquette",    "tops",      "female"),
-    ("womens mini dress",         "Coquette",    "tops",      "female"),
-    ("mens slim trousers",        "Minimalist",  "bottoms",   "male"),
-    ("mens plain white tee",      "Minimalist",  "tops",      "male"),
+# ── CATEGORIES TO FETCH ───────────────────────────────────────────────────────
+# Format: (category_id, label, aesthetic, garment_type, gender)
+#
+# HOW TO FIND IDs: browse asos.com → click a category → copy the cid= number from the URL
+# Example URL: https://www.asos.com/us/men/hoodies-sweatshirts/cat/?cid=4172
+#
+# aesthetic must match one of the 41 aesthetics in the Stitch app exactly
+# garment_type: "tops", "bottoms", "outerwear", "shoes", "accessories"
+# gender: "male", "female", "both"
+CATEGORIES = [
+    # ── MENS ──────────────────────────────────────────────────────────────────
+    (4172,  "mens hoodies sweatshirts", "Streetwear",  "tops",        "male"),
+    (4169,  "mens t-shirts",            "Streetwear",  "tops",        "male"),
+    (4329,  "mens jackets coats",       "Streetwear",  "outerwear",   "male"),
+    (4347,  "mens trousers",            "Streetwear",  "bottoms",     "male"),
+    (4208,  "mens jeans",               "Streetwear",  "bottoms",     "male"),
+    (4207,  "mens shirts",              "Minimalist",  "tops",        "male"),
+    (4365,  "mens knitwear",            "Minimalist",  "tops",        "male"),
+    (4206,  "mens shorts",              "Streetwear",  "bottoms",     "male"),
+    (4205,  "mens tracksuits",          "Sporty",      "tops",        "male"),
+    (4922,  "mens sneakers",            "Streetwear",  "shoes",       "male"),
+
+    # ── WOMENS ────────────────────────────────────────────────────────────────
+    (4174,  "womens tops",              "Coquette",    "tops",        "female"),
+    (8799,  "womens dresses",           "Coquette",    "tops",        "female"),
+    (4169,  "womens t-shirts",          "Y2K",         "tops",        "female"),
+    (4172,  "womens hoodies",           "Soft Girl",   "tops",        "female"),
+    (4176,  "womens jeans",             "Y2K",         "bottoms",     "female"),
+    (4177,  "womens trousers",          "Minimalist",  "bottoms",     "female"),
+    (4175,  "womens skirts",            "Coquette",    "bottoms",     "female"),
+    (4330,  "womens jackets coats",     "Streetwear",  "outerwear",   "female"),
+    (4921,  "womens sneakers",          "Sporty",      "shoes",       "female"),
 ]
 
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-ITEMS_PER_QUERY = 12
-DELAY_SECS = 2.0
-DRY_RUN = False
+MAX_ITEMS_PER_CATEGORY = 72     # max products to fetch per category (72 = 1 page)
+                                # increase to 144, 216, etc. for more (multiples of 72)
+PAGE_SIZE = 72                  # ASOS max per page is 72
+DELAY_SECS = 2.5                # wait between requests (be polite)
+DRY_RUN = False                 # set True to test without writing to DB
 
 
 def make_headers(referer="https://www.asos.com/"):
-    """Build headers that mimic a real Chrome browser on ASOS."""
+    """Headers that mimic a real Chrome browser visiting ASOS."""
     return {
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "accept-language": "en-US,en;q=0.9",
@@ -76,13 +105,11 @@ def make_headers(referer="https://www.asos.com/"):
 
 def load_existing_urls(conn):
     """
-    Load all product URLs already in the cache into a set for O(1) lookup.
-    We extract the 'url' field from every listing object in every row so we
-    can skip any listing whose URL is already stored (prevents duplicates).
+    Load all product URLs already in the cache into a Python set.
+    Used for O(1) dedup checking — if a URL is in this set, skip it.
     """
     cur = conn.cursor()
-    # Guard against rows where listings is not a JSON array (e.g. null or object)
-    # jsonb_typeof checks the type before calling jsonb_array_elements to avoid crashes
+    # Guard against rows where listings is not a JSON array
     cur.execute("""
         SELECT listing->>'url'
         FROM depop_cache,
@@ -92,111 +119,111 @@ def load_existing_urls(conn):
     """)
     rows = cur.fetchall()
     cur.close()
-    return set(row[0] for row in rows)  # a set of URL strings
+    return set(row[0] for row in rows)
 
 
-def search_asos(query, limit=12):
+def fetch_category_page(category_id, offset, label):
     """
-    Fetch ASOS search results page and extract product data from the
-    embedded __NEXT_DATA__ JSON blob.
+    Fetch one page of products from an ASOS category.
 
-    ASOS uses Next.js, which embeds the initial page data as a JSON object
-    in a <script id="__NEXT_DATA__"> tag. This is much cleaner than parsing
-    HTML — it gives us structured product objects directly.
+    ASOS category pages use this URL format:
+        https://www.asos.com/us/men/hoodies-sweatshirts/cat/?cid=4172&offset=0&currentpage=1
 
-    Returns a list of parsed product dicts.
+    The page HTML contains a __NEXT_DATA__ JSON blob with all product data.
+    We parse that JSON to get clean product objects without messy HTML parsing.
+
+    Returns a list of raw product dicts (or empty list on failure).
     """
-    encoded = requests.utils.quote(query)
-    url = f"https://www.asos.com/us/search/?q={encoded}"
+    # Build the category URL — offset controls which page we're on
+    # ASOS uses offset (not page number): page 1 = offset 0, page 2 = offset 72, etc.
+    url = f"https://www.asos.com/us/cat/?cid={category_id}&offset={offset}&currentpage={offset // PAGE_SIZE + 1}"
 
-    print(f"  Searching: {url}")
-    resp = requests.get(url, headers=make_headers(), timeout=15)
+    referer = f"https://www.asos.com/us/cat/?cid={category_id}"
+    resp = requests.get(url, headers=make_headers(referer), timeout=20)
 
-    if resp.status_code != 200 or len(resp.text) < 100:
-        print(f"  ✗ Status {resp.status_code} / empty response — try refreshing cookies")
+    if resp.status_code != 200 or len(resp.text) < 500:
+        print(f"    ✗ Status {resp.status_code} / empty — cookies may be expired")
         return []
 
     html = resp.text
 
-    # Find the __NEXT_DATA__ script tag — it contains all page data as JSON
-    # This is a standard Next.js pattern: <script id="__NEXT_DATA__">{ ... }</script>
+    # ASOS uses Next.js — all initial page data is in this script tag as JSON
     match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', html, re.DOTALL)
     if not match:
-        print("  ✗ No __NEXT_DATA__ found — ASOS may have changed their page structure")
+        print(f"    ✗ No __NEXT_DATA__ found on page")
         return []
 
     try:
         data = json.loads(match.group(1))
-    except json.JSONDecodeError as e:
-        print(f"  ✗ Failed to parse __NEXT_DATA__: {e}")
+    except json.JSONDecodeError:
+        print(f"    ✗ Failed to parse __NEXT_DATA__")
         return []
 
-    # Drill into the Next.js data structure to find product listings
-    # The path may vary — ASOS sometimes restructures this
+    # Drill into Next.js page props to find the product list
     page_props = data.get("props", {}).get("pageProps", {})
 
-    # Try several possible locations for the product list
+    # ASOS stores products under different keys depending on the page type
     products = (
         page_props.get("products") or
         page_props.get("items") or
+        page_props.get("categoryProducts", {}).get("products") or
         page_props.get("searchResults", {}).get("products") or
         []
     )
 
+    # If the structured path didn't work, try regex on the raw JSON
     if not products:
-        # Fall back to searching the raw JSON for product-looking objects
-        raw = match.group(1)
-        # Look for objects with productId, name, and price fields
-        product_blocks = re.findall(r'\{[^{}]*"productId"\s*:\s*\d+[^{}]*"name"\s*:\s*"[^"]+"[^{}]*\}', raw)
-        print(f"  Found {len(product_blocks)} product blocks via regex fallback")
-        for block in product_blocks[:limit]:
+        raw_json = match.group(1)
+        # Look for arrays of product objects with productId fields
+        array_match = re.search(r'"products"\s*:\s*(\[\{.+?\}\])', raw_json, re.DOTALL)
+        if array_match:
             try:
-                products.append(json.loads(block))
+                products = json.loads(array_match.group(1))
             except Exception:
                 pass
 
-    print(f"  Found {len(products)} products")
-    return products[:limit]
+    return products
 
 
-def parse_asos_product(raw, query, aesthetic, garment_type, gender):
+def parse_asos_product(raw, label, aesthetic, garment_type, gender):
     """
     Convert a raw ASOS product object into our cache listing format.
 
-    ASOS product objects typically have:
-        productId   — numeric ID
-        name        — product title
-        price       — dict with current/previous prices
-        imageUrl    — product image URL
-        url         — relative product URL
-        brandName   — brand
+    ASOS product fields we use:
+        productId / id  — numeric product ID
+        name            — product title
+        price           — nested dict: { current: { text: "$35.00", value: 35 } }
+        imageUrl        — CDN image URL (sometimes without https:)
+        url             — relative product URL like /asos-design/hoodie/prd/123
+        brandName       — brand name (ASOS Design, Nike, etc.)
     """
-    # ASOS uses different field names depending on the endpoint/page
     title = raw.get("name") or raw.get("title") or raw.get("productName", "")
     if not title:
         return None
 
     product_id = raw.get("productId") or raw.get("id", "")
 
-    # Price — ASOS stores this as a nested object
+    # Price is a nested object in ASOS — dig into current.text for the formatted string
     price_obj = raw.get("price", {})
     if isinstance(price_obj, dict):
-        # current.value is the sale price, original.value is the original
         current = price_obj.get("current", {})
         price = current.get("text") or f"${current.get('value', 'N/A')}"
+    elif price_obj:
+        price = f"${price_obj}"
     else:
-        price = f"${price_obj}" if price_obj else "N/A"
+        price = "N/A"
 
-    # Image URL — ASOS CDN
+    # Image URL — ASOS CDN sometimes omits the https: protocol
     image = raw.get("imageUrl") or raw.get("image", {}).get("url", "")
     if image and not image.startswith("http"):
-        image = f"https:{image}"  # ASOS sometimes omits the protocol
+        image = f"https:{image}"
 
-    # Product URL
+    # Product URL — ASOS gives relative URLs like /asos-design/prd/123
     product_url = raw.get("url") or raw.get("productUrl", "")
     if product_url and not product_url.startswith("http"):
         product_url = f"https://www.asos.com{product_url}"
 
+    # Skip products with no image or URL — can't show them as cards
     if not image or not product_url:
         return None
 
@@ -207,18 +234,14 @@ def parse_asos_product(raw, query, aesthetic, garment_type, gender):
         "url": product_url,
         "seller": "asos",
         "slug": str(product_id),
-        "query": query,
+        "query": label,
         "_gender": gender,
         "_source": "asos",
     }
 
 
 def upsert_to_db(conn, query_key, aesthetic, garment_type, gender, listings):
-    """
-    Insert listings into depop_cache, appending to any existing rows.
-    Duplicates were already filtered out via existing_urls before we got here;
-    the ON CONFLICT append remains as a safety net for truly new listings.
-    """
+    """Insert listings into depop_cache, appending to existing rows."""
     if not listings or DRY_RUN:
         if DRY_RUN:
             print(f"    [DRY RUN] Would insert {len(listings)} listings")
@@ -243,40 +266,60 @@ def main():
         return
 
     print("=" * 60)
-    print("Stitch — ASOS Scraper")
+    print("Stitch — ASOS Category Scraper")
     print("=" * 60)
 
     conn = psycopg2.connect(DB_URL, sslmode="require")
     print("✓ Connected to database\n")
 
-    # Load every URL already in the cache ONCE up front so we can skip
-    # listings we've already stored (prevents duplicate entries).
+    # Load all cached URLs once upfront for fast dedup checking
     existing_urls = load_existing_urls(conn)
     print(f"✓ Loaded {len(existing_urls)} existing URLs from cache\n")
 
     total_inserted = 0
 
-    for search_term, aesthetic, garment_type, gender in SEARCH_QUERIES:
-        print(f"\n── '{search_term}' → {aesthetic}/{garment_type}/{gender} ──")
+    for category_id, label, aesthetic, garment_type, gender in CATEGORIES:
+        print(f"\n── Category {category_id}: '{label}' → {aesthetic}/{garment_type}/{gender} ──")
 
-        raw_products = search_asos(search_term, limit=ITEMS_PER_QUERY)
+        all_listings = []
+        offset = 0
 
-        listings = []
-        for raw in raw_products:
-            listing = parse_asos_product(raw, search_term, aesthetic, garment_type, gender)
-            if listing:
-                # Dedup check: skip any listing whose URL is already in the
-                # cache (or already seen earlier in this run).
-                if listing["url"] in existing_urls:
-                    print(f"  ⟳ Already in cache, skipping: {listing['title']}")
+        # Paginate through the category until we hit our limit
+        while offset < MAX_ITEMS_PER_CATEGORY:
+            print(f"  Fetching offset {offset}...")
+            raw_products = fetch_category_page(category_id, offset, label)
+
+            if not raw_products:
+                print(f"  No products returned — stopping pagination")
+                break
+
+            print(f"  Got {len(raw_products)} products from page")
+
+            for raw in raw_products:
+                listing = parse_asos_product(raw, label, aesthetic, garment_type, gender)
+                if not listing:
                     continue
-                existing_urls.add(listing["url"])  # add so we don't dupe within this run
-                listings.append(listing)
-                print(f"  ✓ {listing['title']} — {listing['price']}")
 
-        cache_key = f"asos {search_term}"
-        upsert_to_db(conn, cache_key, aesthetic, garment_type, gender, listings)
-        total_inserted += len(listings)
+                # Skip if URL already in cache or seen earlier this run
+                if listing["url"] in existing_urls:
+                    print(f"    ⟳ Already cached: {listing['title'][:50]}")
+                    continue
+
+                existing_urls.add(listing["url"])
+                all_listings.append(listing)
+                print(f"    ✓ {listing['title'][:60]} — {listing['price']}")
+
+            # If ASOS returned fewer items than PAGE_SIZE, we've hit the last page
+            if len(raw_products) < PAGE_SIZE:
+                break
+
+            offset += PAGE_SIZE
+            time.sleep(DELAY_SECS)
+
+        # Insert all listings for this category into DB
+        cache_key = f"asos {label}"
+        upsert_to_db(conn, cache_key, aesthetic, garment_type, gender, all_listings)
+        total_inserted += len(all_listings)
 
         time.sleep(DELAY_SECS)
 
