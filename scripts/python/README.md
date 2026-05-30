@@ -93,6 +93,68 @@ python scripts/python/purge_junk.py --delete
 
 ---
 
+### `export_scanned_clothes.py` — Export what users have actually scanned
+
+Reads every outfit scan in the database and extracts the clothing items
+Gemini detected. Saves them to two files:
+
+- `scanned_clothes.txt` — plain list, one item per line (read by scraper scripts)
+- `scanned_clothes_stats.txt` — same list with scan counts (for your reference)
+
+Run this before running the scraper scripts so they search for items
+your users actually wear instead of a hardcoded list.
+
+```powershell
+python scripts/python/export_scanned_clothes.py
+```
+
+---
+
+### `scrape_shopify.py` — Fetch products from Shopify brands (no cookies needed)
+
+Fetches products from Civil Regime, MNML, and Union LA using Shopify's free
+public API. Works from any machine — no cookies, no bot protection.
+Add any other Shopify brand by adding their domain to `SHOPIFY_STORES`.
+
+```powershell
+python scripts/python/scrape_shopify.py
+```
+
+---
+
+### `scrape_pacsun.py` — Fetch products from Pacsun (requires cookies)
+
+Scrapes Pacsun search results for clothing items. Requires fresh browser
+cookies — run locally, NOT from the Render server.
+
+```powershell
+python scripts/python/scrape_pacsun.py
+```
+
+---
+
+### `scrape_asos.py` — Fetch products from ASOS (requires cookies)
+
+Fetches ASOS listings from their Next.js embedded JSON data.
+Requires fresh browser cookies — run locally only.
+
+```powershell
+python scripts/python/scrape_asos.py
+```
+
+---
+
+### `scrape_grailed.py` — Fetch listings from Grailed (requires cookies)
+
+Hits Grailed's internal search API to pull secondhand/designer menswear.
+Requires fresh browser cookies — run locally only.
+
+```powershell
+python scripts/python/scrape_grailed.py
+```
+
+---
+
 ## Recommended workflow after seeding
 
 Run these in order after adding new listings:
