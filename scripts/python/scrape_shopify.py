@@ -45,19 +45,19 @@ SHOPIFY_STORES = [
         "domain": "www.civilregime.com",
         "aesthetic": "Streetwear",
         "gender": "both",        # Civil Regime sells mens + womens
-        "limit": 50,             # how many products to fetch per brand
+        "limit": 9999,             # how many products to fetch per brand
     },
     {
         "domain": "www.mnml.la",
         "aesthetic": "Minimalist",
         "gender": "male",        # MNML is primarily menswear
-        "limit": 50,
+        "limit": 99999,
     },
     {
         "domain": "www.unionlosangeles.com",
         "aesthetic": "Streetwear",
         "gender": "both",
-        "limit": 30,
+        "limit": 9999,
     },
 ]
 
@@ -96,7 +96,7 @@ def load_existing_urls(conn):
     return set(row[0] for row in rows)  # a set of URL strings
 
 
-def fetch_shopify_products(domain, limit=50):
+def fetch_shopify_products(domain, limit=9999):
     """
     Fetch products from a Shopify store's public /products.json endpoint.
     Returns a list of raw product dicts from Shopify's API.
