@@ -42,7 +42,37 @@ import time
 
 # ── PASTE YOUR COOKIE STRING HERE ─────────────────────────────────────────────
 # Get from: asos.com → DevTools (F12) → Network → any request → Headers → cookie:
-COOKIE = ""  # <-- paste here
+#
+# If you copied the cookie from a Windows CMD cURL command, paste the raw string
+# below and the script will auto-clean Windows escape characters (^%^, ^"^, etc.)
+# If you copied directly from Chrome DevTools "Copy as cURL (bash)", it's already clean.
+COOKIE_RAW = ""  # <-- paste your cookie string here (raw, Windows escaping OK)
+
+
+def _clean_cookie(raw: str) -> str:
+    """
+    Clean Windows CMD cURL escape sequences from a cookie string.
+
+    When you copy a cURL command from Chrome DevTools on Windows, CMD escapes
+    special characters with ^ (caret). This function strips those so the cookie
+    string is valid for HTTP headers.
+
+    Common Windows CMD escape sequences:
+        ^%^  ->  %    (percent-encoded characters like %3A, %2F)
+        ^\\^" ->  "    (escaped double-quote inside a quoted string)
+        ^"   ->  (removed, CMD quote artifact)
+        ^&   ->  &    (ampersand between cookie key=value pairs)
+    """
+    clean = raw
+    clean = clean.replace("^%^", "%")      # %3A, %2F, etc.
+    clean = clean.replace(r'^\^"', '"')    # escaped double-quote (raw string avoids SyntaxWarning)
+    clean = clean.replace('^"', "")        # stray CMD quote artifact
+    clean = clean.replace("^&", "&")       # ampersand separator
+    clean = clean.strip('"').strip("'")    # strip surrounding quotes if any
+    return clean
+
+
+COOKIE = _clean_cookie(COOKIE_RAW)
 
 
 # ── DATABASE ──────────────────────────────────────────────────────────────────
@@ -136,7 +166,9 @@ def fetch_category_page(category_id, offset, label):
     """
     # Build the category URL — offset controls which page we're on
     # ASOS uses offset (not page number): page 1 = offset 0, page 2 = offset 72, etc.
-    url = f"https://www.asos.com/us/cat/?cid={category_id}&offset={offset}&currentpage={offset // PAGE_SIZE + 1}"
+    # The URL must include /men/ or /women/ path for ASOS to route correctly
+    gender_path = "women" if any(x in label for x in ["women", "womens"]) else "men"
+    url = f"https://www.asos.com/us/{gender_path}/cat/?cid={category_id}&offset={offset}&currentpage={offset // PAGE_SIZE + 1}"
 
     referer = f"https://www.asos.com/us/cat/?cid={category_id}"
     resp = requests.get(url, headers=make_headers(referer), timeout=20)
@@ -260,9 +292,10 @@ def upsert_to_db(conn, query_key, aesthetic, garment_type, gender, listings):
 
 
 def main():
-    if not COOKIE:
-        print("ERROR: Paste your ASOS cookie string into COOKIE = \"\" at the top")
+    if not COOKIE_RAW:
+        print("ERROR: Paste your ASOS cookie string into COOKIE_RAW = \"\" at the top")
         print("Get it: asos.com → DevTools (F12) → Network → any request → Headers → cookie:")
+        print("Windows CMD cURL escaping (^%^, ^\") is cleaned automatically.")
         return
 
     print("=" * 60)
