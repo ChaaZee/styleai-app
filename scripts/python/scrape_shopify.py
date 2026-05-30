@@ -63,7 +63,7 @@ SHOPIFY_STORES = [
         "domain": "shop.carhartt-wip.com",
         "aesthetic": "Workwear",
         "gender": "both",
-        "limit": 50,
+        "limit": 9999,
     },
 ]
 
