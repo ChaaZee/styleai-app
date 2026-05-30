@@ -283,8 +283,7 @@ def upsert_to_db(conn, rows):
             INSERT INTO depop_cache (query, listings, aesthetic, garment_type, permanent, created_at)
             VALUES (%s, %s::jsonb, %s, %s, true, NOW())
             ON CONFLICT (query) DO UPDATE
-            SET listings = depop_cache.listings || EXCLUDED.listings::jsonb,
-                updated_at = NOW()
+            SET listings = depop_cache.listings || EXCLUDED.listings::jsonb
         """, (
             query_key,
             json.dumps(listings),   # list of listing objects as JSON
