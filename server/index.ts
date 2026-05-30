@@ -113,9 +113,17 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
     () => {
       log(`serving on port ${port}`);
       // Auto-seed discover feed if empty (non-blocking)
-      triggerSeedIfEmpty().catch(err => log(`Auto-seed error: ${err.message}`, "seed"));
+      try {
+        triggerSeedIfEmpty().catch(err => log(`Auto-seed error: ${err.message}`, "seed"));
+      } catch (err: any) {
+        log(`Auto-seed sync error: ${err.message}`, "seed");
+      }
       // Start daily refresh cron (hot sort + prune stale cards)
-      startDailyRefreshCron();
+      try {
+        startDailyRefreshCron();
+      } catch (err: any) {
+        log(`Daily refresh cron error: ${err.message}`, "cron");
+      }
     },
   );
 })();
