@@ -350,7 +350,7 @@ def main():
         print(f"\n── Category '{cgid}': {label} -> {aesthetic}/{garment_type}/{gender} ──")
 
         all_listings = []
-        consecutive_empty = 0
+        consecutive_zero_new = 0
 
         for page in range(MAX_PAGES_PER_CATEGORY):
             print(f"  Page {page}...")
@@ -362,14 +362,12 @@ def main():
 
             products = parse_products_from_html(html, cgid)
 
+            # No products parsed at all = truly empty page, we're done
             if not products:
-                consecutive_empty += 1
-                print(f"  No products on page {page} — stopping (empty page)")
+                print(f"  No products on page {page} — end of category")
                 break
 
-            consecutive_empty = 0
             new_count = 0
-
             for p in products:
                 if not p.get("url"):
                     continue
@@ -394,12 +392,21 @@ def main():
                 new_count += 1
                 print(f"    ✓ {p['title'][:60]} — {p['price']}")
 
-            print(f"  Page {page}: {new_count} new products")
+            print(f"  Page {page}: {new_count} new / {len(products)} total")
 
-            # If we got fewer products than a full page, this is the last page
+            # Stop if fewer than a full page returned — last page
             if len(products) < PAGE_SIZE:
                 print(f"  Last page reached (got {len(products)} < {PAGE_SIZE})")
                 break
+
+            # Stop if 2 consecutive pages had zero new products (all already cached)
+            if new_count == 0:
+                consecutive_zero_new += 1
+                if consecutive_zero_new >= 2:
+                    print(f"  2 consecutive pages fully cached — stopping")
+                    break
+            else:
+                consecutive_zero_new = 0
 
             time.sleep(DELAY_SECS)
 
