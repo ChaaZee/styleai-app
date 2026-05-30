@@ -26,7 +26,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 // Pulls in DB helpers from storage.ts — analogous to importing a Python
 // service module (e.g. `from storage import get_user, set_cache, ...`).
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, upsertScannedPieces, getScannedPieces, tagListingGender, genderPassesFilter as listingGenderOk } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, recomputeTasteClusters, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, upsertScannedPieces, getScannedPieces, tagListingGender, genderPassesFilter as listingGenderOk } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai"; // Gemini client (like `google.generativeai` in Python)
 import multer from "multer";           // Multipart/form-data parser (Python equivalent: Werkzeug's `request.files` or FastAPI's `UploadFile`)
 import rateLimit from "express-rate-limit"; // Per-IP throttling middleware (Python equivalent: `flask-limiter`)
@@ -2283,11 +2283,15 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         //   [float(x) for x in s.strip("[]").split(",")]
         const currentVec = profile.taste_vector.slice(1, -1).split(",").map(Number);
         const n = profile.interaction_count || 1;
-        const totalWeight = n + Math.abs(weight);
+        // Apply exponential temporal decay so recent interactions pull the
+        // vector slightly more than old history.
+        const decay = 0.95;
+        const effectiveOldWeight = n * decay;
+        const totalWeight = effectiveOldWeight + Math.abs(weight);
         // `.map((v, i) => ...)` is the JS equivalent of a Python list
         // comprehension with index: `[f(v, i) for i, v in enumerate(xs)]`.
         newVector = currentVec.map((v, i) =>
-          (v * n + itemEmbedding![i] * weight) / totalWeight
+          (v * effectiveOldWeight + itemEmbedding![i] * weight) / totalWeight
         );
       }
 
@@ -2303,6 +2307,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         action !== "skip" ? itemId : undefined,
         action === "skip" ? itemId : undefined
       );
+
+      // Recompute taste clusters every 5 interactions (async, don't await)
+      const newCount = (profile?.interaction_count || 0) + Math.abs(weight);
+      if (newCount % 5 === 0) {
+        recomputeTasteClusters(userId).catch((e: any) =>
+          console.error("[recomputeTasteClusters]", e.message)
+        );
+      }
 
       res.json({ success: true, updated: true, action, interactionCount: (profile?.interaction_count || 0) + Math.abs(weight) });
     } catch (e: any) {

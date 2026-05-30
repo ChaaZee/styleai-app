@@ -141,6 +141,9 @@ export async function initDB() {
       updated_at        TIMESTAMPTZ DEFAULT NOW()
     )
   `.catch(() => {});
+  await client`
+    ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS taste_clusters jsonb DEFAULT '[]'::jsonb
+  `.catch(() => {});
 
   await client`
     CREATE TABLE IF NOT EXISTS wardrobe_items (
@@ -855,7 +858,7 @@ export async function getUserProfile(userId: string) {
     skipped_ids: string[];
     onboarded: boolean;
   }[]>`
-    SELECT user_id, taste_vector::text, interaction_count, liked_ids, skipped_ids, onboarded, gender
+    SELECT user_id, taste_vector::text, interaction_count, liked_ids, skipped_ids, onboarded, gender, taste_clusters
     FROM user_profiles WHERE user_id = ${userId}
   `;
   return rows[0] ?? null;
@@ -912,6 +915,83 @@ export async function upsertUserProfile(
   if (skippedId) {
     await client`UPDATE user_profiles SET skipped_ids = array_append(skipped_ids, ${skippedId}) WHERE user_id = ${userId}`;
   }
+}
+
+/**
+ * Recompute taste clusters from a user's liked item embeddings.
+ * Uses simple k-means (k=3, max 10 iterations) on the liked items' embeddings
+ * fetched from depop_cache. Falls back to the single taste_vector if < 3 liked items.
+ *
+ * Clusters let users with mixed taste (e.g. minimalist + streetwear) get
+ * recommendations that cover both styles instead of a blurred average.
+ */
+export async function recomputeTasteClusters(userId: string): Promise<void> {
+  const profile = await getUserProfile(userId);
+  if (!profile) return;
+
+  const likedIds: string[] = profile.liked_ids || [];
+  if (likedIds.length < 6) return; // not enough data to cluster — fall back to single vector
+
+  // Fetch embeddings for liked cache rows
+  const rows = await client<{ embedding: string }[]>`
+    SELECT embedding
+    FROM depop_cache
+    WHERE query = ANY(${likedIds}::text[])
+      AND embedding IS NOT NULL
+    LIMIT 50
+  `;
+
+  if (rows.length < 6) return;
+
+  // Parse embeddings from postgres vector string "[0.1,0.2,...]"
+  const vecs: number[][] = rows.map(r => {
+    const s = typeof r.embedding === "string" ? r.embedding : JSON.stringify(r.embedding);
+    return s.replace(/[\[\]]/g, "").split(",").map(Number);
+  });
+
+  const dim = vecs[0].length;
+  const k = Math.min(3, Math.floor(vecs.length / 2));
+
+  // Initialize centroids by picking k evenly-spaced vectors
+  let centroids: number[][] = Array.from({ length: k }, (_, i) =>
+    vecs[Math.floor(i * vecs.length / k)]
+  );
+
+  // K-means: 10 iterations
+  for (let iter = 0; iter < 10; iter++) {
+    // Assign each vec to nearest centroid
+    const clusters: number[][][] = Array.from({ length: k }, () => []);
+    for (const vec of vecs) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let ci = 0; ci < k; ci++) {
+        // Euclidean distance
+        const dist = centroids[ci].reduce((sum, v, i) => sum + (v - vec[i]) ** 2, 0);
+        if (dist < bestDist) { bestDist = dist; bestIdx = ci; }
+      }
+      clusters[bestIdx].push(vec);
+    }
+
+    // Recompute centroids as mean of assigned vecs
+    const newCentroids = clusters.map((clusterVecs, ci) => {
+      if (clusterVecs.length === 0) return centroids[ci]; // keep old centroid if empty
+      const mean = new Array(dim).fill(0);
+      for (const vec of clusterVecs) {
+        for (let d = 0; d < dim; d++) mean[d] += vec[d];
+      }
+      const mag = Math.sqrt(mean.reduce((s, v) => s + v * v, 0));
+      return mag > 0 ? mean.map(v => v / clusterVecs.length / mag) : mean.map(v => v / clusterVecs.length);
+    });
+
+    centroids = newCentroids;
+  }
+
+  // Store clusters as JSONB array of arrays
+  await client`
+    UPDATE user_profiles
+    SET taste_clusters = ${JSON.stringify(centroids)}::jsonb
+    WHERE user_id = ${userId}
+  `;
 }
 
 /** Append a full liked item object to the liked_items JSONB array.
@@ -1127,63 +1207,68 @@ export async function getForYouRecommendations(
   }
 
   const gender: string = (profile as any).gender || "both";
-
   const excluded = [
     ...(profile.liked_ids || []),
     ...(profile.skipped_ids || []),
   ];
 
-  // Pull a large pool of cache rows ranked by cosine similarity to the user's taste vector.
-  // We fetch many more rows than needed so we have enough variety across sources after filtering.
-  const fetchRows = limit * 20;
-
   const genderQueryFilter = gender === "male"
     ? client`AND NOT (query ILIKE ANY(ARRAY['%women%','%womens%','%womans%','%woman%','%ladies%','%girls%','%female%']))`
     : client``;
 
-  const rows = await client<{ listings: any[]; query: string; aesthetic: string }[]>`
-    SELECT listings, query, aesthetic
-    FROM depop_cache
-    WHERE embedding IS NOT NULL
-      AND permanent = TRUE
-      AND (${excluded.length} = 0 OR query != ALL(${excluded}::text[]))
-      ${genderQueryFilter}
-    ORDER BY embedding <=> ${profile.taste_vector}::vector
-    LIMIT ${fetchRows}
-    OFFSET ${offset * 5}
-  `;
+  // Build list of vectors to query — use clusters if available, else single vector
+  const clustersRaw = (profile as any).taste_clusters;
+  let queryVectors: number[][] = [];
 
-  // ── Step 1: Flatten all listings from the pool into per-source buckets ────
-  // Key insight: ignore brand/site name when building the pool — a good match
-  // is a good match regardless of where it comes from.
-  // Group by _source so we can interleave evenly.
-  const buckets: Record<string, any[]> = {};
+  if (Array.isArray(clustersRaw) && clustersRaw.length >= 2) {
+    queryVectors = clustersRaw as number[][];
+  } else {
+    // Fall back to single taste vector
+    const vecStr: string = profile.taste_vector as any;
+    const single = vecStr.replace(/[\[\]]/g, "").split(",").map(Number);
+    queryVectors = [single];
+  }
+
+  // Query each cluster vector separately, pulling limit*8 rows per cluster
+  const rowsPerCluster = Math.ceil((limit * 16) / queryVectors.length);
   const seen = new Set<string>();
+  const buckets: Record<string, any[]> = {}; // keyed by source
 
-  for (const row of rows) {
-    // Skip aesthetics blocked for this gender
-    if (gender === "male" && FEMALE_ONLY_AESTHETICS.has(row.aesthetic)) continue;
+  for (const vec of queryVectors) {
+    const vecStr = `[${vec.join(",")}]`;
 
-    const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
+    const rows = await client<{ listings: any[]; query: string; aesthetic: string }[]>`
+      SELECT listings, query, aesthetic
+      FROM depop_cache
+      WHERE embedding IS NOT NULL
+        AND permanent = TRUE
+        AND (${excluded.length} = 0 OR query != ALL(${excluded}::text[]))
+        ${genderQueryFilter}
+      ORDER BY embedding <=> ${vecStr}::vector
+      LIMIT ${rowsPerCluster}
+      OFFSET ${offset * 3}
+    `;
 
-    for (const item of listings) {
-      const key = item.url || item.id;
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
+    for (const row of rows) {
+      if (gender === "male" && FEMALE_ONLY_AESTHETICS.has(row.aesthetic)) continue;
 
-      if (!genderPassesFilter(item, gender)) continue;
+      const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
 
-      // Determine source — fall back to "depop" for legacy rows without _source
-      const source: string = item._source || "depop";
+      for (const item of listings) {
+        const key = item.url || item.id;
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
 
-      if (!buckets[source]) buckets[source] = [];
-      buckets[source].push({ ...item, _aesthetic: row.aesthetic });
+        if (!genderPassesFilter(item, gender)) continue;
+
+        const source: string = item._source || "depop";
+        if (!buckets[source]) buckets[source] = [];
+        buckets[source].push({ ...item, _aesthetic: row.aesthetic });
+      }
     }
   }
 
-  // ── Step 2: Round-robin interleave across sources ─────────────────────────
-  // This ensures the feed has e.g. depop, asos, pacsun, shopify items mixed in
-  // rather than 60 depop items followed by nothing else.
+  // Round-robin interleave across sources for variety
   const sourceKeys = Object.keys(buckets);
   const interleaved: any[] = [];
   let i = 0;
@@ -1197,7 +1282,7 @@ export async function getForYouRecommendations(
         if (interleaved.length >= limit + 1) break;
       }
     }
-    if (!added) break; // all buckets exhausted
+    if (!added) break;
     i++;
   }
 
