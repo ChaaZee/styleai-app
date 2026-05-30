@@ -1477,40 +1477,12 @@ async function analyzeAndStore(
 // analyzeAndStore, and populate the Discover feed. Best-effort: errors are
 // logged but don't crash startup.
 export async function triggerSeedIfEmpty() {
-  try {
-    const existing = await storage.discoverCardCount();
-    if (existing > 0) {
-      console.log(`[seed] ${existing} cards already in DB — skipping auto-seed`);
-      return;
-    }
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.log("[seed] No GEMINI_API_KEY — skipping auto-seed");
-      return;
-    }
-    console.log("[seed] 0 cards found — starting background seed from Reddit...");
-    const genAI = new GoogleGenerativeAI(apiKey);
-    let seeded = 0;
-    for (const { sub, aesthetic } of SUBREDDIT_MAP) {
-      try {
-        const posts = await fetchSubredditImages(sub, 2, "month");
-        for (const post of posts) {
-          try {
-            const card = await analyzeAndStore(post.imageUrl, post.postUrl, sub, aesthetic, genAI);
-            if (card) seeded++;
-            await new Promise(r => setTimeout(r, 600));
-          } catch (e: any) {
-            console.warn(`[seed] ${sub} image error: ${e.message}`);
-          }
-        }
-      } catch (e: any) {
-        console.warn(`[seed] ${sub} fetch error: ${e.message}`);
-      }
-    }
-    console.log(`[seed] Auto-seed complete — ${seeded} cards added`);
-  } catch (err: any) {
-    console.error("[seed] Auto-seed failed:", err.message);
-  }
+  // Cache-only mode — skip auto-seed check entirely. The depop_cache is already
+  // populated (3,700+ rows) and we're not doing live scraping, so there's no
+  // reason to query the DB here. A COUNT/SELECT on startup was hitting the
+  // Postgres statement timeout and crashing the process via unhandled rejection.
+  console.log("[seed] Cache-only mode: skipping auto-seed check");
+  return;
 }
 
 // `registerRoutes` is called once at server startup. It runs DB migrations
@@ -2340,8 +2312,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   });
 
   /**
-   * GET /api/for-you/:userId?offset=0
-   * Returns 20 personalized Depop recommendations ranked by cosine similarity
+   * GET /api/for-you/:userId?offset=0&limit=20
+   * Returns personalized Depop recommendations ranked by cosine similarity
    * to the user's taste vector. Excludes already-liked/skipped items and
    * applies the user's gender filter. Returns 404 if the user hasn't onboarded.
    *
@@ -2351,13 +2323,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     try {
       const { userId } = req.params;
       const offset = parseInt((req.query.offset as string) || "0", 10);
+      const limit = Math.min(parseInt((req.query.limit as string) || "20", 10) || 20, 100);
 
       const profile = await getUserProfile(userId);
       if (!profile || !profile.onboarded) {
         return res.status(404).json({ error: "user_not_onboarded", onboarded: false });
       }
 
-      const { items, hasMore } = await getForYouRecommendations(userId, 20, offset);
+      const { items, hasMore } = await getForYouRecommendations(userId, limit, offset);
       res.json({ items, hasMore, interactionCount: profile.interaction_count });
     } catch (e: any) {
       console.error("[for-you]", e);
