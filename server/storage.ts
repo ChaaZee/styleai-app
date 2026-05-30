@@ -1133,14 +1133,14 @@ export async function getForYouRecommendations(
     ...(profile.skipped_ids || []),
   ];
 
-  // Pull more rows to compensate for gender filtering (3x for both, 6x for single gender)
-  const fetchMultiple = gender === "both" ? 3 : 6;
+  // Pull a large pool of cache rows ranked by cosine similarity to the user's taste vector.
+  // We fetch many more rows than needed so we have enough variety across sources after filtering.
+  const fetchRows = limit * 20;
 
-  // Cosine similarity across ALL aesthetics/types — pure taste-based
-  // For male users: exclude cache rows whose query contains female keywords
   const genderQueryFilter = gender === "male"
     ? client`AND NOT (query ILIKE ANY(ARRAY['%women%','%womens%','%womans%','%woman%','%ladies%','%girls%','%female%']))`
     : client``;
+
   const rows = await client<{ listings: any[]; query: string; aesthetic: string }[]>`
     SELECT listings, query, aesthetic
     FROM depop_cache
@@ -1149,29 +1149,62 @@ export async function getForYouRecommendations(
       AND (${excluded.length} = 0 OR query != ALL(${excluded}::text[]))
       ${genderQueryFilter}
     ORDER BY embedding <=> ${profile.taste_vector}::vector
-    LIMIT ${limit * fetchMultiple}
-    OFFSET ${offset}
+    LIMIT ${fetchRows}
+    OFFSET ${offset * 5}
   `;
 
-  // Flatten + dedupe + gender filter + aesthetic block
-  const all: any[] = [];
+  // ── Step 1: Flatten all listings from the pool into per-source buckets ────
+  // Key insight: ignore brand/site name when building the pool — a good match
+  // is a good match regardless of where it comes from.
+  // Group by _source so we can interleave evenly.
+  const buckets: Record<string, any[]> = {};
   const seen = new Set<string>();
+
   for (const row of rows) {
-    // Skip entire cache rows from aesthetics blocked for this gender
+    // Skip aesthetics blocked for this gender
     if (gender === "male" && FEMALE_ONLY_AESTHETICS.has(row.aesthetic)) continue;
+
     const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
+
     for (const item of listings) {
       const key = item.url || item.id;
-      if (seen.has(key)) continue;
+      if (!key || seen.has(key)) continue;
       seen.add(key);
+
       if (!genderPassesFilter(item, gender)) continue;
-      all.push({ ...item, _aesthetic: row.aesthetic });
-      if (all.length >= limit + 1) break;
+
+      // Determine source — fall back to "depop" for legacy rows without _source
+      const source: string = item._source || "depop";
+
+      if (!buckets[source]) buckets[source] = [];
+      buckets[source].push({ ...item, _aesthetic: row.aesthetic });
     }
-    if (all.length >= limit + 1) break;
   }
 
-  return { items: all.slice(0, limit), hasMore: all.length > limit };
+  // ── Step 2: Round-robin interleave across sources ─────────────────────────
+  // This ensures the feed has e.g. depop, asos, pacsun, shopify items mixed in
+  // rather than 60 depop items followed by nothing else.
+  const sourceKeys = Object.keys(buckets);
+  const interleaved: any[] = [];
+  let i = 0;
+
+  while (interleaved.length < limit + 1) {
+    let added = false;
+    for (const source of sourceKeys) {
+      if (buckets[source].length > i) {
+        interleaved.push(buckets[source][i]);
+        added = true;
+        if (interleaved.length >= limit + 1) break;
+      }
+    }
+    if (!added) break; // all buckets exhausted
+    i++;
+  }
+
+  return {
+    items: interleaved.slice(0, limit),
+    hasMore: interleaved.length > limit,
+  };
 }
 
 /**
