@@ -3,10 +3,12 @@
   "short_name": "Stitch",
   "description": "Decode your aesthetic. Discover your style.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#5088B8",
   "theme_color": "#5088B8",
   "orientation": "portrait",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",

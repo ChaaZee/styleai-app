@@ -15,6 +15,7 @@ import ForYouPage from "@/pages/forYou";
 import HowItWorksPage from "@/pages/howItWorks";
 import StyleQuizPage from "@/pages/styleQuiz";
 import NavBar from "@/components/NavBar";
+import InstallPrompt from "@/components/InstallPrompt";
 import { Link } from "wouter";
 import { useTheme } from "@/lib/useTheme";
 
@@ -294,6 +295,7 @@ export default function App() {
         {loading && <LoadingScreen onDone={() => setLoading(false)} />}
         <AppContent />
         <Toaster />
+        <InstallPrompt />
       </Router>
     </QueryClientProvider>
   );
