@@ -172,9 +172,10 @@ export default function InstallPrompt() {
           {/* Steps */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 24 }}>
             {[
-              { n: 1, icon: shareIcon(), text: <>Tap the <strong>Share</strong> button <strong style={{ fontSize: 16 }}>⎦</strong> at the bottom of Safari</> },
-              { n: 2, icon: addIcon(), text: <>Scroll down and tap <strong>"Add to Home Screen"</strong></> },
-              { n: 3, icon: checkIcon(), text: <>Tap <strong>Add</strong> in the top-right — you're done!</> },
+              { n: 1, icon: dotsIcon(), text: <>Tap the <strong>···</strong> button in the <strong>bottom-right</strong> corner of Safari</> },
+              { n: 2, icon: shareIcon(), text: <>Tap <strong>Share</strong> <ShareInline /> in the menu that appears</> },
+              { n: 3, icon: addIcon(), text: <>Scroll down and tap <strong>"Add to Home Screen"</strong></> },
+              { n: 4, icon: checkIcon(), text: <>Tap <strong>Add</strong> in the top-right corner — you're done!</> },
             ].map(({ n, icon, text }) => (
               <div key={n} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{
@@ -280,12 +281,41 @@ export default function InstallPrompt() {
 
 // ── Inline SVG helpers (keeps the component self-contained) ─────────────────
 
+// Three dots (···) — Safari's bottom-right menu button
+function dotsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="#5088B8">
+      <circle cx="5" cy="12" r="2"/>
+      <circle cx="12" cy="12" r="2"/>
+      <circle cx="19" cy="12" r="2"/>
+    </svg>
+  );
+}
+
+// Safari share icon: rectangle with upward arrow (the real iOS Share button)
 function shareIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5088B8" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-      <polyline points="16 6 12 2 8 6"/>
-      <line x1="12" y1="2" x2="12" y2="15"/>
+      {/* Box */}
+      <path d="M8 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/>
+      {/* Arrow up from box */}
+      <polyline points="12 2 12 15"/>
+      <polyline points="9 5 12 2 15 5"/>
+    </svg>
+  );
+}
+
+// Tiny inline share icon that appears inside the step text
+function ShareInline() {
+  return (
+    <svg
+      width="13" height="13" viewBox="0 0 24 24" fill="none"
+      stroke="#5088B8" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+      style={{ display: "inline", verticalAlign: "middle", marginLeft: 2 }}
+    >
+      <path d="M8 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/>
+      <polyline points="12 2 12 15"/>
+      <polyline points="9 5 12 2 15 5"/>
     </svg>
   );
 }
