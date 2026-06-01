@@ -104,28 +104,42 @@ export async function initDB() {
   `;
 
   // Add garment_type column to depop_cache for smart recommendations
-  await client`
-    ALTER TABLE depop_cache ADD COLUMN IF NOT EXISTS garment_type TEXT
-  `;
-  await client`
-    CREATE INDEX IF NOT EXISTS depop_cache_garment_type_idx ON depop_cache(garment_type)
-  `;
-  await client`
-    CREATE INDEX IF NOT EXISTS depop_cache_aesthetic_garment_idx ON depop_cache(aesthetic, garment_type)
-  `;
+  await client`ALTER TABLE depop_cache ADD COLUMN IF NOT EXISTS garment_type TEXT`.catch(() => {});
 
-  // pgvector: semantic search on cache query strings.
-  // `vector(1536)` matches the OpenAI text-embedding-3-small output dimension.
-  // The ivfflat index with cosine ops makes `embedding <=> query::vector`
-  // (cosine distance) fast at scale; `lists = 100` is a tuning knob —
-  // higher = faster queries but slower writes. Catches are because the
-  // pgvector extension may not be installed on local dev databases.
+  // pgvector: add the embedding column (fast — DDL only, no data scan)
   await client`CREATE EXTENSION IF NOT EXISTS vector`.catch(() => {});
   await client`ALTER TABLE depop_cache ADD COLUMN IF NOT EXISTS embedding vector(1536)`.catch(() => {});
-  await client`
-    CREATE INDEX IF NOT EXISTS depop_cache_embedding_idx
-    ON depop_cache USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)
-  `.catch(() => {});
+
+  // Index creation is deliberately deferred and non-blocking:
+  //   - B-tree indexes on 40k+ rows take a few seconds → tolerable but wasteful on every restart
+  //   - IVFFlat vector index can take 30-60s → hits Supabase's statement_timeout → crashes server
+  // Solution: fire-and-forget after a 5s delay with statement_timeout disabled for that session.
+  setTimeout(() => {
+    (async () => {
+      // Each index is built in its own reserved connection with statement_timeout
+      // disabled. CREATE INDEX cannot run inside a transaction, so we use
+      // client.reserve() to pin a single connection for the duration.
+      let reserved: any = null;
+      try {
+        reserved = await client.reserve();
+        // Disable timeout on this connection only — index builds can take 30-60s
+        await reserved`SET statement_timeout = 0`;
+        await reserved`CREATE INDEX IF NOT EXISTS depop_cache_garment_type_idx ON depop_cache(garment_type)`;
+        await reserved`CREATE INDEX IF NOT EXISTS depop_cache_aesthetic_garment_idx ON depop_cache(aesthetic, garment_type)`;
+        await reserved`
+          CREATE INDEX IF NOT EXISTS depop_cache_embedding_idx
+          ON depop_cache USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)
+        `;
+        console.log("[initDB] deferred indexes OK");
+      } catch (err: any) {
+        // Log but never crash — indexes are performance helpers, not correctness requirements.
+        // Queries fall back to sequential scans if indexes are missing.
+        console.warn("[initDB] deferred index build skipped:", err?.message ?? err);
+      } finally {
+        reserved?.release();
+      }
+    })();
+  }, 5000);
 
   // user_profiles table for personalized For You recommendations
   await client`CREATE EXTENSION IF NOT EXISTS vector`.catch(() => {});
