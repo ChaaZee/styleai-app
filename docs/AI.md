@@ -15,6 +15,8 @@
 12. [`normalizeForEmbedding()` — Brand Stripping](#12-normalizeforembedding--brand-stripping)
 13. [Gemini Structured Output (JSON Schemas)](#13-gemini-structured-output-json-schemas)
 14. [AI Costs & Model Selection Rationale](#14-ai-costs--model-selection-rationale)
+15. [Recommendation System](#15-recommendation-system)
+16. [Style Shuffle (Cold Start)](#16-style-shuffle-cold-start)
 
 ---
 
@@ -1049,3 +1051,67 @@ const analysisResult = await geminiWithRetry(() =>
   geminiFlash.generateContent(pass2Request)
 );
 ```
+
+---
+
+## 15. Recommendation System
+
+### Overview
+The for-you feed uses a multi-stage personalization pipeline inspired by systems like Pinterest PinSage and Vinted's two-tower model.
+
+### Taste Vector
+Every user has a `taste_vector` (1536-dimensional OpenAI embedding) stored in `user_profiles`. It represents their style preferences as a point in semantic space — items close to this vector match their taste.
+
+**How it's built:**
+- On onboarding: averaged from embeddings of their chosen aesthetics (via `getAverageEmbeddingForAesthetics`)
+- After each interaction: updated via weighted running average with temporal decay
+
+**Temporal decay** (implemented in `/api/interact`):
+```
+decay = 0.95
+effectiveOldWeight = interactionCount * decay
+newVector = (oldVector * effectiveOldWeight + itemEmbedding * actionWeight) / totalWeight
+```
+This means recent likes influence the vector more than old ones. The vector gradually drifts toward current taste rather than locking in first impressions.
+
+**Action weights:**
+- Save = 3 (strongest signal)
+- Like = 1
+- Skip = -0.5 (pushes vector away)
+
+### Multi-Cluster Vectors
+A single taste vector averages together all interests, which destroys accuracy for users with mixed taste (e.g. someone who likes both Minimalist and Streetwear gets a blurred middle vector).
+
+**Solution:** k-means clustering (k=3) on the user's liked item embeddings, stored as `taste_clusters` JSONB in `user_profiles`. Recomputed every 5 interactions via `recomputeTasteClusters()` in `server/storage.ts`.
+
+**How it works:**
+1. Fetch embeddings for the user's liked cache rows
+2. Run k-means (10 iterations, k=min(3, liked/2)) to find 3 style clusters
+3. Store centroids as `taste_clusters: number[][]`
+4. `getForYouRecommendations` queries each cluster separately, then merges results
+
+Falls back to single `taste_vector` if user has fewer than 6 liked items.
+
+### For-You Feed Algorithm
+`getForYouRecommendations` in `server/storage.ts`:
+
+1. **Retrieve** — Query `depop_cache` ordered by `embedding <=> taste_vector` (pgvector cosine distance) for each cluster vector. Fetch `limit * 16` rows per cluster.
+2. **Filter** — Skip gender-blocked aesthetics, apply per-listing gender filter (`genderPassesFilter`)
+3. **Bucket by source** — Group listings by `_source` field (depop, asos, pacsun, shopify, etc.)
+4. **Round-robin interleave** — Take one item from each source bucket in rotation so the feed always has variety across sites
+5. **Return** — Slice to `limit` items
+
+**Key design decision:** Brand/site name is ignored during ranking. A Pacsun hoodie that matches your taste vector beats a Depop hoodie that doesn't, regardless of source.
+
+---
+
+## 16. Style Shuffle (Cold Start)
+New users have no interaction history, so the taste vector must be seeded from something else.
+
+**Style Shuffle** (in `OnboardingModal.tsx`) solves this by collecting visual preferences before the aesthetic picker:
+- Shows 16 outfit photos one at a time (one per aesthetic)
+- User taps ♥ Like or ✕ Nope for each
+- Liked aesthetics are pre-selected in the aesthetic picker (capped at 4)
+- The aesthetic picker result is passed to `POST /api/onboarding` which calls `getAverageEmbeddingForAesthetics` to build the initial vector
+
+This is analogous to Stitch Fix's "Style Shuffle" feature and Spotify's "pick 3 artists" cold start — collect a signal before showing any recommendations.
