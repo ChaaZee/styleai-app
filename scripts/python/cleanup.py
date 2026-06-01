@@ -4,31 +4,34 @@ cleanup.py — Scan all cached listings and remove dead/broken links
 
 HOW IT WORKS:
     1. Loads all rows from depop_cache
-    2. For each listing URL, sends a HEAD request (falls back to GET if needed)
-    3. Dead listings (404, 410, or redirect to a not-found page) are removed
-    4. Rows where ALL listings are dead get deleted entirely
-    5. Rows where SOME listings are dead get trimmed
+    2. For each listing, checks whether the product still exists
+    3. Dead listings are removed; rows that become fully empty are deleted
 
 WHAT COUNTS AS "DEAD":
     - HTTP 404 / 410 — explicitly gone
     - Redirect to a URL containing "/not-found", "page-not-found", "sold-out", etc.
-    - HEAD blocked (403) but GET also returns 404 — confirmed dead
-    - 403 from a HEAD that we can't verify with GET → kept (benefit of the doubt)
+    - Depop (with cookie): slug not found in search results → dead
+    - Depop (no cookie): 403 from WAF → skipped (can't tell)
 
 SOURCE-SPECIFIC RULES:
-    depop    — HEAD first, GET fallback. 403 = assume live (Depop WAF)
-    asos     — GET only (they reject HEAD). Check for 404 or redirect to homepage
-    pacsun   — HEAD only, 403 = assume live
-    shopify  — GET /products/{handle}.json — 404 = dead, 200 = live
-    default  — HEAD first, GET fallback
+    depop    — Uses Depop search API with cookie (same as seed script).
+               Paste your cookie into DEPOP_COOKIE below.
+               Without cookie: Depop listings are SKIPPED (WAF blocks all checks).
+    asos     — GET only (they reject HEAD). Check for 404 or redirect to homepage.
+    pacsun   — HEAD only, 403 = assume live.
+    shopify  — GET /products/{handle}.json — 404 = dead, 200 = live.
+    default  — HEAD first, GET fallback.
 
 USAGE:
     pip install requests psycopg2-binary
     python scripts/python/cleanup.py              # dry run (safe, shows what would be removed)
     python scripts/python/cleanup.py --delete     # actually remove dead listings
 
-IMPORTANT: Run from your HOME computer, not a server.
-    Many sites block cloud IP ranges with 403. From home you get real 404s.
+FOR DEPOP CLEANUP:
+    1. Go to depop.com in Chrome and browse for a second
+    2. DevTools (F12) → Network → any depop request → Headers → copy full "cookie:" value
+    3. Paste it into DEPOP_COOKIE below
+    4. Run from your HOME computer (not a server)
 ===========================================================================
 """
 
@@ -46,12 +49,16 @@ from urllib.parse import urlparse
 DB_URL      = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
 DRY_RUN     = "--delete" not in sys.argv   # safe by default
 CONCURRENCY = 8     # parallel URL checks per batch
-BATCH_SIZE  = 50    # DB rows per batch
 TIMEOUT     = 10    # seconds per request
 
-# Sources that should be filtered (set to empty to check ALL sources)
-# e.g. CHECK_SOURCES = {"depop"} to only clean depop listings
-CHECK_SOURCES = set()  # empty = check everything
+# Paste your Depop browser cookie here to enable Depop dead-link checking.
+# Without this, Depop listings are skipped (their WAF blocks all cookieless requests).
+# Get it: DevTools → Network → any depop.com request → Headers → copy "cookie:" value
+DEPOP_COOKIE = ""  # <-- paste here
+
+# Sources to check. Leave empty to check all sources.
+# Example: CHECK_SOURCES = {"depop"} to only clean Depop listings.
+CHECK_SOURCES = set()
 
 # These URL patterns always indicate a dead/sold listing
 DEAD_URL_PATTERNS = [
@@ -136,35 +143,85 @@ def check_asos(url: str) -> bool:
         return True
 
 
+def extract_depop_slug(url: str) -> str:
+    """Extract the full product slug from a Depop URL.
+
+    Example:
+        https://www.depop.com/products/seller-title-words-ab12/
+        → 'seller-title-words-ab12'
+    """
+    m = re.search(r'/products/([^/?#]+)', url)
+    return m.group(1).rstrip('/') if m else ""
+
+
 def check_depop(url: str) -> bool:
     """
-    Depop: try HEAD first. If blocked (403), try GET.
-    403 from both = WAF blocked = assume live.
-    404 from either = dead.
+    Verify a Depop listing using the same v3 search API the seed script uses.
+
+    Strategy:
+      - Extract the slug from the URL (e.g. 'seller-cool-jacket-ab12')
+      - Search Depop for that exact slug string
+      - If any result has the same slug → listing is live
+      - If 0 results or slug absent → listing is dead
+
+    Requires DEPOP_COOKIE to be set. Without a cookie the Depop WAF returns
+    403 for every request (live or dead), so we skip and assume live.
     """
+    if not DEPOP_COOKIE:
+        # Cannot check without a cookie — skip to avoid false positives
+        return True
+
+    slug = extract_depop_slug(url)
+    if not slug:
+        return True  # malformed URL, keep it
+
     try:
-        resp = requests.head(
-            url, headers=HEADERS, allow_redirects=True, timeout=TIMEOUT
+        api_headers = {
+            "accept": "*/*",
+            "accept-language": "en-US,en;q=0.9",
+            "content-type": "application/json",
+            "cookie": DEPOP_COOKIE,
+            "origin": "https://www.depop.com",
+            "referer": f"https://www.depop.com/products/{slug}/",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "user-agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+        }
+        # Search using the slug as the query — if the listing exists it will
+        # appear in results and its slug will match exactly.
+        params = {
+            "what": slug,
+            "items_per_page": 5,
+            "country": "us",
+            "currency": "USD",
+        }
+        resp = requests.get(
+            "https://www.depop.com/api/v3/search/products/",
+            headers=api_headers,
+            params=params,
+            timeout=TIMEOUT,
         )
-        if resp.status_code in (404, 410):
-            return False
-        if url_has_dead_pattern(resp.url or url):
-            return False
         if resp.status_code == 403:
-            # WAF blocked HEAD — try GET to confirm
-            try:
-                gresp = requests.get(
-                    url, headers=HEADERS, allow_redirects=True, timeout=TIMEOUT
-                )
-                if gresp.status_code == 404:
-                    return False
-                if url_has_dead_pattern(gresp.url or url):
-                    return False
-            except Exception:
-                pass
-        return True
+            # Cookie expired or WAF block — can't tell, assume live
+            return True
+        if resp.status_code != 200:
+            return True  # network error, assume live
+
+        data = resp.json()
+        products = data.get("products") or data.get("objects") or []
+        # Check if any result has our exact slug
+        for product in products:
+            if product.get("slug", "") == slug:
+                return True  # found it — listing is live
+        # Slug not in results → listing is gone
+        return False
     except Exception:
-        return True
+        return True  # network error, assume live
 
 
 def check_generic(url: str) -> bool:
@@ -245,6 +302,9 @@ def main():
     print(f"\nStitch Cache Cleanup — {mode}{src_filter}\n")
     if DRY_RUN:
         print("  Pass --delete to actually remove dead listings.\n")
+    if not DEPOP_COOKIE:
+        print("  ⚠⃣  DEPOP_COOKIE is empty — Depop listings will be SKIPPED.")
+        print("     Paste your Depop browser cookie into DEPOP_COOKIE at the top of this file.\n")
 
     conn = get_connection()
     cur = conn.cursor()
