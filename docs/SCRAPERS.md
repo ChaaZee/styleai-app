@@ -19,7 +19,64 @@ Run `reembed.py` last — embeddings are what the recommendation system actually
 
 ---
 
-## Existing Scrapers
+## Cache Maintenance Scripts
+
+### cleanup.py — Remove dead/broken listings
+
+Scans every URL in the cache and removes listings where the product page no longer exists (sold, deleted, or 404).
+
+```powershell
+python scripts/python/cleanup.py              # dry run — shows what would be removed
+python scripts/python/cleanup.py --delete     # actually remove dead listings
+```
+
+**Source-specific behaviour:**
+
+| Source | Check method |
+|---|---|
+| Depop | HEAD first; if 403, falls back to GET. 403 from both = WAF block = assume live |
+| ASOS | GET only (they reject HEAD). Checks for 404 or redirect to asos.com homepage |
+| Pacsun | HEAD only; 403 = assume live |
+| Shopify brands | GET `/products/{handle}.json` — 404 = dead, 200 = live |
+| Everything else | HEAD first, GET fallback |
+
+**Important:** Run this from your home computer, not a server. Cloud IP ranges are blocked by retailer WAFs, causing false 403s that make live products look dead.
+
+**Config options** (edit at top of script):
+```python
+CHECK_SOURCES = set()   # empty = check all sources
+                         # e.g. {"depop"} to only check Depop URLs
+CONCURRENCY = 8         # parallel URL checks
+TIMEOUT = 10            # seconds per request
+```
+
+---
+
+### delete_depop.py — Remove all Depop listings
+
+Bulk-removes every Depop listing from the cache in one pass. Useful when you want to re-seed Depop from scratch with fresh/different items.
+
+```powershell
+python scripts/python/delete_depop.py              # dry run — shows what would be removed
+python scripts/python/delete_depop.py --delete     # actually delete
+```
+
+**What it does:**
+- Marks a listing as Depop if `_source == "depop"` OR its URL contains `depop.com`
+- Rows where every listing is Depop → entire row deleted
+- Rows with mixed sources → Depop listings stripped, rest kept
+- Prints a summary: listings removed, rows deleted, rows trimmed
+
+**Typical workflow after running:**
+```powershell
+python scripts/python/depop_seed.py    # re-seed with new/different Depop items
+python scripts/python/retag_gender.py # fix gender tags
+python scripts/python/reembed.py      # regenerate embeddings
+```
+
+---
+
+## Scrapers
 
 ### scrape_asos.py — No cookies needed
 Uses ASOS's internal product search JSON API directly.
