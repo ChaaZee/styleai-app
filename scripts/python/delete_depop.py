@@ -43,15 +43,30 @@ def get_connection():
 
 
 def get_all_rows(cursor):
-    """Load every non-empty cache row."""
+    """Load every non-empty cache row.
+
+    Avoids jsonb_array_length in SQL — some rows store listings as a JSON
+    string instead of a proper JSONB array, which causes that function to
+    throw even when guarded by jsonb_typeof. Filtering is done in Python.
+    """
     cursor.execute("""
         SELECT query, listings
         FROM depop_cache
-        WHERE jsonb_typeof(listings) = 'array'
-          AND jsonb_array_length(listings) > 0
         ORDER BY query
     """)
-    return cursor.fetchall()
+    all_rows = cursor.fetchall()
+    result = []
+    for query, listings_raw in all_rows:
+        if isinstance(listings_raw, str):
+            try:
+                listings = json.loads(listings_raw)
+            except Exception:
+                continue
+        else:
+            listings = listings_raw
+        if isinstance(listings, list) and len(listings) > 0:
+            result.append((query, listings))
+    return result
 
 
 def delete_row(cursor, query: str):
