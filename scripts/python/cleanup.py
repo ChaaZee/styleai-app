@@ -273,12 +273,19 @@ def get_connection():
 
 
 def get_all_rows(cursor):
-    """Load all non-empty cache rows."""
+    """Load all non-empty cache rows.
+
+    Uses a subquery so jsonb_typeof filters first, preventing
+    jsonb_array_length from being evaluated on non-array rows.
+    """
     cursor.execute("""
         SELECT query, listings
-        FROM depop_cache
-        WHERE jsonb_typeof(listings) = 'array'
-          AND jsonb_array_length(listings) > 0
+        FROM (
+            SELECT query, listings
+            FROM depop_cache
+            WHERE jsonb_typeof(listings) = 'array'
+        ) AS arr_rows
+        WHERE jsonb_array_length(listings) > 0
         ORDER BY query
     """)
     return cursor.fetchall()
