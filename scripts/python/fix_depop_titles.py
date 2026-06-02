@@ -149,40 +149,39 @@ def load_depop_rows(cursor):
     """Load all cache rows, returning (query, listings_list) for rows that have
     at least one Depop-sourced listing.
 
-    Filtering happens in Python — never with jsonb_array_length / jsonb scalar
-    functions in SQL, because some rows store listings as a double-encoded JSON
-    string and those functions crash on non-array values.
+    Mirrors cleanup.py's get_all_rows(): no filtering in SQL at all (just fetch
+    everything), then handle double-encoded listings and source filtering in
+    Python. jsonb_array_length / jsonb scalar functions are never used in SQL
+    because some rows store listings as a double-encoded JSON string and those
+    functions crash on non-array values.
     """
     cursor.execute("SELECT query, listings FROM depop_cache ORDER BY query")
-    rows = cursor.fetchall()
+    all_rows = cursor.fetchall()
     result = []
-    for query, listings_raw in rows:
-        listings = parse_listings(listings_raw)
+    depop_count = 0
+    for query, listings_raw in all_rows:
+        # Skip rows with no listings at all.
+        if listings_raw is None:
+            continue
+        # Double-encoded rows arrive as a JSON string — parse once more.
+        if isinstance(listings_raw, str):
+            try:
+                listings = json.loads(listings_raw)
+            except Exception:
+                continue
+        else:
+            listings = listings_raw
+        # Skip anything that isn't a list of listings.
         if not isinstance(listings, list) or not listings:
             continue
         # Keep the row only if any listing is from Depop.
         if any((l.get("_source") == "depop") for l in listings if isinstance(l, dict)):
             result.append((query, listings))
+            depop_count += 1
+
+    print(f"  {len(all_rows)} total rows loaded from DB")
+    print(f"  {depop_count} rows contain Depop listings")
     return result
-
-
-def parse_listings(listings_raw):
-    """Defensively parse the listings column into a Python list.
-
-    Handles three storage shapes: a real list, a JSON string wrapping a list,
-    and a double-encoded JSON string. Returns [] on anything unparseable.
-    """
-    value = listings_raw
-    # Unwrap up to two layers of JSON string encoding.
-    for _ in range(2):
-        if isinstance(value, str):
-            try:
-                value = json.loads(value)
-            except Exception:
-                return []
-        else:
-            break
-    return value if isinstance(value, list) else []
 
 
 def upsert_row(cursor, query, listings):
@@ -207,7 +206,7 @@ def main():
 
     print("Loading Depop cache rows...")
     rows = load_depop_rows(cur)
-    print(f"  {len(rows)} rows with Depop listings loaded\n")
+    print()
 
     fixed = skipped = failed = 0
 
