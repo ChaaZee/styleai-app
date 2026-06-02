@@ -40,7 +40,7 @@ BATCH_SIZE  = 100  # how many rows to fetch from DB at a time
 # These match storage.ts exactly — keep them in sync if you change either.
 # \b means "word boundary" — so "women" matches but "womenswear" only matches via its own term
 FEMALE_RE = re.compile(
-    r"\b(women[\u2019\u2018\']?s?|woman|womans|womena|ladies|lady|girls?|female|womenswear)\b",
+    r"\b(women[\u2019\u2018\']?s?|woman|womans|womena|ladies|lady|girls?|female|womenswear|dress|skirt)\b",
     re.IGNORECASE
 )
 MALE_RE = re.compile(
