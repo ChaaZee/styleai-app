@@ -70,6 +70,26 @@ python scripts/python/fix_depop_titles.py --apply
 
 ---
 
+### `tag_sources.py` — Backfill the `_source` field from listing URLs
+
+Every listing carries a `_source` field ("depop", "asos", "pacsun", "grailed",
+"vinted", "shopify") used for source-diversity in recommendations. Older listings
+predate this field and a few have the wrong value. This script detects the source
+from each listing's URL and fills in any that are missing or `"unknown"`, and warns
++ corrects any that disagree with the URL.
+
+No cookie required — it only reads URLs already in the cache.
+
+```powershell
+# Dry run first — see what would change
+python scripts/python/tag_sources.py
+
+# Actually write the source tags
+python scripts/python/tag_sources.py --apply
+```
+
+---
+
 ### `retag_gender.py` — Fix gender tags on listings
 
 Every listing has a `_gender` field ("male", "female", or "both") that controls
