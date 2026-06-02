@@ -49,21 +49,8 @@ MALE_RE = re.compile(
 )
 
 
-def listing_text(listing):
-    """
-    Combines a listing's title with its URL slug words for gender detection.
-    E.g. title="Vintage Jacket" + slug="seller-mens-vintage-jacket-a1b2" → "Vintage Jacket mens vintage jacket"
-    """
-    title = listing.get("title") or listing.get("name") or ""
-    url   = listing.get("url") or ""
-    slug_match = re.search(r"/products/([^/?#]+)", url)
-    slug_words = slug_match.group(1).replace("-", " ") if slug_match else ""
-    return f"{title} {slug_words}"
-
-
-def tag_gender(listing):
-    """Returns 'male', 'female', or 'both' for a single listing."""
-    text       = listing_text(listing)
+def gender_from_text(text):
+    """Returns 'male', 'female', or 'both' for an arbitrary string."""
     has_female = bool(FEMALE_RE.search(text))
     has_male   = bool(MALE_RE.search(text))
     if has_female and not has_male:
@@ -71,6 +58,29 @@ def tag_gender(listing):
     if has_male and not has_female:
         return "male"
     return "both"  # neutral, unisex, or no gender word at all
+
+
+def tag_gender(listing):
+    """
+    Returns ('male'|'female'|'both', source) for a single listing.
+
+    Title takes priority — only fall back to the URL as a tiebreaker when the
+    title is ambiguous ("both"). source is "title", "url", or None (the latter
+    when the result is "both" or the title was already definitive).
+    """
+    title = listing.get("title") or listing.get("name") or ""
+    url   = listing.get("url") or ""
+
+    title_gender = gender_from_text(title)
+    if title_gender != "both":
+        return title_gender, None  # title definitive — no annotation needed
+
+    # Title ambiguous — try the URL as a tiebreaker
+    url_gender = gender_from_text(url)
+    if url_gender != "both":
+        return url_gender, "url"
+
+    return "both", None  # both ambiguous → fall back to "both"
 
 
 # ── DATABASE ──────────────────────────────────────────────────────────────────
@@ -99,11 +109,14 @@ def process_row(args):
     updated = []
     counts  = {"male": 0, "female": 0, "both": 0}
     for listing in listings:
-        new_gender = tag_gender(listing)
+        new_gender, source = tag_gender(listing)
         old_gender = listing.get("_gender")
-        # Print the actual title used to determine gender, plus the resulting tag
+        # Print the title + URL used to determine gender, plus the resulting tag.
+        # Annotate the source only when the URL broke a tie on an ambiguous title.
         title = listing.get("title") or listing.get("name") or ""
-        print(f'[retag] "{title}" → {new_gender}')
+        url   = listing.get("url") or ""
+        annotation = f" (from {source})" if source else ""
+        print(f'[retag] "{title}" | {url} → {new_gender}{annotation}')
         counts[new_gender] += 1
         if new_gender != old_gender:
             changed += 1
