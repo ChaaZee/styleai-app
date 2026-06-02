@@ -5,6 +5,23 @@ They all connect directly to the Supabase database.
 
 ---
 
+## Environment Variables
+
+Scripts read their credentials from environment variables — nothing is hardcoded.
+
+- **`DEPOP_COOKIE`** — required for the Depop scripts (`depop_seed.py`, `cleanup.py`,
+  `fix_depop_titles.py`). Get it from DevTools → Network → any `depop.com` request →
+  copy the `cookie:` header value. Set it in PowerShell with:
+  ```powershell
+  $env:DEPOP_COOKIE = Get-Content "cookie.txt" -Raw
+  ```
+  If it's unset, each Depop script prints `[warn] DEPOP_COOKIE env var not set` at
+  startup and Depop API calls may fail (the WAF blocks cookieless requests).
+- **`DATABASE_URL`** — optional. Defaults to the Supabase connection string already
+  baked into each script, so you only need to set it to point at a different database.
+
+---
+
 ## Setup (run once)
 
 ```powershell
@@ -20,11 +37,11 @@ pip install requests psycopg2-binary openai
 Searches Depop for a list of queries and saves the results to the database.
 Run this whenever you want to add new listings or refresh stale ones.
 
-**Requires your Depop cookie** (expires every ~1 hour):
+**Requires the `DEPOP_COOKIE` env var** (cookie expires every ~1 hour):
 1. Open [depop.com](https://www.depop.com) in Chrome and search for anything
 2. DevTools (F12) → Network tab → find a GET to `www.depop.com/api/v3/search/products/`
 3. Right-click → Copy as cURL → find the `-b "..."` value
-4. Paste it into the `COOKIE = ""` line at the top of `seed.py`
+4. Set it as `DEPOP_COOKIE` (see [Environment Variables](#environment-variables))
 
 ```powershell
 python scripts/python/seed.py

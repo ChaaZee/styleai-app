@@ -13,7 +13,7 @@ HOW TO GET YOUR COOKIE:
   3. Find a GET request to www.depop.com/api/v3/search/products/
   4. Right-click it → Copy → Copy as cURL (cmd)
   5. Find the -b "..." part — that entire string is your cookie
-  6. Paste it into the COOKIE variable below (between the quotes)
+  6. Set it as the DEPOP_COOKIE env var (PowerShell: $env:DEPOP_COOKIE = "...")
 
 USAGE (PowerShell):
   pip install requests psycopg2-binary
@@ -26,6 +26,7 @@ ADD NEW QUERIES:
   - garment_type: type of clothing (tops, bottoms, outerwear, shoes, accessories)
 """
 
+import os
 import requests
 import psycopg2
 import psycopg2.extras
@@ -33,10 +34,14 @@ import json
 import time
 import re
 
-# ── PASTE YOUR COOKIE HERE ────────────────────────────────────────────────────
-# Get this from DevTools → Network → copy as cURL → find the -b "..." value
-# The cf_clearance cookie expires after ~1 hour, so grab a fresh one if you get 403s
-COOKIE = ""  # <-- paste your full cookie string here
+# ── COOKIE ────────────────────────────────────────────────────────────────────
+# Read the Depop cookie from the DEPOP_COOKIE env var (never hardcode it).
+# Get it from DevTools → Network → copy as cURL → find the -b "..." value.
+# The cf_clearance cookie expires after ~1 hour, so grab a fresh one if you get 403s.
+# PowerShell:  $env:DEPOP_COOKIE = Get-Content "cookie.txt" -Raw
+DEPOP_COOKIE = os.environ.get("DEPOP_COOKIE", "")
+if not DEPOP_COOKIE:
+    print("[warn] DEPOP_COOKIE env var not set — Depop API calls may fail")
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 DEVICE_ID   = "199707a3-3c09-408b-ab30-6d036c7d6b64"  # your Depop device ID
@@ -44,7 +49,10 @@ SESSION_ID  = "dbc61275-5cbd-46ce-8258-e19e984803b0"   # your Depop session ID
 ITEMS_PER_QUERY = 12    # how many listings to fetch per query
 DELAY_SECS  = 2.5       # wait between requests (be polite to Depop)
 
-DB_URL = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
+DB_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres",
+)
 
 # ── QUERIES TO SEED ───────────────────────────────────────────────────────────
 # Add or remove entries here to control what gets seeded.
@@ -145,7 +153,7 @@ def fetch_depop(query, limit, existing_urls):
         "accept": "*/*",
         "accept-language": "en-US,en;q=0.9",
         "content-type": "application/json",
-        "cookie": COOKIE,
+        "cookie": DEPOP_COOKIE,
         "depop-device-id": DEVICE_ID,
         "depop-session-id": SESSION_ID,
         "origin": "https://www.depop.com",
@@ -255,8 +263,8 @@ def save_to_cache(cursor, query, listings, aesthetic, garment_type):
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 def main():
-    if not COOKIE:
-        print("❌  COOKIE is empty! Paste your Depop cookie at the top of this file.")
+    if not DEPOP_COOKIE:
+        print("❌  DEPOP_COOKIE is empty! Set the DEPOP_COOKIE env var before running.")
         return
 
     print(f"\n🪡  Stitch Seed Script — {len(SEED_QUERIES)} queries, {ITEMS_PER_QUERY} items each\n")
@@ -295,7 +303,7 @@ def main():
         except requests.HTTPError as e:
             print(f"❌  HTTP {e.response.status_code}")
             if e.response.status_code == 403:
-                print("     ⚠️  Cookie expired — grab a fresh one from DevTools and update COOKIE at the top")
+                print("     ⚠️  Cookie expired — grab a fresh one from DevTools and update the DEPOP_COOKIE env var")
                 break
             failed += 1
         except Exception as e:

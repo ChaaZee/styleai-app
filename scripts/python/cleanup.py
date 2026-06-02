@@ -15,7 +15,7 @@ WHAT COUNTS AS "DEAD":
 
 SOURCE-SPECIFIC RULES:
     depop    — Uses Depop search API with cookie (same as seed script).
-               Paste your cookie into DEPOP_COOKIE below.
+               Set your cookie in the DEPOP_COOKIE env var.
                Without cookie: Depop listings are SKIPPED (WAF blocks all checks).
     asos     — GET only (they reject HEAD). Check for 404 or redirect to homepage.
     pacsun   — HEAD only, 403 = assume live.
@@ -30,11 +30,12 @@ USAGE:
 FOR DEPOP CLEANUP:
     1. Go to depop.com in Chrome and browse for a second
     2. DevTools (F12) → Network → any depop request → Headers → copy full "cookie:" value
-    3. Paste it into DEPOP_COOKIE below
+    3. Set it as the DEPOP_COOKIE env var (PowerShell: $env:DEPOP_COOKIE = "...")
     4. Run from your HOME computer (not a server)
 ===========================================================================
 """
 
+import os
 import sys
 import json
 import re
@@ -46,15 +47,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-DB_URL      = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
+DB_URL      = os.environ.get(
+    "DATABASE_URL",
+    "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres",
+)
 DRY_RUN     = "--delete" not in sys.argv   # safe by default
 CONCURRENCY = 8     # parallel URL checks per batch
 TIMEOUT     = 10    # seconds per request
 
-# Paste your Depop browser cookie here to enable Depop dead-link checking.
+# Depop browser cookie enables Depop dead-link checking (read from DEPOP_COOKIE env var).
 # Without this, Depop listings are skipped (their WAF blocks all cookieless requests).
 # Get it: DevTools → Network → any depop.com request → Headers → copy "cookie:" value
-DEPOP_COOKIE = ""  # <-- paste here
+DEPOP_COOKIE = os.environ.get("DEPOP_COOKIE", "")
+if not DEPOP_COOKIE:
+    print("[warn] DEPOP_COOKIE env var not set — Depop API calls may fail")
 
 # Sources to check. Leave empty to check all sources.
 # Example: CHECK_SOURCES = {"depop"} to only clean Depop listings.
@@ -322,7 +328,7 @@ def main():
         print("  Pass --delete to actually remove dead listings.\n")
     if not DEPOP_COOKIE:
         print("  ⚠⃣  DEPOP_COOKIE is empty — Depop listings will be SKIPPED.")
-        print("     Paste your Depop browser cookie into DEPOP_COOKIE at the top of this file.\n")
+        print("     Set your Depop browser cookie in the DEPOP_COOKIE env var.\n")
 
     conn = get_connection()
     cur = conn.cursor()

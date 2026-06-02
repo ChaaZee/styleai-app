@@ -55,9 +55,11 @@ DELAY_SECS  = 0.3                          # sleep between Depop API calls
 TIMEOUT     = 15                           # seconds per request
 
 # Optional Depop cookie. Product detail fetches usually work without one, but if
-# the WAF starts blocking cookieless requests, paste a browser cookie here.
+# the WAF starts blocking cookieless requests, set the DEPOP_COOKIE env var.
 # Get it: DevTools → Network → any depop.com request → Headers → copy "cookie:" value
 DEPOP_COOKIE = os.environ.get("DEPOP_COOKIE", "")
+if not DEPOP_COOKIE:
+    print("[warn] DEPOP_COOKIE env var not set — Depop API calls may fail")
 
 # Standard browser headers (mirrors depop_seed.py / cleanup.py).
 HEADERS = {
