@@ -97,15 +97,20 @@ def process_row(args):
 
     changed = 0
     updated = []
+    counts  = {"male": 0, "female": 0, "both": 0}
     for listing in listings:
         new_gender = tag_gender(listing)
         old_gender = listing.get("_gender")
+        # Print the actual title used to determine gender, plus the resulting tag
+        title = listing.get("title") or listing.get("name") or ""
+        print(f'[retag] "{title}" → {new_gender}')
+        counts[new_gender] += 1
         if new_gender != old_gender:
             changed += 1
         listing["_gender"] = new_gender
         updated.append(listing)
 
-    return query, changed, updated
+    return query, changed, updated, counts
 
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
@@ -126,6 +131,7 @@ def main():
     total_changed = 0
     processed     = 0
     offset        = 0
+    gender_totals = {"male": 0, "female": 0, "both": 0}
 
     while offset < total:
         # Fetch a batch of rows — using ::text cast handles both jsonb array and string storage
@@ -147,9 +153,11 @@ def main():
         for result in results:
             if result is None:
                 continue
-            query, changed, updated_listings = result
+            query, changed, updated_listings, counts = result
             total_changed += changed
             processed     += 1
+            for g in gender_totals:
+                gender_totals[g] += counts[g]
             cursor.execute(
                 "UPDATE depop_cache SET listings = %s::jsonb WHERE query = %s",
                 (json.dumps(updated_listings), query)
@@ -163,7 +171,11 @@ def main():
     cursor.close()
     conn.close()
 
-    print(f"\n✅  Done — {processed} rows processed, {total_changed} gender tags updated\n")
+    print(f"\n✅  Done — {processed} rows processed, {total_changed} gender tags updated")
+    print(
+        f"   Summary: {gender_totals['male']} male / "
+        f"{gender_totals['female']} female / {gender_totals['both']} both\n"
+    )
 
 
 if __name__ == "__main__":
