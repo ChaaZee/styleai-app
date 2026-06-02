@@ -51,6 +51,25 @@ python scripts/python/cleanup.py --delete
 
 ---
 
+### `fix_depop_titles.py` — Replace slug titles with real Depop titles
+
+Some Depop listings have a URL slug as their title (e.g. `vintage-nike-hoodie-abc123`)
+instead of the real one (`Men's Vintage Nike Hoodie Size M`). This fetches the real
+title from the Depop product detail API and updates the cache.
+
+No cookie required for product detail fetches (but `DEPOP_COOKIE` is supported if the
+WAF ever demands one). Rate-limited to ~0.3s between calls.
+
+```powershell
+# Dry run first — see what would change
+python scripts/python/fix_depop_titles.py
+
+# Actually write the corrected titles
+python scripts/python/fix_depop_titles.py --apply
+```
+
+---
+
 ### `retag_gender.py` — Fix gender tags on listings
 
 Every listing has a `_gender` field ("male", "female", or "both") that controls
