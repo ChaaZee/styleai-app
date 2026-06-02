@@ -78,6 +78,19 @@ if DEPOP_COOKIE:
     HEADERS["cookie"] = DEPOP_COOKIE
 
 
+# ── DEPOP LISTING DETECTION ───────────────────────────────────────────────────
+def is_depop_listing(listing: dict) -> bool:
+    """Return True if a listing is from Depop.
+
+    Two groups exist in the DB:
+      1. Newer listings tagged with "_source": "depop".
+      2. Older listings with NO _source field, identifiable only by a depop.com URL.
+    """
+    return listing.get("_source") == "depop" or (
+        not listing.get("_source") and "depop.com" in listing.get("url", "")
+    )
+
+
 # ── SLUG DETECTION ──────────────────────────────────────────────────────────--
 def is_slug_title(title: str) -> bool:
     """A title is a slug if it's all lowercase, has a hyphen, and no spaces.
@@ -175,7 +188,7 @@ def load_depop_rows(cursor):
         if not isinstance(listings, list) or not listings:
             continue
         # Keep the row only if any listing is from Depop.
-        if any((l.get("_source") == "depop") for l in listings if isinstance(l, dict)):
+        if any(is_depop_listing(l) for l in listings if isinstance(l, dict)):
             result.append((query, listings))
             depop_count += 1
 
@@ -217,7 +230,7 @@ def main():
             if not isinstance(listing, dict):
                 continue
             # Only touch Depop listings.
-            if listing.get("_source") != "depop":
+            if not is_depop_listing(listing):
                 continue
 
             title = listing.get("title", "") or ""
