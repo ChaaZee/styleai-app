@@ -725,7 +725,7 @@ export default function HomePage() {
                 </button>
               </div>
               {/* Teaser: use real depop cards so links go to actual products */}
-              {depopCards.slice(0, 6).map((card: any, idx: number) => (
+              {depopCards.slice(0, 20).map((card: any, idx: number) => (
                 <a
                   key={card.url || idx}
                   href={card.url}
