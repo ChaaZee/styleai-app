@@ -6,3 +6,6 @@ dist/
 *.db-wal
 .DS_Store
 cURL.txt
+.omc
+.claude
+.understand-anything
