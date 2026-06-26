@@ -4,7 +4,7 @@ import { Plus, Trash2, Upload, Sparkles, ExternalLink } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { WardrobeItem } from "@shared/schema";
-import { getUserId } from "@/lib/deviceId";
+import { getOrCreateUserId } from "@/lib/deviceId";
 
 const CATEGORIES = ["All", "tops", "bottoms", "shoes", "outerwear", "accessories"];
 
@@ -97,7 +97,7 @@ export default function WardrobePage() {
   const [brand, setBrand] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const userId = getUserId();
+  const userId = getOrCreateUserId();
 
   const { data: items = [], isLoading } = useQuery<WardrobeItem[]>({
     queryKey: ["/api/wardrobe"],
