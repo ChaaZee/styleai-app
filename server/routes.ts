@@ -26,7 +26,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 // Pulls in DB helpers from storage.ts — analogous to importing a Python
 // service module (e.g. `from storage import get_user, set_cache, ...`).
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, recomputeTasteClusters, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, upsertScannedPieces, getScannedPieces, tagListingGender, genderPassesFilter as listingGenderOk } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, recomputeTasteClusters, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, upsertScannedPieces, getScannedPieces, tagListingGender, genderPassesFilter as listingGenderOk, verifyUserOwnership, isJunkListing } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai"; // Gemini client (like `google.generativeai` in Python)
 import multer from "multer";           // Multipart/form-data parser (Python equivalent: Werkzeug's `request.files` or FastAPI's `UploadFile`)
 import rateLimit from "express-rate-limit"; // Per-IP throttling middleware (Python equivalent: `flask-limiter`)
@@ -152,6 +152,8 @@ function normaliseDepopItem(i: any, idx: number, searchQ: string) {
     "poster","print","sticker","art print","wall art",
     "candle","mug","cup","pillow","blanket",
     "book","magazine","vinyl record","cd "," dvd",
+    "gift card","e-gift","voucher","store credit",
+    "mystery box","bundle lot","grab bag","sample pack",
   ];
   const titleLower = title.toLowerCase();
   if (NON_CLOTHING_SIGNALS.some(s => titleLower.includes(s))) return null;
@@ -2145,7 +2147,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       if (!tasteVector) {
         return res.status(500).json({ error: "Could not build taste vector" });
       }
-      await upsertUserProfile(userId, tasteVector, 0, undefined, undefined, true);
+      const deviceId = req.headers["x-device-id"] as string | undefined;
+      await upsertUserProfile(userId, tasteVector, 0, undefined, undefined, true, deviceId);
       // Save gender preference if provided
       if (gender && ["male", "female", "both"].includes(gender)) {
         const { default: pg } = await import("postgres");
@@ -2174,6 +2177,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     try {
       const { gender } = req.body as { gender: string };
       const userId = req.params.userId;
+      const deviceId = req.headers["x-device-id"] as string | undefined;
+      if (!await verifyUserOwnership(userId, deviceId)) {
+        return res.status(403).json({ error: "device mismatch" });
+      }
       if (!["male", "female", "both"].includes(gender)) {
         return res.status(400).json({ error: "gender must be male | female | both" });
       }
@@ -2181,8 +2188,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const c = pg(process.env.DATABASE_URL!, { ssl: "require" });
       // UPSERT so new users get a row with the correct gender, not just an UPDATE that hits 0 rows
       await c`
-        INSERT INTO user_profiles (user_id, gender, interaction_count, liked_ids, skipped_ids, onboarded, liked_items)
-        VALUES (${userId}, ${gender}, 0, '{}', '{}', false, '[]')
+        INSERT INTO user_profiles (user_id, gender, interaction_count, liked_ids, skipped_ids, onboarded, liked_items, device_id)
+        VALUES (${userId}, ${gender}, 0, '{}', '{}', false, '[]', ${deviceId || null})
         ON CONFLICT (user_id) DO UPDATE SET gender = EXCLUDED.gender
       `;
 
@@ -2228,6 +2235,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       };
       if (!userId || !itemId || !action) {
         return res.status(400).json({ error: "userId, itemId, action required" });
+      }
+      const deviceId = req.headers["x-device-id"] as string | undefined;
+      if (!await verifyUserOwnership(userId, deviceId)) {
+        return res.status(403).json({ error: "device mismatch" });
       }
 
       // Weights: save = 3, like = 1, skip = -0.5
@@ -2300,12 +2311,19 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       const magnitude = Math.sqrt(newVector.reduce((sum, v) => sum + v * v, 0));
       if (magnitude > 0) newVector = newVector.map(v => v / magnitude);
 
+      if (newVector.some(v => !Number.isFinite(v))) {
+        console.warn("[interact] vector validation failed — NaN/Infinity detected, skipping update");
+        return res.json({ success: true, updated: false, reason: "vector_validation_failed" });
+      }
+
       await upsertUserProfile(
         userId,
         newVector,
         Math.abs(weight),
         action !== "skip" ? itemId : undefined,
-        action === "skip" ? itemId : undefined
+        action === "skip" ? itemId : undefined,
+        undefined,
+        deviceId
       );
 
       // Recompute taste clusters every 5 interactions (async, don't await)
@@ -2410,6 +2428,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
    */
   app.delete("/api/liked-items/:userId", async (req, res) => {
     try {
+      const deviceId = req.headers["x-device-id"] as string | undefined;
+      if (!await verifyUserOwnership(req.params.userId, deviceId)) {
+        return res.status(403).json({ error: "device mismatch" });
+      }
       const { itemKey } = req.body as { itemKey: string };
       if (!itemKey) return res.status(400).json({ error: "itemKey required" });
       await removeLikedItem(req.params.userId, itemKey);
@@ -3060,9 +3082,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.get("/api/discover", async (req, res) => {
     try {
       const userId = req.query.userId as string | undefined;
+      const gender = req.query.gender as string | undefined;
       let cards: any[];
       if (userId) {
-        cards = await getDiscoverCardsByTaste(userId);
+        cards = await getDiscoverCardsByTaste(userId, gender);
       } else {
         cards = await storage.getDiscoverCards();
       }

@@ -158,6 +158,9 @@ export async function initDB() {
   await client`
     ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS taste_clusters jsonb DEFAULT '[]'::jsonb
   `.catch(() => {});
+  await client`
+    ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS device_id TEXT
+  `.catch(() => {});
 
   await client`
     CREATE TABLE IF NOT EXISTS wardrobe_items (
@@ -889,7 +892,8 @@ export async function upsertUserProfile(
   interactionDelta = 0,
   likedId?: string,
   skippedId?: string,
-  onboarded?: boolean
+  onboarded?: boolean,
+  deviceId?: string
 ) {
   const vecStr = `[${tasteVector.join(",")}]`;
 
@@ -899,7 +903,7 @@ export async function upsertUserProfile(
   if (!existing.length) {
     // Fresh insert
     await client`
-      INSERT INTO user_profiles (user_id, taste_vector, interaction_count, liked_ids, skipped_ids, onboarded, created_at, updated_at)
+      INSERT INTO user_profiles (user_id, taste_vector, interaction_count, liked_ids, skipped_ids, onboarded, device_id, created_at, updated_at)
       VALUES (
         ${userId},
         ${vecStr}::vector,
@@ -907,6 +911,7 @@ export async function upsertUserProfile(
         ARRAY[]::text[],
         ARRAY[]::text[],
         ${onboarded ?? false},
+        ${deviceId ?? null},
         NOW(), NOW()
       )
     `;
@@ -1196,6 +1201,31 @@ export function genderPassesFilter(listing: any, gender: string): boolean {
 }
 
 /**
+ * Verify that a device owns a user profile. Returns true if the device_id
+ * matches the stored one, or if no device_id is stored yet (legacy profiles).
+ */
+export async function verifyUserOwnership(userId: string, deviceId: string | undefined): Promise<boolean> {
+  if (!deviceId) return false;
+  const rows = await client<{ device_id: string | null }[]>`
+    SELECT device_id FROM user_profiles WHERE user_id = ${userId}
+  `;
+  if (!rows.length) return true; // new user — will be created with this device
+  if (!rows[0].device_id) {
+    // Legacy profile without device binding — bind it now
+    await client`UPDATE user_profiles SET device_id = ${deviceId} WHERE user_id = ${userId} AND device_id IS NULL`;
+    return true;
+  }
+  return rows[0].device_id === deviceId;
+}
+
+const JUNK_LISTING_RE = /\b(trading\s+cards?|pokemon\s+cards?|yugioh|yu-gi-oh|magic\s+cards?|sports?\s+cards?|gift\s+cards?|e-gift|voucher|store\s+credit|collectible|funko|action\s+figure|figurine|toy|video\s+game|console|phone\s+case|electronics|poster|sticker|art\s+print|wall\s+art|candle|mug|cup|pillow|blanket|book|magazine|vinyl\s+record|mystery\s+box|bundle\s+lot|grab\s+bag|sample\s+pack)\b/i;
+
+export function isJunkListing(listing: any): boolean {
+  const title = (listing.title || listing.name || "").toLowerCase();
+  return JUNK_LISTING_RE.test(title);
+}
+
+/**
  * Get personalized For You recommendations for a user.
  * Finds depop_cache items whose embeddings are closest to the user's taste vector.
  * Excludes already-liked and skipped items. Filters by gender preference.
@@ -1228,6 +1258,8 @@ export async function getForYouRecommendations(
 
   const genderQueryFilter = gender === "male"
     ? client`AND NOT (query ILIKE ANY(ARRAY['%women%','%womens%','%womans%','%woman%','%ladies%','%girls%','%female%']))`
+    : gender === "female"
+    ? client`AND NOT (query ILIKE ANY(ARRAY['%mens %','%menswear%','% boys %']))`
     : client``;
 
   // Build list of vectors to query — use clusters if available, else single vector
@@ -1274,6 +1306,7 @@ export async function getForYouRecommendations(
         seen.add(key);
 
         if (!genderPassesFilter(item, gender)) continue;
+        if (isJunkListing(item)) continue;
 
         const source: string = item._source || "depop";
         if (!buckets[source]) buckets[source] = [];
@@ -1298,6 +1331,27 @@ export async function getForYouRecommendations(
     }
     if (!added) break;
     i++;
+  }
+
+  // Fallback: if vector search returned nothing, serve trending items for this gender
+  if (interleaved.length === 0) {
+    const fallbackRows = await client<{ listings: any[]; aesthetic: string }[]>`
+      SELECT listings, aesthetic FROM depop_cache
+      WHERE permanent = TRUE ${genderQueryFilter}
+      ORDER BY RANDOM()
+      LIMIT 30
+    `;
+    for (const row of fallbackRows) {
+      if (gender === "male" && FEMALE_ONLY_AESTHETICS.has(row.aesthetic)) continue;
+      const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
+      for (const item of listings) {
+        if (!genderPassesFilter(item, gender)) continue;
+        if (isJunkListing(item)) continue;
+        interleaved.push({ ...item, _aesthetic: row.aesthetic });
+        if (interleaved.length >= limit) break;
+      }
+      if (interleaved.length >= limit) break;
+    }
   }
 
   return {
@@ -1374,22 +1428,33 @@ export async function getAverageEmbeddingForAesthetics(aesthetics: string[], gen
  * cosine *distance* (0 = identical) to a *similarity* score (1 = identical)
  * for client display.
  */
-export async function getDiscoverCardsByTaste(userId: string): Promise<any[]> {
+export async function getDiscoverCardsByTaste(userId: string, gender?: string): Promise<any[]> {
   const profile = await getUserProfile(userId);
+  const userGender = gender || (profile as any)?.gender || "both";
+
+  // Build aesthetic exclusion for male users
+  const femExclude = userGender === "male"
+    ? [...FEMALE_ONLY_AESTHETICS].map(a => a.toLowerCase())
+    : [];
+
   if (!profile?.taste_vector) {
-    // Fallback: order by likes_count desc
-    return client`
+    const rows = await client`
       SELECT * FROM discover_cards ORDER BY likes_count DESC, created_at DESC LIMIT 50
     `;
+    return femExclude.length
+      ? rows.filter((r: any) => !femExclude.includes((r.aesthetic || "").toLowerCase()))
+      : rows;
   }
-  // Order by cosine similarity to taste vector
-  return client`
+  const rows = await client`
     SELECT *, 1 - (embedding <=> ${profile.taste_vector}::vector) AS taste_score
     FROM discover_cards
     WHERE embedding IS NOT NULL
     ORDER BY embedding <=> ${profile.taste_vector}::vector
     LIMIT 50
   `;
+  return femExclude.length
+    ? rows.filter((r: any) => !femExclude.includes((r.aesthetic || "").toLowerCase()))
+    : rows;
 }
 
 /**

@@ -51,7 +51,7 @@ export default function HistoryPage() {
     try {
       await fetch(`/api/liked-items/${userId}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-device-id": getDeviceId() },
         body: JSON.stringify({ itemKey }),
       });
     } catch {

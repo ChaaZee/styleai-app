@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { rankByVector, getTopAesthetics } from "@/lib/styleVector";
 import OnboardingModal from "@/components/OnboardingModal";
-import { getOrCreateUserId } from "@/lib/deviceId";
+import { getOrCreateUserId, getDeviceId } from "@/lib/deviceId";
 
 // ── Clothing SVG illustrations (same set as discover) ───────────────────────
 const Icons: Record<string, JSX.Element> = {
@@ -449,7 +449,7 @@ export default function HomePage() {
             const gender: string = (profile as any).gender || "both";
             fetch(`/api/user-gender/${userId}`, {
               method: "PATCH",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", "x-device-id": getDeviceId() },
               body: JSON.stringify({ gender }),
             }).catch(() => {});
           } catch {}

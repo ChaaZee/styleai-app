@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import OnboardingModal from "../components/OnboardingModal";
-import { getOrCreateUserId } from "@/lib/deviceId";
+import { getOrCreateUserId, getDeviceId } from "@/lib/deviceId";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface DepopItem {
@@ -258,7 +258,7 @@ export default function ForYouPage() {
             const gender: string = (profile as any).gender || "both";
             fetch(`/api/user-gender/${userId}`, {
               method: "PATCH",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", "x-device-id": getDeviceId() },
               body: JSON.stringify({ gender }),
             }).catch(() => {});
           } catch {}
@@ -330,7 +330,7 @@ export default function ForYouPage() {
     setInteractedIds(prev => new Set([...prev, item.id]));
     fetch("/api/interact", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-device-id": getDeviceId() },
       body: JSON.stringify({
         userId,
         itemId: item.id,

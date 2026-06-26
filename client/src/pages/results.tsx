@@ -5,7 +5,7 @@ import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 import { useState, useEffect, useRef } from "react";
 import type { Scan } from "@shared/schema";
 import { onResultViewed, onResultSaved, onUnlike } from "@/lib/styleVector";
-import { getOrCreateUserId } from "@/lib/deviceId";
+import { getOrCreateUserId, getDeviceId } from "@/lib/deviceId";
 
 // ── Clothing SVG illustrations ────────────────────────────────────────────────
 const ClothingIcons: Record<string, JSX.Element> = {
@@ -460,7 +460,7 @@ export default function ResultsPage() {
                     if (userId) {
                       fetch("/api/interact", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: { "Content-Type": "application/json", "x-device-id": getDeviceId() },
                         body: JSON.stringify({
                           userId,
                           itemId: `piece_${scan.id}_${piece}`,

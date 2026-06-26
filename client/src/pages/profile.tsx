@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { ChevronLeft, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getOrCreateUserId } from "@/lib/deviceId";
+import { getOrCreateUserId, getDeviceId } from "@/lib/deviceId";
 
 // Aesthetics that are female-coded — remap to neutral equivalent for male users
 const FEMALE_ONLY_AESTHETICS = new Set(["Coquette","Soft Girl","Cottagecore","Coastal Grandmother","E-Girl","Clean Girl","Balletcore","Romantic","Fairycore","Dark Feminine","Baddie"]);
@@ -369,7 +369,7 @@ export default function ProfilePage() {
     if (profile.gender && ["male", "female", "both"].includes(profile.gender)) {
       fetch(`/api/user-gender/${userId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-device-id": getDeviceId() },
         body: JSON.stringify({ gender: profile.gender }),
       }).catch(() => {});
     }
