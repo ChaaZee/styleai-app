@@ -1,0 +1,21 @@
+{
+  "issues": [],
+  "warnings": [
+    {
+      "type": "UI/UX Gap",
+      "severity": "MEDIUM",
+      "title": "No 'Add to Wardrobe' action on scan results",
+      "description": "Product requirement #4: items bought through the app should auto-add to wardrobe. The results page shows products but has no 'Add to Wardrobe' or 'Buy & Add' button. Users must manually re-upload via Wardrobe tab.",
+      "file": "client/src/pages/results.tsx",
+      "fix": "Add 'Add to Wardrobe' button on product cards; create /api/wardrobe/auto-add endpoint that copies scan results to wardrobe_items."
+    },
+    {
+      "type": "Algorithmic Taste Failure",
+      "severity": "MEDIUM",
+      "title": "Home feed is 135 hardcoded items, not dynamic inventory",
+      "description": "Product requirement #9: discovery feed should be styled around user's taste. The FEED_ITEMS array is static with 135 hardcoded entries. While rankByVector reorders them, the actual product data doesn't come from live inventory/affiliate APIs.",
+      "file": "client/src/pages/home.tsx",
+      "fix": "Replace static FEED_ITEMS with dynamic fetch from /api/depop-feed or affiliate API; use FEED_ITEMS only as fallback skeleton."
+    }
+  ]
+}

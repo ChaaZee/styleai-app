@@ -100,12 +100,17 @@ export default function WardrobePage() {
   const userId = getOrCreateUserId();
 
   const { data: items = [], isLoading } = useQuery<WardrobeItem[]>({
-    queryKey: ["/api/wardrobe"],
+    queryKey: ["/api/wardrobe", userId],
+    queryFn: async () => {
+      const res = await fetch(`/api/wardrobe?userId=${encodeURIComponent(userId)}`);
+      if (!res.ok) throw new Error("Failed to fetch wardrobe");
+      return res.json();
+    },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/wardrobe/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/wardrobe"] }),
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/wardrobe/${id}?userId=${encodeURIComponent(userId)}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/wardrobe", userId] }),
   });
 
   const addMutation = useMutation({
@@ -116,12 +121,13 @@ export default function WardrobePage() {
       formData.append("name", name);
       formData.append("category", category);
       formData.append("brand", brand);
+      formData.append("userId", userId);
       const res = await fetch("/api/wardrobe", { method: "POST", body: formData });
       if (!res.ok) throw new Error("Failed to add item");
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/wardrobe"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/wardrobe", userId] });
       setAdding(false); setAddFile(null); setAddPreview(null); setName(""); setBrand("");
       toast({ title: "Added to wardrobe" });
     },

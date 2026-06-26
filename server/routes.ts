@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // routes.ts — All HTTP endpoints for the StyleAI server.
 //
 // Mental model for a Python dev: this file is roughly the equivalent of a Flask
@@ -2427,12 +2427,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       // through stripToDepopQuery. Skips accessories/non-clothing because
       // those rarely give useful Depop search results. Returns up to 4
       // {query, garmentType} pairs, one per detected garment.
-      function buildGarmentQueries(garments: any[], aesthetic = ""): { query: string; garmentType: string }[] {
+      function buildGarmentQueries(garments: any[], aesthetic = "", userGender = "both"): { query: string; garmentType: string }[] {
         // Skip accessories and non-clothing items for Depop search
         const skipTypes = /hat|bag|purse|sunglasses|glasses|watch|jewelry|necklace|ring|earring|bracelet|belt|sock|perfume|scarf|glove|ball|volleyball|football|basketball|helmet|phone|bottle|prop/i;
         const usefulGarments = garments
           .filter((g: any) => !skipTypes.test(g.item))
           .slice(0, 4);
+
+        const genderKeyword = userGender === "male" ? "men" : userGender === "female" ? "women" : "";
 
         return usefulGarments.map((g: any) => {
           const parts: string[] = [];
@@ -2441,7 +2443,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           parts.push(g.item);
           const verbose = parts.join(" ").toLowerCase().trim();
           // Apply Depop-native query transformation: aesthetic prefix + stripped description
-          const query = aesthetic ? stripToDepopQuery(verbose, aesthetic) : verbose;
+          let query = aesthetic ? stripToDepopQuery(verbose, aesthetic) : verbose;
+          // Append gender keyword for better gender-matched results
+          if (genderKeyword && !query.includes(genderKeyword)) {
+            query = `${query} ${genderKeyword}`.trim();
+          }
           return { query, garmentType: inferGarmentType(g.item) };
         });
       }
@@ -2488,12 +2494,19 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       const analysis = JSON.parse(jsonMatch[0]);
 
+      const analyzeUserId = req.body?.userId as string | undefined;
+      let userGender = "both";
+      if (analyzeUserId) {
+        const userProfile = await getUserProfile(analyzeUserId).catch(() => null);
+        userGender = (userProfile as any)?.gender || "both";
+      }
+
       // Rebuild with aesthetic prefix now that Pass 2 has returned the aesthetic
       const resolvedAesthetic: string = analysis.aesthetic || "";
       const aestheticGarmentQueries = rawGarmentQueries.length >= 2
-        ? buildGarmentQueries(garmentData.garments || [], resolvedAesthetic)
+        ? buildGarmentQueries(garmentData.garments || [], resolvedAesthetic, userGender)
         : (analysis.keyPieces || []).map((p: string) => ({
-            query: stripToDepopQuery(p.toLowerCase(), resolvedAesthetic),
+            query: stripToDepopQuery(p.toLowerCase(), resolvedAesthetic) + (userGender !== "both" ? ` ${userGender === "male" ? "men" : "women"}` : ""),
             garmentType: inferGarmentType(p),
           }));
       const garmentDepopQueries = aestheticGarmentQueries;
@@ -2545,10 +2558,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       }
 
       // Remap female-only aesthetics for male users before saving the scan
-      const analyzeUserId = req.body?.userId as string | undefined;
       if (analyzeUserId) {
-        const userProfile = await getUserProfile(analyzeUserId).catch(() => null);
-        const userGender = (userProfile as any)?.gender || "both";
         analysis.aesthetic = remapAestheticForGender(analysis.aesthetic, userGender);
       }
 
@@ -2558,6 +2568,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         deviceId: deviceId || null,
         imageData: imageDataUrl,
         aesthetic: analysis.aesthetic,
+        secondaryAesthetic: analysis.secondaryAesthetic || null,
         confidence: analysis.confidence,
         styleBreakdown: JSON.stringify(styleBreakdown),
         occasions: JSON.stringify(analysis.occasions),
@@ -2660,7 +2671,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
    * Like Flask: @app.route("/api/wardrobe", methods=["GET"])
    */
   app.get("/api/wardrobe", async (req, res) => {
-    const items = await storage.getWardrobeItems();
+    const userId = req.query.userId as string | undefined;
+    const items = await storage.getWardrobeItems(userId);
     res.json(items);
   });
 
@@ -2676,11 +2688,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.post("/api/wardrobe", upload.single("image"), async (req, res) => {
     try {
       const file = req.file;
-      const { name, category, brand, color, aesthetic } = req.body;
+      const { name, category, brand, color, aesthetic, userId } = req.body;
       if (!file || !name || !category) return res.status(400).json({ error: "Missing required fields" });
 
       const imageData = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
-      const item = await storage.createWardrobeItem({ name, category, brand, color, aesthetic, imageData, source: "manual" });
+      const item = await storage.createWardrobeItem({ name, category, brand, color, aesthetic, imageData, source: "manual", userId: userId || null });
       res.json(item);
     } catch (err: any) {
       console.error("Wardrobe error:", err);
@@ -2695,8 +2707,33 @@ export async function registerRoutes(httpServer: Server, app: Express) {
    * Like Flask: @app.route("/api/wardrobe/<int:id>", methods=["DELETE"])
    */
   app.delete("/api/wardrobe/:id", async (req, res) => {
-    await storage.deleteWardrobeItem(Number(req.params.id));
+    const userId = req.query.userId as string | undefined;
+    await storage.deleteWardrobeItem(Number(req.params.id), userId);
     res.json({ ok: true });
+  });
+
+  /**
+   * POST /api/wardrobe/auto-add
+   * Adds a product from scan results directly to the wardrobe without requiring
+   * a new image upload. Uses the product metadata + a placeholder image.
+   *
+   * Body: { name, category, brand, color, aesthetic, userId, imageUrl? }
+   */
+  app.post("/api/wardrobe/auto-add", async (req, res) => {
+    try {
+      const { name, category, brand, color, aesthetic, userId, imageUrl } = req.body;
+      if (!name || !category || !userId) return res.status(400).json({ error: "Missing required fields" });
+
+      const imageData = imageUrl || "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400&q=80";
+      const item = await storage.createWardrobeItem({
+        name, category, brand: brand || "", color: color || "", aesthetic: aesthetic || "",
+        imageData, source: "scan-result", userId: userId || null
+      });
+      res.json(item);
+    } catch (err: any) {
+      console.error("[wardrobe-auto-add]", err);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // ── Discover feed ─────────────────────────────────────────────────────────────────
@@ -2797,7 +2834,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     try {
       const { userId } = req.params;
       if (!userId) return res.status(400).json({ error: "Missing userId" });
-      const wardrobeItems = await storage.getWardrobeItems();
+      const wardrobeItems = await storage.getWardrobeItems(userId);
       const mapped = wardrobeItems.map((w: any) => ({
         name: w.name,
         category: w.category,

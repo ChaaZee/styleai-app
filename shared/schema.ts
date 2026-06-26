@@ -14,6 +14,7 @@ export const scans = pgTable("scans", {
   keyPieces: text("key_pieces").notNull(),            // JSON string — display labels
   depopQueries: text("depop_queries"),                // JSON string — garment search queries for Depop
   colorPalette: text("color_palette").notNull(),      // JSON string
+  secondaryAesthetic: text("secondary_aesthetic"),
   results: text("results").notNull(),                 // JSON string
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -29,6 +30,7 @@ export type Scan = typeof scans.$inferSelect;
 // Wardrobe items
 export const wardrobeItems = pgTable("wardrobe_items", {
   id: serial("id").primaryKey(),
+  userId: text("user_id"),
   name: text("name").notNull(),
   category: text("category").notNull(),
   imageData: text("image_data").notNull(),

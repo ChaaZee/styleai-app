@@ -20,6 +20,8 @@ export const AESTHETICS = [
   "Preppy",
   "Business Casual",
   "Athleisure",
+  "Western / Americana",
+  "Workwear",
 ] as const;
 
 export type Aesthetic = (typeof AESTHETICS)[number];
@@ -87,6 +89,7 @@ function isAesthetic(s: string): s is Aesthetic {
 function applyBoost(
   v: StyleVector,
   targetAesthetic: string | undefined,
+  secondaryAesthetic: string | undefined,
   targetTags: string[],
   primaryDelta: number,
   decayOthers: boolean
@@ -96,7 +99,7 @@ function applyBoost(
   // Decay non-target aesthetics first
   if (decayOthers && targetAesthetic && isAesthetic(targetAesthetic)) {
     for (const a of AESTHETICS) {
-      if (a !== targetAesthetic) {
+      if (a !== targetAesthetic && a !== secondaryAesthetic) {
         updated[a] = Math.max(FLOOR, updated[a] * DECAY);
       }
     }
@@ -105,6 +108,11 @@ function applyBoost(
   // Boost primary aesthetic
   if (targetAesthetic && isAesthetic(targetAesthetic)) {
     updated[targetAesthetic] = clamp(updated[targetAesthetic] + primaryDelta);
+  }
+
+  // Boost secondary aesthetic at half strength
+  if (secondaryAesthetic && isAesthetic(secondaryAesthetic)) {
+    updated[secondaryAesthetic] = clamp(updated[secondaryAesthetic] + primaryDelta * 0.5);
   }
 
   // Boost tag-mapped aesthetics at half strength
@@ -119,15 +127,18 @@ function applyBoost(
 }
 
 /** User liked a discover card */
-export function onLike(aesthetic: string, tags: string[] = []): StyleVector {
-  return applyBoost(loadVector(), aesthetic, tags, +0.08, true);
+export function onLike(aesthetic: string, secondaryAesthetic?: string, tags: string[] = []): StyleVector {
+  return applyBoost(loadVector(), aesthetic, secondaryAesthetic, tags, +0.08, true);
 }
 
 /** User unliked a discover card */
-export function onUnlike(aesthetic: string, tags: string[] = []): StyleVector {
+export function onUnlike(aesthetic: string, secondaryAesthetic?: string, tags: string[] = []): StyleVector {
   const v = { ...loadVector() };
   if (isAesthetic(aesthetic)) {
     v[aesthetic] = clamp(v[aesthetic] - 0.08);
+  }
+  if (secondaryAesthetic && isAesthetic(secondaryAesthetic)) {
+    v[secondaryAesthetic] = clamp(v[secondaryAesthetic] - 0.04);
   }
   for (const tag of tags) {
     if (isAesthetic(tag)) v[tag] = clamp(v[tag] - 0.04);
@@ -137,19 +148,22 @@ export function onUnlike(aesthetic: string, tags: string[] = []): StyleVector {
 }
 
 /** Scan result was viewed for > 2s (passive signal) */
-export function onResultViewed(aesthetics: string[]): StyleVector {
+export function onResultViewed(aesthetics: string[], secondaryAesthetic?: string): StyleVector {
   const v = { ...loadVector() };
   for (const a of aesthetics) {
     if (isAesthetic(a)) v[a] = clamp(v[a] + 0.04);
+  }
+  if (secondaryAesthetic && isAesthetic(secondaryAesthetic)) {
+    v[secondaryAesthetic] = clamp(v[secondaryAesthetic] + 0.02);
   }
   saveVector(v);
   return v;
 }
 
 /** Scan result was explicitly liked/saved */
-export function onResultSaved(aesthetics: string[], tags: string[] = []): StyleVector {
+export function onResultSaved(aesthetics: string[], secondaryAesthetic?: string, tags: string[] = []): StyleVector {
   // Use the first aesthetic as primary for decay purposes
-  return applyBoost(loadVector(), aesthetics[0], [...aesthetics.slice(1), ...tags], +0.12, true);
+  return applyBoost(loadVector(), aesthetics[0], secondaryAesthetic, [...aesthetics.slice(1), ...tags], +0.12, true);
 }
 
 /** Item scrolled past 3 times without interaction — mild negative signal */

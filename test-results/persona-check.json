@@ -1,0 +1,27 @@
+{
+  "persona": {
+    "primary_style_goal": "Earth-toned Japanese Americana / Workwear",
+    "gender": "male",
+    "simulated_wardrobe": 0,
+    "test_image": "test_raw_outfit_1.jpg (olive fatigue jacket, white heavy-tee, relaxed denim)"
+  },
+  "checks": {
+    "tab_1_scan": {
+      "multi_pass_pipeline": true,
+      "structured_visual_facts": true,
+      "primary_secondary_style": true,
+      "color_palette_in_schema": true,
+      "palette_rendered": true
+    },
+    "tab_2_wardrobe": {
+      "has_auto_add_endpoint": true,
+      "has_user_id_column": true,
+      "has_gap_recommendations": true
+    },
+    "tab_3_discovery": {
+      "has_vector_ranking": true,
+      "has_chips": true,
+      "has_taste_memory": true
+    }
+  }
+}

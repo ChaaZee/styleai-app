@@ -1,0 +1,1 @@
+I need to debug the syntax error in results.tsx. Let me read the file around the error lines and check the structure carefully. The error says ',' expected at line 565, column 15 and '}' expected at line 615, column 7. Let me try to understand what's happening by removing the new section temporarily and checking if the file compiles without it.

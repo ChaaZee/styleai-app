@@ -198,6 +198,7 @@ export async function initDB() {
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS subreddit TEXT`;
   await client`ALTER TABLE discover_cards ADD COLUMN IF NOT EXISTS embedding vector(1536)`.catch(() => {});
   await client`ALTER TABLE wardrobe_items ADD COLUMN IF NOT EXISTS embedding vector(1536)`.catch(() => {});
+  await client`ALTER TABLE wardrobe_items ADD COLUMN IF NOT EXISTS user_id TEXT`.catch(() => {});
 
   // Depop search result cache — keyed by query string, TTL 24h (permanent rows never expire)
   await client`
@@ -231,12 +232,12 @@ export async function initDB() {
 
 export interface IStorage {
   createScan(scan: InsertScan): Promise<Scan>;
-  getScans(deviceId?: string): Promise<Scan[]>;
+  getScans(deviceId?: string): Promise<Array<Omit<Scan, 'imageData'>>>;
   getScan(id: number): Promise<Scan | undefined>;
   deleteScan(id: number): Promise<void>;
   createWardrobeItem(item: InsertWardrobeItem): Promise<WardrobeItem>;
-  getWardrobeItems(): Promise<WardrobeItem[]>;
-  deleteWardrobeItem(id: number): Promise<void>;
+  getWardrobeItems(userId?: string): Promise<WardrobeItem[]>;
+  deleteWardrobeItem(id: number, userId?: string): Promise<void>;
   // Discover
   getDiscoverCards(): Promise<DiscoverCard[]>;
   createDiscoverCard(card: InsertDiscoverCard): Promise<DiscoverCard>;
@@ -767,6 +768,7 @@ export const storage: IStorage = {
       id: scans.id,
       deviceId: scans.deviceId,
       aesthetic: scans.aesthetic,
+      secondaryAesthetic: scans.secondaryAesthetic,
       confidence: scans.confidence,
       styleBreakdown: scans.styleBreakdown,
       occasions: scans.occasions,
@@ -792,11 +794,18 @@ export const storage: IStorage = {
     const [row] = await db.insert(wardrobeItems).values(item).returning();
     return row;
   },
-  async getWardrobeItems() {
+  async getWardrobeItems(userId?: string) {
+    if (userId) {
+      return db.select().from(wardrobeItems).where(eq(wardrobeItems.userId, userId)).orderBy(desc(wardrobeItems.id));
+    }
     return db.select().from(wardrobeItems).orderBy(desc(wardrobeItems.id));
   },
-  async deleteWardrobeItem(id) {
-    await db.delete(wardrobeItems).where(eq(wardrobeItems.id, id));
+  async deleteWardrobeItem(id: number, userId?: string) {
+    if (userId) {
+      await db.delete(wardrobeItems).where(and(eq(wardrobeItems.id, id), eq(wardrobeItems.userId, userId)));
+    } else {
+      await db.delete(wardrobeItems).where(eq(wardrobeItems.id, id));
+    }
   },
   async getDiscoverCards() {
     return db.select().from(discoverCards).orderBy(desc(discoverCards.id));

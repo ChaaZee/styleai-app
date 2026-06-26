@@ -1,6 +1,6 @@
 import { useParams, useLocation, useSearch } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, ExternalLink, Loader2 } from "lucide-react";
+import { X, ExternalLink, Loader2, Plus } from "lucide-react";
 import { depopUrl, isDepopAesthetic } from "@/lib/depop";
 import { useState, useEffect, useRef } from "react";
 import type { Scan } from "@shared/schema";
@@ -71,6 +71,14 @@ function iconForProduct(name: string): keyof typeof ClothingIcons {
   if (/shoe|sneaker|boot|heel|loafer|flat|sandal|mule|clog|oxford|trainer|pump/.test(n)) return "shoes";
   if (/bag|tote|purse|clutch|backpack|pouch|wallet|satchel/.test(n)) return "bag";
   return "accessory";
+}
+
+function wardrobeCategoryFromIcon(icon: keyof typeof ClothingIcons): string {
+  const map: Record<string, string> = {
+    shirt: "tops", pants: "bottoms", dress: "bottoms", skirt: "bottoms",
+    jacket: "outerwear", shoes: "shoes", bag: "accessories", accessory: "accessories",
+  };
+  return map[icon] || "accessories";
 }
 
 // ── Outfit piece card with like button ──────────────────────────────────────
@@ -269,7 +277,7 @@ export default function ResultsPage() {
           scan.aesthetic,
           ...styleBreakdown.map((s: any) => s?.label),
         ].filter(Boolean) as string[];
-        onResultViewed(aesthetics);
+        onResultViewed(aesthetics, scan.secondaryAesthetic || undefined);
       } catch (e) {
         console.error("[results] vector signal failed", e);
       }
@@ -415,15 +423,16 @@ export default function ResultsPage() {
         {/* Right: colour palette */}
         <div className="flex-shrink-0">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Palette</p>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-3 flex-wrap">
             {colorPalette.map((hex, i) => (
-              <div key={i} className="flex flex-col items-center gap-1 group">
+              <div key={i} className="flex flex-col items-center gap-1.5">
                 <div
-                  className="w-7 h-7 rounded-full border border-border/60 shadow-sm"
+                  className="w-10 h-10 rounded-full border border-border/60 shadow-sm ring-2 ring-background"
                   style={{ backgroundColor: hex }}
                   data-testid={`color-swatch-${i}`}
+                  title={hex}
                 />
-                <span className="text-[7px] font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200">{hex}</span>
+                <span className="text-[8px] font-mono text-muted-foreground">{hex}</span>
               </div>
             ))}
           </div>
@@ -454,7 +463,7 @@ export default function ResultsPage() {
                   if (!wasLiked) {
                     // Boost local taste vector
                     const secondaryAesthetics = styleBreakdown.slice(1).map(s => s.label);
-                    onResultSaved([scan.aesthetic, ...secondaryAesthetics]);
+                    onResultSaved([scan.aesthetic, ...secondaryAesthetics], scan.secondaryAesthetic || undefined);
                     // Persist to liked_items so it shows in History → Liked
                     const userId = getOrCreateUserId();
                     if (userId) {
@@ -551,6 +560,58 @@ export default function ResultsPage() {
           </div>
         </div>
       )}
+
+      {/* Product recommendations from Gemini analysis with Add to Wardrobe
+      {results.length > 0 && (
+        <div className="px-5 sm:px-8 pb-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="font-label text-[10px] text-foreground tracking-widest">SHOP THE LOOK</p>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">AI Picks</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {results.map((product: any) => (
+              <div key={product.id} className="rounded-xl border border-border bg-card overflow-hidden hover:border-primary/40 transition-colors group relative">
+                <div
+                  className="aspect-[3/4] bg-cover bg-center bg-muted group-hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
+                  style={{ backgroundImage: `url('${product.image || ""}')` }}
+                  onClick={() => window.open(product.url, '_blank', 'noopener,noreferrer')}
+                />
+                <div className="p-2">
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">{product.retailer}</p>
+                  <p className="text-xs font-semibold text-foreground leading-tight mb-0.5 line-clamp-2">{product.name}</p>
+                  <p className="text-xs text-primary font-semibold">${product.price}</p>
+                  <button
+                    onClick={() => {
+                      const userId = getOrCreateUserId();
+                      fetch("/api/wardrobe/auto-add", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          userId,
+                          name: product.name,
+                          category: wardrobeCategoryFromIcon(iconForProduct(product.name)),
+                          brand: product.brand,
+                          aesthetic: scan.aesthetic,
+                          imageUrl: product.image,
+                        }),
+                      }).then(r => {
+                        if (r.ok) {
+                          queryClient.invalidateQueries({ queryKey: ["/api/wardrobe", userId] });
+                        }
+                      }).catch(() => {});
+                    }}
+                    className="mt-1.5 w-full h-7 rounded-lg bg-primary/10 text-primary text-[10px] font-medium flex items-center justify-center gap-1 hover:bg-primary/20 transition-colors"
+                  >
+                    <Plus size={10} />
+                    Add to Wardrobe
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      */}
 
       {/* Depop recommendations */}
       <div className="px-5 sm:px-8 pb-4">
