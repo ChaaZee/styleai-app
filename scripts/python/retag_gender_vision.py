@@ -110,7 +110,8 @@ def classify_gender_vision(client, url):
         return None
     b64, mime = img
 
-    for attempt in range(8):
+    waits = [5, 15, 30, 60]  # 4 retries max — long backoff just stalls the whole run
+    for attempt in range(len(waits) + 1):
         try:
             response = client.models.generate_content(
                 model=MODEL,
@@ -121,7 +122,6 @@ def classify_gender_vision(client, url):
                 config=types.GenerateContentConfig(temperature=0.0, max_output_tokens=8),
             )
             raw = response.text.strip().lower()
-            print(f"  [gemini raw] {response.text.strip()!r}", flush=True)
             if "female" in raw:
                 return "female"
             if "male" in raw:
@@ -129,17 +129,16 @@ def classify_gender_vision(client, url):
             return "both"
         except Exception as e:
             msg = str(e).lower()
-            wait = min(10 * (2 ** attempt), 120)
-            if "timeout" in msg or "timed out" in msg or "deadline" in msg:
-                print(f"  [timeout attempt {attempt+1}/8] retrying in {wait}s", flush=True)
-            elif "503" in msg or "unavailable" in msg or "429" in msg or "resource_exhausted" in msg:
-                print(f"  [rate limit attempt {attempt+1}/8] retrying in {wait}s", flush=True)
-            else:
+            retryable = any(s in msg for s in ("timeout", "timed out", "deadline", "503", "unavailable", "429", "resource_exhausted", "quota"))
+            if not retryable:
                 print(f"  [gemini error] {e}", flush=True)
                 return None
-            time.sleep(wait)
+            if attempt == len(waits):
+                break
+            print(f"  [retry {attempt+1}/{len(waits)}] {msg[:60]} -- waiting {waits[attempt]}s", flush=True)
+            time.sleep(waits[attempt])
 
-    print(f"  [gave up after 8 attempts] {url[:60]}", flush=True)
+    print(f"  [gave up] {url[:60]}", flush=True)
     return None
 
 
@@ -161,20 +160,23 @@ def fetch_rows(cursor, only_both, offset, limit):
 
 # ── PER-LISTING WORKER ────────────────────────────────────────────────────────
 def process_listing(args):
+    """Returns (listing, new_gender, ok). ok=False means classification failed
+    (no image, hard error, or quota) — the listing stays unmarked so a rerun
+    retries it."""
     listing, client = args
     old_gender = listing.get("_gender", "both")
     url = listing.get("image") or listing.get("imageUrl") or ""
     if not url:
-        return listing, old_gender
+        return listing, old_gender, False
 
     new_gender = classify_gender_vision(client, url)
     if new_gender is None:
-        return listing, old_gender
+        return listing, old_gender, False
 
     title = listing.get("title") or listing.get("name") or "(no title)"
     marker = "CHANGED" if new_gender != old_gender else "same"
-    print(f"  [{marker}] {old_gender} -> {new_gender}  |  {title[:70]}")
-    return listing, new_gender
+    print(f"  [{marker}] {old_gender} -> {new_gender}  |  {title[:70]}", flush=True)
+    return listing, new_gender, True
 
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
@@ -207,13 +209,14 @@ def main():
     total_checked = 0
     total_changed = 0
     offset        = 0
+    consecutive_failures = 0
 
     while offset < total_rows:
         rows = fetch_rows(cur, only_both, offset, BATCH_SIZE)
         if not rows:
             break
 
-        for query, listings_raw in rows:
+        for row_i, (query, listings_raw) in enumerate(rows):
             try:
                 listings = json.loads(listings_raw) if isinstance(listings_raw, str) else listings_raw
             except Exception:
@@ -221,37 +224,65 @@ def main():
             if not isinstance(listings, list) or not listings:
                 continue
 
-            print(f"\n[row {offset + 1}/{total_rows}] {query!r} ({len(listings)} listings)")
+            # Copy listings; skip ones already vision-checked (_vc) so reruns resume for free
+            results = [dict(l) if isinstance(l, dict) else l for l in listings]
+            pending = [i for i, l in enumerate(results)
+                       if isinstance(l, dict) and not l.get("_vc")
+                       and (l.get("image") or l.get("imageUrl"))]
 
-            work = [(l, client) for l in listings]
-            results_ordered = [None] * len(work)
-            row_changed = 0
+            row_num = offset + row_i + 1
+            if not pending:
+                print(f"[row {row_num}/{total_rows}] {query!r} -- all {len(results)} already checked, skipping", flush=True)
+                continue
+            print(f"\n[row {row_num}/{total_rows}] {query!r} ({len(pending)}/{len(results)} to check)", flush=True)
 
-            with ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
-                futures = {pool.submit(process_listing, w): i for i, w in enumerate(work)}
-                for future in as_completed(futures):
-                    idx = futures[future]
-                    listing, new_gender = future.result()
-                    old_gender = listing.get("_gender", "both")
-                    if new_gender != old_gender:
-                        row_changed += 1
-                        total_changed += 1
-                        listing = dict(listing)
-                        listing["_gender"] = new_gender
-                    results_ordered[idx] = listing
-
-            total_checked += len(listings)
-
-            if not dry_run and row_changed > 0:
+            def flush_row():
+                """Partial save — big rows (some have 9k+ listings) commit as they go."""
                 cur.execute(
                     "UPDATE depop_cache SET listings = %s::jsonb WHERE query = %s",
-                    (json.dumps(results_ordered), query),
+                    (json.dumps(results), query),
                 )
                 conn.commit()
 
+            row_changed = 0
+            done_count = 0
+            pool = ThreadPoolExecutor(max_workers=CONCURRENCY)
+            futures = {pool.submit(process_listing, (results[i], client)): i for i in pending}
+            for future in as_completed(futures):
+                idx = futures[future]
+                listing, new_gender, ok = future.result()
+                if ok:
+                    consecutive_failures = 0
+                    listing["_vc"] = 1  # mark checked — reruns skip it
+                    if new_gender != listing.get("_gender", "both"):
+                        row_changed += 1
+                        total_changed += 1
+                        listing["_gender"] = new_gender
+                else:
+                    consecutive_failures += 1
+                results[idx] = listing
+                done_count += 1
+                total_checked += 1
+                if not dry_run and done_count % 150 == 0:
+                    flush_row()
+                    print(f"  -- partial save: {done_count}/{len(pending)} in this row | {total_changed} changed total --", flush=True)
+                if consecutive_failures >= 20:
+                    print("\n!! 20 consecutive failures -- likely daily API quota exhausted.", flush=True)
+                    print("!! Progress saved. Re-run the same command later to resume.", flush=True)
+                    pool.shutdown(wait=False, cancel_futures=True)
+                    if not dry_run:
+                        flush_row()
+                    cur.close()
+                    conn.close()
+                    sys.exit(2)
+            pool.shutdown(wait=True)
+
+            if not dry_run:
+                flush_row()
+
         offset += len(rows)
         pct = min(100, round(offset / total_rows * 100))
-        print(f"\n  -- Progress: {offset}/{total_rows} rows ({pct}%) | {total_changed} tags changed --")
+        print(f"\n  -- Progress: {offset}/{total_rows} rows ({pct}%) | {total_changed} tags changed --", flush=True)
 
     cur.close()
     conn.close()
