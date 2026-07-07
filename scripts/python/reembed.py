@@ -35,7 +35,7 @@ import psycopg2.extras
 from openai import OpenAI
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-DB_URL      = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
+DB_URL      = (__import__("os").getenv("DATABASE_URL") or [l.split("=",1)[1].strip().strip('"') for l in open(".env") if l.startswith("DATABASE_URL=")][0])
 OPENAI_KEY  = os.environ.get("OPENAI_API_KEY", "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")
 CONCURRENCY = 8     # how many embeddings to generate in parallel
 BATCH_SIZE  = 50    # how many rows to process before printing progress

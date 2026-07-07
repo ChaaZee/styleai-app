@@ -47,8 +47,8 @@ export default function HowItWorksPage() {
         <p className="text-sm text-muted-foreground leading-relaxed pl-11">
           You receive two sets of product recommendations: <strong className="text-foreground">Get the Look</strong> — exact
           pieces that replicate what's in the outfit — and <strong className="text-foreground">Complete the Look</strong> — stylist-curated
-          additions that complement the aesthetic. Every recommendation links directly to a product on Amazon
-          so you can shop immediately.
+          additions that complement the aesthetic. Recommendations come from secondhand marketplaces
+          like Depop, plus ASOS and other curated shops, so you can find similar pieces without paying full retail.
         </p>
       </div>
 
@@ -91,19 +91,19 @@ export default function HowItWorksPage() {
         </div>
       </div>
 
-      {/* Amazon shop CTA */}
+      {/* Affiliate shop CTA */}
       <div className="rounded-xl border border-border bg-card p-5 mb-4">
-        <h2 className="text-base font-semibold text-foreground mb-1">Shop fashion on Amazon</h2>
+        <h2 className="text-base font-semibold text-foreground mb-1">Shop our curated picks</h2>
         <p className="text-sm text-muted-foreground mb-3">
-          Browse thousands of clothing, shoes, and accessories on Amazon — all available with fast shipping.
+          Browse hand-picked clothing, shoes, and accessories that match the aesthetics Stitch recognises.
         </p>
         <a
-          href="https://www.amazon.com/s?k=fashion+clothing&tag=styleaiapp-20"
+          href="https://sovrn.co/ccalx03"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
         >
-          Shop Fashion on Amazon
+          Shop Curated Picks
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
             <polyline points="15 3 21 3 21 9"/>
@@ -113,7 +113,7 @@ export default function HowItWorksPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Stitch is an Amazon Associates participant. We earn a small commission on qualifying purchases at no extra cost to you.
+        Stitch participates in affiliate programs and may earn a small commission on qualifying purchases at no extra cost to you.
       </p>
     </div>
   );

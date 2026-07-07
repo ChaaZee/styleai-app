@@ -5,7 +5,7 @@
  */
 import postgres from "postgres";
 
-const DATABASE_URL = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres";
+const DATABASE_URL = process.env.DATABASE_URL;
 const client = postgres(DATABASE_URL, { ssl: { rejectUnauthorized: false }, max: 12, prepare: false });
 
 // Only explicit gender words in the title — no brands, no garment types.

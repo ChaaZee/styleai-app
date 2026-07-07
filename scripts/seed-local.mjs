@@ -16,7 +16,7 @@
 
 import postgres from "postgres";
 
-const DB_URL = process.env.DATABASE_URL || "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres";
+const DB_URL = process.env.DATABASE_URL || process.env.DATABASE_URL;
 const COOKIE = process.env.DEPOP_COOKIE;
 const DEVICE_ID = process.env.DEPOP_DEVICE_ID || "89954962-57bb-4300-bef7-91339e5f8281";
 const SESSION_ID = process.env.DEPOP_SESSION_ID || "7262fa1b-fdd7-43d4-adc5-222dacd93f5e";

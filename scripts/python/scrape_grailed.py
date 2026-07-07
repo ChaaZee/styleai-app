@@ -40,7 +40,7 @@ COOKIE = ""  # <-- paste here
 
 
 # ── DATABASE ──────────────────────────────────────────────────────────────────
-DB_URL = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
+DB_URL = (__import__("os").getenv("DATABASE_URL") or [l.split("=",1)[1].strip().strip('"') for l in open(".env") if l.startswith("DATABASE_URL=")][0])
 
 
 # ── SEARCH QUERIES ────────────────────────────────────────────────────────────

@@ -91,7 +91,7 @@ function TopBar({ theme, toggleTheme }: { theme: string; toggleTheme: () => void
                 </Link>
                 <div className="border-t border-border"/>
                 <a
-                  href="https://www.amazon.com/s?k=fashion+clothing&tag=styleaiapp-20"
+                  href="https://sovrn.co/ccalx03"
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setMenuOpen(false)}
@@ -102,7 +102,7 @@ function TopBar({ theme, toggleTheme }: { theme: string; toggleTheme: () => void
                     <circle cx="20" cy="21" r="1"/>
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
                   </svg>
-                  <span className="text-sm font-medium text-foreground">Shop on Amazon</span>
+                  <span className="text-sm font-medium text-foreground">Shop Our Picks</span>
                 </a>
                 <div className="border-t border-border"/>
                 <Link href="/profile" onClick={() => setMenuOpen(false)}>

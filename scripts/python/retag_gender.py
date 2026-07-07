@@ -32,7 +32,7 @@ import psycopg2.extras
 from concurrent.futures import ThreadPoolExecutor
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-DB_URL      = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
+DB_URL      = (__import__("os").getenv("DATABASE_URL") or [l.split("=",1)[1].strip().strip('"') for l in open(".env") if l.startswith("DATABASE_URL=")][0])
 CONCURRENCY = 10   # how many rows to process at once
 BATCH_SIZE  = 100  # how many rows to fetch from DB at a time
 

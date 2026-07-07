@@ -34,7 +34,7 @@ export default function HistoryPage() {
       (old || []).filter(s => s.id !== scanId)
     );
     try {
-      await fetch(`/api/scans/${scanId}`, { method: "DELETE" });
+      await fetch(`/api/scans/${scanId}`, { method: "DELETE", headers: { "x-device-id": deviceId } });
     } catch {
       queryClient.invalidateQueries({ queryKey: ["/api/scans", deviceId] });
     } finally {

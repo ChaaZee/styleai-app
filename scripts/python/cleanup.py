@@ -49,7 +49,7 @@ from urllib.parse import urlparse
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 DB_URL      = os.environ.get(
     "DATABASE_URL",
-    "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres",
+    (__import__("os").getenv("DATABASE_URL") or [l.split("=",1)[1].strip().strip('"') for l in open(".env") if l.startswith("DATABASE_URL=")][0]),
 )
 DRY_RUN     = "--delete" not in sys.argv   # safe by default
 CONCURRENCY = 8     # parallel URL checks per batch

@@ -26,7 +26,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 // Pulls in DB helpers from storage.ts — analogous to importing a Python
 // service module (e.g. `from storage import get_user, set_cache, ...`).
-import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, recomputeTasteClusters, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, upsertScannedPieces, getScannedPieces, tagListingGender, genderPassesFilter as listingGenderOk, verifyUserOwnership, isJunkListing } from "./storage";
+import { storage, initDB, getDepopCache, getDepopCacheSince, setDepopCache, getDepopCacheByAesthetic, getDepopCacheByType, getDepopCacheByEmbedding, getUserProfile, upsertUserProfile, appendLikedItem, getLikedItems, removeLikedItem, getForYouRecommendations, recomputeTasteClusters, getAverageEmbeddingForAesthetics, getEmbedding, getDiscoverCardsByTaste, getShopTheLookItems, getWardrobeGapRecommendations, getSimilarDiscoverCards, embedDiscoverCard, FEMALE_ONLY_AESTHETICS, remapAestheticForGender, toCacheAesthetic, upsertScannedPieces, getScannedPieces, tagListingGender, genderPassesFilter as listingGenderOk, verifyUserOwnership, isJunkListing } from "./storage";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai"; // Gemini client (like `google.generativeai` in Python)
 import multer from "multer";           // Multipart/form-data parser (Python equivalent: Werkzeug's `request.files` or FastAPI's `UploadFile`)
 import rateLimit from "express-rate-limit"; // Per-IP throttling middleware (Python equivalent: `flask-limiter`)
@@ -522,11 +522,11 @@ async function fetchDepopListings(
   }
 }
 
-// Generates an Amazon affiliate search URL for a product.
-// We earn a small commission when users buy through `tag=styleaiapp-20`.
-function amazonUrl(productName: string, brand: string): string {
-  const query = encodeURIComponent(`${brand} ${productName}`);
-  return `https://www.amazon.com/s?k=${query}&tag=styleaiapp-20`;
+// Depop search URL for a Gemini-recommended product. Product rules: only
+// Depop/ASOS/Pacsun/Shopify — never Amazon or eBay.
+function depopSearchUrl(productName: string, brand: string): string {
+  const query = encodeURIComponent(`${brand} ${productName}`.trim());
+  return `https://www.depop.com/search/?q=${query}`;
 }
 
 // Legacy MVP product catalog — removed (contained Amazon URLs which violate product rules).
@@ -2523,8 +2523,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           price: rec.price,
           image: buildImageKeywords(rec.name),
           match: Math.max(75, 97 - i * 4),
-          retailer: "Amazon",
-          url: amazonUrl(rec.name, rec.brand),
+          retailer: "Depop",
+          url: depopSearchUrl(rec.name, rec.brand),
           reason: rec.reason,
           type,
         }));
@@ -2541,8 +2541,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         price: rec.price,
         image: buildImageKeywords(rec.name),
         match: Math.max(75, 97 - i * 4),
-        retailer: "Amazon",
-        url: amazonUrl(rec.name, rec.brand),
+        retailer: "Depop",
+        url: depopSearchUrl(rec.name, rec.brand),
         reason: rec.reason,
         type: "outfit",
       }));
@@ -2597,7 +2597,9 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       // res.json() has already returned to the client. Equivalent to
       // `asyncio.create_task(...)` in Python.
       if (garmentDepopQueries.length) {
-        const aesthetic = analysis.aesthetic;
+        // Translate the 41-taxonomy analysis label to a cached aesthetic —
+        // cache rows only use 16 labels, so an unmapped lookup returns nothing.
+        const aesthetic = toCacheAesthetic(analysis.aesthetic);
         const queries = garmentDepopQueries.slice(0, 4);
         (async () => {
           let served = 0;
@@ -2656,6 +2658,13 @@ export async function registerRoutes(httpServer: Server, app: Express) {
    */
   app.delete("/api/scans/:id", async (req, res) => {
     try {
+      const scan = await storage.getScan(Number(req.params.id));
+      if (!scan) return res.status(404).json({ error: "Scan not found" });
+      // Ownership: a scan bound to a device can only be deleted by that device
+      const deviceId = req.headers["x-device-id"] as string | undefined;
+      if (scan.deviceId && scan.deviceId !== deviceId) {
+        return res.status(403).json({ error: "device mismatch" });
+      }
       await storage.deleteScan(Number(req.params.id));
       res.json({ success: true });
     } catch (e: any) {
@@ -2794,26 +2803,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       if (!rawAesthetic || !piecesRaw) {
         return res.status(400).json({ error: "Missing aesthetic or pieces" });
       }
-      // Normalize Gemini variant labels → cached aesthetic (e.g. "E-Girl / Alt" → "E-Girl")
-      const CACHED_AESTHETICS = ["Boho","Coastal Grandmother","Coquette","Cottagecore","Dark Academia","E-Girl","Grunge","Minimalist","Old Money","Preppy","Skater","Soft Girl","Streetwear","Techwear","Vintage","Y2K"];
-      const AESTHETIC_FALLBACK: Record<string, string> = {
-        "Clean Fit": "Minimalist", "Skatecore": "Skater", "Quiet Luxury": "Old Money",
-        "Classic": "Old Money", "Casual": "Minimalist", "Normcore": "Minimalist",
-        "Business Casual": "Old Money", "Rave": "E-Girl", "Retro-Futurism": "Techwear",
-        "Glam": "Coquette", "Party": "Coquette", "Indie": "Vintage",
-        "Dark Feminine": "Coquette", "Mob Wife": "Old Money", "Biker": "Grunge",
-        "Punk": "Grunge", "Academia": "Dark Academia", "Light Academia": "Cottagecore",
-        "Barbiecore": "Coquette", "Balletcore": "Soft Girl", "Coastal": "Coastal Grandmother",
-        "Beach": "Boho", "Western": "Boho", "Grunge / Punk": "Grunge",
-        "E-Girl / Alt": "E-Girl", "Athleisure": "Streetwear", "Sporty": "Streetwear",
-        "Hip Hop": "Streetwear", "Tomboy": "Skater", "Androgynous": "Minimalist",
-        "Smart Casual": "Minimalist", "Workwear": "Old Money", "Dark Romantic": "Coquette",
-        "Fairycore": "Cottagecore", "Ethereal": "Soft Girl", "Kawaii": "Soft Girl",
-        "Avant Garde": "Techwear",
-      };
-      const aesthetic = CACHED_AESTHETICS.includes(rawAesthetic)
-        ? rawAesthetic
-        : (AESTHETIC_FALLBACK[rawAesthetic] ?? "Minimalist");
+      // Normalize Gemini variant labels → cached aesthetic via the shared map
+      const aesthetic = toCacheAesthetic(rawAesthetic);
       const keyPieces = piecesRaw.split(",").map((p: string) => p.trim()).filter(Boolean);
       const results = await getShopTheLookItems(aesthetic, keyPieces, 3);
       res.json(results);
@@ -3052,8 +3043,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
       if (queriesNeedingFallback.length > 0) {
         console.log(`[depop] Apify unavailable for ${queriesNeedingFallback.length} queries — using aesthetic cache fallback for "${aesthetic}"`);
-        // Pull a generous pool from the aesthetic permanent cache
-        const pool = await getDepopCacheByAesthetic(aesthetic, 150);
+        // Pull a generous pool from the aesthetic permanent cache (map to a cached label first)
+        const pool = await getDepopCacheByAesthetic(toCacheAesthetic(aesthetic), 150);
         if (pool.length > 0) {
           const fallbackGroups = queriesNeedingFallback.map(q => {
             const piece = q.includes(" ") ? q.split(" ").slice(1).join(" ") : q;
@@ -3273,59 +3264,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const scanId = parseInt(req.params.scanId, 10);
     if (isNaN(scanId)) return res.status(400).json({ error: "Invalid scanId" });
 
-    // Map aesthetics Gemini may return → nearest cached aesthetic label
-    const AESTHETIC_FALLBACK: Record<string, string> = {
-      "Clean Fit":        "Minimalist",
-      "Skatecore":        "Skater",
-      "Quiet Luxury":     "Old Money",
-      "Classic":          "Old Money",
-      "Casual":           "Minimalist",
-      "Normcore":         "Minimalist",
-      "Business Casual":  "Old Money",
-      "Rave":             "E-Girl",
-      "Retro-Futurism":   "Techwear",
-      "Glam":             "Coquette",
-      "Party":            "Coquette",
-      "Indie":            "Vintage",
-      "Dark Feminine":    "Coquette",
-      "Mob Wife":         "Old Money",
-      "Biker":            "Grunge",
-      "Punk":             "Grunge",
-      "Academia":         "Dark Academia",
-      "Light Academia":   "Cottagecore",
-      "Barbiecore":       "Coquette",
-      "Balletcore":       "Soft Girl",
-      "Coastal":          "Coastal Grandmother",
-      "Beach":            "Boho",
-      "Western":          "Boho",
-      // Compound/variant labels Gemini sometimes returns
-      "Grunge / Punk":    "Grunge",
-      "E-Girl / Alt":     "E-Girl",
-      // Additional taxonomy aesthetics
-      "Athleisure":       "Streetwear",
-      "Sporty":           "Streetwear",
-      "Hip Hop":          "Streetwear",
-      "Tomboy":           "Skater",
-      "Androgynous":      "Minimalist",
-      "Smart Casual":     "Minimalist",
-      "Workwear":         "Old Money",
-      "Dark Romantic":    "Coquette",
-      "Fairycore":        "Cottagecore",
-      "Ethereal":         "Soft Girl",
-      "Kawaii":           "Soft Girl",
-      "Avant Garde":      "Techwear",
-    };
-
     try {
       const scan = await storage.getScan(scanId);
       if (!scan) return res.status(404).json({ error: "Scan not found" });
 
-      const rawAesthetic = scan.aesthetic || "";
-      // Resolve to a cached aesthetic — exact match first, then fallback map, then Minimalist
-      const CACHED_AESTHETICS = ["Boho","Coastal Grandmother","Coquette","Cottagecore","Dark Academia","E-Girl","Grunge","Minimalist","Old Money","Preppy","Skater","Soft Girl","Streetwear","Techwear","Vintage","Y2K"];
-      const aesthetic = CACHED_AESTHETICS.includes(rawAesthetic)
-        ? rawAesthetic
-        : (AESTHETIC_FALLBACK[rawAesthetic] ?? "Minimalist");
+      // Resolve to a cached aesthetic via the shared 41→16 taxonomy map
+      const aesthetic = toCacheAesthetic(scan.aesthetic || "");
 
       const rawQ = scan.depopQueries || "[]";
       // Support both old format (string[]) and new format ({query,garmentType}[])

@@ -6,7 +6,7 @@
 
 import postgres from "postgres";
 
-const DATABASE_URL = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres";
+const DATABASE_URL = process.env.DATABASE_URL;
 
 // ── Replicated signal regexes (must match storage.ts exactly) ────────────────
 const FEMALE_TITLE_SIGNALS = /\b(women|womens|woman|ladies|lady|girls?|female|feminine|womenswear|dress|dresses|skirt|skirts|blouse|bra|corset|midi|maxi|sundress|miniskirt|bodycon|camisole|romper|jumpsuit|floral|petite|heels?|stiletto|pumps?|ballet flat|wedge|kitten heel|crop top|halter|tube top|bustier|slip dress|wrap dress|pinafore|smock|prairie|lace top|ruffle|bow top|cardigan set|matching set|co-ord|kickpleat|kick pleat|peplum|spaghetti strap|off shoulder|one shoulder|asymmetric hem|babydoll|broderie|chiffon blouse|silk slip|lingerie|cami|nightgown|bikini|swimsuit|one-piece|sarong|palazzo|culottes|girlie|bardot|milkmaid|bralette|bodysuit|flowy|ditsy|smocked|tiered skirt|balloon sleeve|puff sleeve|frill|flutter sleeve|a-line|wrap skirt|mini dress|maxi dress|midi dress|shirt dress|tea dress|gown|ballgown|prom dress|bridesmaid|floaty|empire waist|sweetheart neck|scoop back|keyhole|lace dress|floral dress|slip skirt|denim skirt|pleated skirt|tennis skirt|plisse|shirred|smocking|eyelet|broderie anglaise|feminine dress|boho dress|summer dress|floral skirt)\b/i;

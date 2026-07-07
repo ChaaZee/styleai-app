@@ -1114,6 +1114,9 @@ export async function getLikedItems(userId: string): Promise<any[]> {
 export const FEMALE_ONLY_AESTHETICS = new Set([
   "Coquette", "Soft Girl", "Cottagecore", "Coastal Grandmother", "E-Girl",
   "Clean Girl", "Balletcore", "Romantic", "Fairycore",
+  // Compound labels from the 41-aesthetic analysis taxonomy — same aesthetics,
+  // different spellings. Without these the gender block silently misses.
+  "Soft Girl / Kawaii", "E-Girl / Alt",
 ]);
 // Remap: if Gemini returns a female-only aesthetic for a male user, use this
 // instead. Picked by hand for "closest masculine equivalent" — e.g. Clean
@@ -1136,6 +1139,71 @@ export const MALE_AESTHETIC_REMAP: Record<string, string> = {
 export function remapAestheticForGender(aesthetic: string, gender: string): string {
   if (gender !== "male") return aesthetic;
   return MALE_AESTHETIC_REMAP[aesthetic] ?? aesthetic;
+}
+
+// ── Analysis aesthetic → cache aesthetic mapping ─────────────────────────────
+// Gemini classifies outfits into a 41-label taxonomy, but depop_cache rows are
+// tagged with only 16 aesthetics. Every cache lookup must translate through
+// this map or most analysis labels silently return zero products.
+export const CACHE_AESTHETICS = [
+  "Boho", "Coastal Grandmother", "Coquette", "Cottagecore", "Dark Academia",
+  "E-Girl", "Grunge", "Minimalist", "Old Money", "Preppy", "Skater",
+  "Soft Girl", "Streetwear", "Techwear", "Vintage", "Y2K",
+];
+
+const ANALYSIS_TO_CACHE: Record<string, string> = {
+  // 41-aesthetic analysis taxonomy → nearest cached aesthetic
+  "Quiet Luxury":           "Old Money",
+  "Clean Fit":              "Minimalist",
+  "Classic / Timeless":     "Old Money",
+  "Soft Girl / Kawaii":     "Soft Girl",
+  "Pink Pilates / Wellness": "Soft Girl",
+  "Dark Feminine":          "Coquette",
+  "Old School Preppy":      "Preppy",
+  "Modern Preppy":          "Preppy",
+  "Hypebeast":              "Streetwear",
+  "Skatecore":              "Skater",
+  "Baddie":                 "Streetwear",
+  "Fairycore":              "Cottagecore",
+  "Gorpcore":               "Techwear",
+  "90s Grunge":             "Grunge",
+  "70s-80s Retro":          "Vintage",
+  "Vintage / Thrift":       "Vintage",
+  "Maximalist":             "Boho",
+  "Glam / Party":           "Coquette",
+  "Rave":                   "E-Girl",
+  "E-Girl / Alt":           "E-Girl",
+  "Office Siren":           "Old Money",
+  "Occasion Wear":          "Old Money",
+  "Athleisure":             "Streetwear",
+  "Blokecore":              "Streetwear",
+  "Blokette":               "Coquette",
+  "Goth":                   "Grunge",
+  "Grunge / Punk":          "Grunge",
+  "Bohemian":               "Boho",
+  "Western / Americana":    "Boho",
+  "K-Fashion":              "Streetwear",
+  "Retro-Futurism":         "Techwear",
+  "Historical Romanticism": "Coquette",
+  "Indie Sleaze":           "Vintage",
+  "Light Academia":         "Cottagecore",
+  "Granola Girl":           "Boho",
+  // Legacy / variant labels Gemini has returned historically
+  "Classic": "Old Money", "Casual": "Minimalist", "Normcore": "Minimalist",
+  "Business Casual": "Old Money", "Glam": "Coquette", "Party": "Coquette",
+  "Indie": "Vintage", "Mob Wife": "Old Money", "Biker": "Grunge",
+  "Punk": "Grunge", "Academia": "Dark Academia", "Barbiecore": "Coquette",
+  "Balletcore": "Soft Girl", "Coastal": "Coastal Grandmother", "Beach": "Boho",
+  "Western": "Boho", "Sporty": "Streetwear", "Hip Hop": "Streetwear",
+  "Tomboy": "Skater", "Androgynous": "Minimalist", "Smart Casual": "Minimalist",
+  "Workwear": "Old Money", "Dark Romantic": "Coquette", "Ethereal": "Soft Girl",
+  "Kawaii": "Soft Girl", "Avant Garde": "Techwear",
+};
+
+/** Translate any analysis-taxonomy label to one of the 16 cached aesthetics. */
+export function toCacheAesthetic(aesthetic: string): string {
+  if (CACHE_AESTHETICS.includes(aesthetic)) return aesthetic;
+  return ANALYSIS_TO_CACHE[aesthetic] ?? "Minimalist";
 }
 
 // Gender detection: only look at explicit gender words in the title.
@@ -1181,12 +1249,13 @@ function listingText(listing: any): string {
 export function tagListingGender(listing: any): any {
   const text = listingText(listing);
   // Only use explicit gender words in the title — no brands, no garment types.
-  // If the title says "women" or "men", tag it. Otherwise both.
+  // If the title says "women" or "men", tag it. Otherwise keep any existing
+  // tag (vision-based retagging may have classified the photo) or "both".
   const hasFem  = EXPLICIT_FEMALE.test(text);
   const hasMasc = EXPLICIT_MALE.test(text);
   if (hasFem && !hasMasc)       listing._gender = "female";
   else if (hasMasc && !hasFem)  listing._gender = "male";
-  else                          listing._gender = "both";  // ambiguous or neutral
+  else if (!listing._gender)    listing._gender = "both";  // ambiguous — don't clobber vision tags
   return listing;
 }
 
@@ -1199,6 +1268,13 @@ export function tagListingGender(listing: any): any {
 //   - no gender word at all → neutral, allow everyone.
 export function genderPassesFilter(listing: any, gender: string): boolean {
   if (gender === "both") return true;
+  // Respect the stored _gender tag first — vision-based retagging classifies
+  // the product PHOTO, which catches gendered items whose titles are neutral
+  // (e.g. "vintage denim jacket" that clearly reads women's from the image).
+  if (listing && typeof listing === "object" && listing._gender) {
+    if (listing._gender === "both") return true;
+    return listing._gender === gender;
+  }
   const text = typeof listing === "string" ? listing : listingText(listing);
   // Only explicit gender words decide — no brands, no garment types.
   const hasFem  = EXPLICIT_FEMALE.test(text);

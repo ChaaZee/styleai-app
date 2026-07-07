@@ -10,7 +10,7 @@
 
 import postgres from "postgres";
 
-const DB_URL = process.env.DATABASE_URL || "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres";
+const DB_URL = process.env.DATABASE_URL || process.env.DATABASE_URL;
 const DRY_RUN = !process.argv.includes("--delete");
 const CONCURRENCY = 8;
 const DELAY_MS = 150;

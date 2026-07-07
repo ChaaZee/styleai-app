@@ -11,7 +11,7 @@
 import postgres from "postgres";
 import OpenAI from "openai";
 
-const DATABASE_URL = "postgresql://postgres.cdjuosvljudidvyxdfwn:RJkU3AvtaV2BuBGy@aws-1-us-east-1.pooler.supabase.com:5432/postgres";
+const DATABASE_URL = process.env.DATABASE_URL;
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "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";
 
 const openai = new OpenAI({ apiKey: OPENAI_KEY });
