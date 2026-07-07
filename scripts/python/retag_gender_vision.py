@@ -58,7 +58,7 @@ if not DB_URL:
 GEMINI_KEY    = os.getenv("GEMINI_API_KEY", "")
 MODEL         = "gemini-2.5-flash-lite"
 BATCH_SIZE    = 50
-CONCURRENCY   = 3
+CONCURRENCY   = 8  # paid-tier key — flash-lite allows far more; 503s are absorbed by retries
 IMG_TIMEOUT   = 8
 MAX_IMG_BYTES = 4 * 1024 * 1024  # 4 MB inline limit
 
