@@ -83,8 +83,9 @@ def init_client():
     if not key:
         print("ERROR: GEMINI_API_KEY not set. Export it or add to .env")
         sys.exit(1)
-    # http_options timeout (seconds) closes hung connections instead of hanging forever
-    return genai.Client(api_key=key, http_options={"timeout": 120})
+    # http_options timeout is in MILLISECONDS in the google-genai SDK.
+    # 120 (ms) made every request fail instantly with "deadline too short".
+    return genai.Client(api_key=key, http_options={"timeout": 120_000})
 
 
 def fetch_image_b64(url):
