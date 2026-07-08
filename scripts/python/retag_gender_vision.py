@@ -28,8 +28,10 @@ import base64
 import json
 import os
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 
 import psycopg2
 import psycopg2.extras
@@ -88,8 +90,20 @@ def init_client():
     return genai.Client(api_key=key, http_options={"timeout": 120_000})
 
 
+# Domains that tar-pit scripted downloads (e.g. images.asos-media.com hangs
+# every request until timeout — Akamai bot protection). After N consecutive
+# timeouts a domain is blocklisted for the rest of the run so we don't burn
+# 8s per listing on thousands of unfetchable images.
+_domain_fails = {}
+_domain_lock = threading.Lock()
+DOMAIN_FAIL_LIMIT = 8
+
 def fetch_image_b64(url):
     """Download image, return (base64_str, mime_type) or None."""
+    domain = urlparse(url).netloc
+    with _domain_lock:
+        if _domain_fails.get(domain, 0) >= DOMAIN_FAIL_LIMIT:
+            return None
     try:
         r = requests.get(url, timeout=IMG_TIMEOUT, headers={"User-Agent": "Mozilla/5.0"})
         if r.status_code != 200:
@@ -98,16 +112,24 @@ def fetch_image_b64(url):
         data = r.content
         if len(data) > MAX_IMG_BYTES:
             return None
+        with _domain_lock:
+            _domain_fails[domain] = 0
         return base64.b64encode(data).decode(), mime
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+        # Only network-level failures count toward the blocklist — a 404 on a
+        # dead listing is per-URL, but consistent timeouts are per-domain.
+        with _domain_lock:
+            _domain_fails[domain] = _domain_fails.get(domain, 0) + 1
+            if _domain_fails[domain] == DOMAIN_FAIL_LIMIT:
+                print(f"  [domain blocked] {domain} -- {DOMAIN_FAIL_LIMIT} consecutive timeouts, skipping its images from now on", flush=True)
+        return None
     except Exception:
         return None
 
 
-def classify_gender_vision(client, url):
-    """Ask Gemini to visually classify garment gender. Returns 'male'/'female'/'both'/None."""
-    img = fetch_image_b64(url)
-    if img is None:
-        return None
+def classify_gender_vision(client, img):
+    """Ask Gemini to visually classify garment gender from a pre-fetched image.
+    Takes (base64_str, mime_type). Returns 'male'/'female'/'both'/None."""
     b64, mime = img
 
     waits = [5, 15, 30, 60]  # 4 retries max — long backoff just stalls the whole run
@@ -138,7 +160,7 @@ def classify_gender_vision(client, url):
             print(f"  [retry {attempt+1}/{len(waits)}] {msg[:60]} -- waiting {waits[attempt]}s", flush=True)
             time.sleep(waits[attempt])
 
-    print(f"  [gave up] {url[:60]}", flush=True)
+    print("  [gave up] api error persisted through retries", flush=True)
     return None
 
 
@@ -160,23 +182,28 @@ def fetch_rows(cursor, only_both, offset, limit):
 
 # ── PER-LISTING WORKER ────────────────────────────────────────────────────────
 def process_listing(args):
-    """Returns (listing, new_gender, ok). ok=False means classification failed
-    (no image, hard error, or quota) — the listing stays unmarked so a rerun
-    retries it."""
+    """Returns (listing, new_gender, status).
+    status: "ok"       — classified successfully
+            "img_fail" — image missing/unfetchable; keep existing tag, mark done
+            "api_fail" — Gemini failed; leave unmarked so a rerun retries it"""
     listing, client = args
     old_gender = listing.get("_gender", "both")
     url = listing.get("image") or listing.get("imageUrl") or ""
     if not url:
-        return listing, old_gender, False
+        return listing, old_gender, "img_fail"
 
-    new_gender = classify_gender_vision(client, url)
+    img = fetch_image_b64(url)
+    if img is None:
+        return listing, old_gender, "img_fail"
+
+    new_gender = classify_gender_vision(client, img)
     if new_gender is None:
-        return listing, old_gender, False
+        return listing, old_gender, "api_fail"
 
     title = listing.get("title") or listing.get("name") or "(no title)"
     marker = "CHANGED" if new_gender != old_gender else "same"
     print(f"  [{marker}] {old_gender} -> {new_gender}  |  {title[:70]}", flush=True)
-    return listing, new_gender, True
+    return listing, new_gender, "ok"
 
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
@@ -250,15 +277,20 @@ def main():
             futures = {pool.submit(process_listing, (results[i], client)): i for i in pending}
             for future in as_completed(futures):
                 idx = futures[future]
-                listing, new_gender, ok = future.result()
-                if ok:
+                listing, new_gender, status = future.result()
+                if status == "ok":
                     consecutive_failures = 0
                     listing["_vc"] = 1  # mark checked — reruns skip it
                     if new_gender != listing.get("_gender", "both"):
                         row_changed += 1
                         total_changed += 1
                         listing["_gender"] = new_gender
-                else:
+                elif status == "img_fail":
+                    # Image gone or CDN blocks scripts (ASOS) — keep the existing
+                    # tag (ASOS rows are gender-correct from their scrape query)
+                    # and mark done so reruns don't retry the dead download.
+                    listing["_vc"] = "noimg"
+                else:  # api_fail — the only signal that the API/quota is down
                     consecutive_failures += 1
                 results[idx] = listing
                 done_count += 1
