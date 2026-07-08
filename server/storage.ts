@@ -103,6 +103,12 @@ export async function initDB() {
     ALTER TABLE scans ADD COLUMN IF NOT EXISTS depop_queries TEXT
   `;
 
+  // secondary_aesthetic is in the Drizzle schema but was never migrated here —
+  // without it every scan INSERT fails on tables created before it was added
+  await client`
+    ALTER TABLE scans ADD COLUMN IF NOT EXISTS secondary_aesthetic TEXT
+  `;
+
   // Add garment_type column to depop_cache for smart recommendations
   await client`ALTER TABLE depop_cache ADD COLUMN IF NOT EXISTS garment_type TEXT`.catch(() => {});
 

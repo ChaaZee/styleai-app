@@ -2378,11 +2378,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         if (/dress|gown|romper|jumpsuit/.test(i)) return "dresses";
         if (/skirt/.test(i)) return "bottoms";
         if (/pant|jean|trouser|shorts|legging|chino|cargo/.test(i)) return "bottoms";
-        if (/jacket|coat|blazer|hoodie|cardigan|vest|puffer|windbreaker|bomber|parka/.test(i)) return "outerwear";
+        // NOTE: hoodies are tagged "tops" in the cache (curatedBase) — keep this in sync
+        if (/jacket|coat|blazer|cardigan|vest|puffer|windbreaker|bomber|parka/.test(i)) return "outerwear";
         if (/sneaker|shoe|boot|loafer|heel|flat|sandal|mule|oxford|espadrille/.test(i)) return "shoes";
         if (/hat|bag|purse|belt|scarf|necklace|earring|ring|bracelet|glasses|sunglasses|sock|glove/.test(i)) return "accessories";
         if (/tracksuit|set|co-ord|matching/.test(i)) return "sets";
-        return "tops"; // default: t-shirt, top, blouse, shirt, tee, sweater, knit
+        return "tops"; // default: t-shirt, top, blouse, shirt, tee, sweater, knit, hoodie
       }
 
       // Aesthetic -> short Depop search prefix (how sellers actually tag)
@@ -3281,7 +3282,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         if (/dress|gown|romper|jumpsuit/.test(i)) return "dresses";
         if (/skirt/.test(i)) return "bottoms";
         if (/pant|jean|trouser|shorts|legging|chino|cargo/.test(i)) return "bottoms";
-        if (/jacket|coat|blazer|hoodie|cardigan|vest|puffer|windbreaker|bomber|parka/.test(i)) return "outerwear";
+        // NOTE: hoodies are tagged "tops" in the cache (curatedBase) — keep this in sync
+        if (/jacket|coat|blazer|cardigan|vest|puffer|windbreaker|bomber|parka/.test(i)) return "outerwear";
         if (/sneaker|shoe|boot|loafer|heel|flat|sandal|mule|oxford|espadrille/.test(i)) return "shoes";
         if (/hat|bag|purse|belt|scarf|necklace|earring|ring|bracelet|glasses|sunglasses|sock|glove/.test(i)) return "accessories";
         if (/tracksuit|set|co-ord|matching/.test(i)) return "sets";
@@ -3301,15 +3303,20 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       // Falls back to keyword-based getDepopCacheByType if no embeddings available yet.
       const groups = await Promise.all(
         garmentEntries.map(async ({ query, garmentType }) => {
+          // The analyze step appends the user's gender to each query ("... men" /
+          // "... women") — recover it here and filter listings so a male user's
+          // scan never surfaces women's items (and vice versa).
+          const qGender = /\bwomen\b/i.test(query) ? "female" : /\bmen\b/i.test(query) ? "male" : "both";
           // Use vector search: embed the detected garment description, find closest cache rows
-          let listings = await getDepopCacheByEmbedding(query, aesthetic, garmentType, 10, query).catch(() => []);
+          let listings = await getDepopCacheByEmbedding(query, aesthetic, garmentType, 24, query).catch(() => []);
           if (!listings.length) {
             // Fallback: aesthetic-only pool
-            listings = await getDepopCacheByAesthetic(aesthetic, 10).catch(() => []);
+            listings = await getDepopCacheByAesthetic(aesthetic, 24).catch(() => []);
           }
           if (!listings.length) {
-            listings = await getDepopCacheByAesthetic("Minimalist", 10).catch(() => []);
+            listings = await getDepopCacheByAesthetic("Minimalist", 24).catch(() => []);
           }
+          listings = listings.filter((l: any) => feedGenderOk(l, qGender)).slice(0, 10);
           return { piece: query, listings };
         })
       );

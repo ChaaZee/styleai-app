@@ -108,7 +108,8 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
+      // reusePort is Linux-only (Render) — it throws ENOTSUP on Windows
+      ...(process.platform !== "win32" ? { reusePort: true } : {}),
     },
     () => {
       log(`serving on port ${port}`);
