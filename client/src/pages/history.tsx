@@ -181,9 +181,21 @@ export default function HistoryPage() {
                         onClick={() => setLocation(`/results/${scan.id}?from=history`)}
                         className="flex-1 p-3 flex items-center gap-3 hover:bg-muted/20 transition-all text-left"
                       >
+                        {/* List endpoint omits image_data for payload size — render the
+                            scan's colour palette as a gradient placeholder instead */}
                         <div
                           className="w-16 h-16 rounded-xl bg-cover bg-center border border-border flex-shrink-0"
-                          style={{ backgroundImage: `url('${scan.imageData}')` }}
+                          style={{
+                            backgroundImage: scan.imageData
+                              ? `url('${scan.imageData}')`
+                              : (() => {
+                                  try {
+                                    const colors = JSON.parse(scan.colorPalette || "[]");
+                                    if (colors.length >= 2) return `linear-gradient(135deg, ${colors.slice(0, 4).join(", ")})`;
+                                  } catch {}
+                                  return "linear-gradient(135deg, #5088B8, #0E0F16)";
+                                })(),
+                          }}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-foreground text-sm truncate mb-1">{scan.aesthetic}</p>

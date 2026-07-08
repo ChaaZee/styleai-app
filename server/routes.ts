@@ -948,40 +948,43 @@ const SUBREDDIT_MAP: { sub: string; aesthetic: string }[] = [
   { sub: "fashionadvice",         aesthetic: "Granola Girl" },
 ];
 
-// Fetch top image posts from a subreddit (no auth needed for read-only).
-// Uses Reddit's anonymous JSON endpoint — same data as adding `.json` to
-// any subreddit URL in a browser. Filters out non-image links and NSFW posts.
+// Fetch top image posts from a subreddit.
+// Reddit's anonymous JSON API now returns 403 for all server traffic — the
+// Atom RSS feed is the only endpoint still open. Entries carry the post
+// permalink, title, and the full-size i.redd.it image inside escaped HTML.
 async function fetchSubredditImages(
   sub: string,
   limit = 3,
   time: "week" | "month" | "hot" = "week"
 ): Promise<{ imageUrl: string; postUrl: string; title: string }[]> {
+  // Reddit rate-limits anonymous RSS aggressively (~1 req / 10s per IP) —
+  // pace requests and retry once on 429. Seeding is a background/cron job,
+  // so the added minutes don't affect any user-facing path.
+  await new Promise(r => setTimeout(r, 10_000));
   const url = time === "hot"
-    ? `https://www.reddit.com/r/${sub}/hot.json?limit=25`
-    : `https://www.reddit.com/r/${sub}/top.json?limit=25&t=${time}`;
-  const res = await fetch(url, {
-    headers: { "User-Agent": "StitchApp/1.0 (fashion discovery)" },
-  });
+    ? `https://www.reddit.com/r/${sub}/hot.rss`
+    : `https://www.reddit.com/r/${sub}/top.rss?t=${time}`;
+  const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+  let res = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15_000) });
+  if (res.status === 429) {
+    await new Promise(r => setTimeout(r, 30_000));
+    res = await fetch(url, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15_000) });
+  }
   if (!res.ok) throw new Error(`Reddit ${sub}: HTTP ${res.status}`);
-  const json = await res.json() as any;
-  const posts = json?.data?.children ?? [];
+  const xml = await res.text();
 
   const images: { imageUrl: string; postUrl: string; title: string }[] = [];
-  for (const { data: post } of posts) {
-    if (images.length >= limit) break;
-    const postUrl = (post.url_overridden_by_dest || post.url) as string;
-    if (!postUrl) continue;
-    const isRedditImg = postUrl.includes("i.redd.it") || postUrl.includes("preview.redd.it");
-    const isDirectImg = /\.(jpg|jpeg|png|webp)(\?|$)/i.test(postUrl);
-    const isImgur = postUrl.includes("i.imgur.com") && /\.(jpg|jpeg|png|gif|webp)/i.test(postUrl);
-    if (!isRedditImg && !isDirectImg && !isImgur) continue;
-    if (post.over_18) continue;
-    const imageUrl = postUrl.replace("preview.redd.it", "i.redd.it").split("?")[0];
-    images.push({
-      imageUrl,
-      postUrl: `https://reddit.com${post.permalink}`,
-      title: post.title,
-    });
+  const entryRe = /<entry>([\s\S]*?)<\/entry>/g;
+  let m: RegExpExecArray | null;
+  while ((m = entryRe.exec(xml)) !== null && images.length < limit) {
+    const entry = m[1];
+    const title = (entry.match(/<title>([^<]*)<\/title>/)?.[1] ?? "")
+      .replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+    const postUrl = entry.match(/<link href="([^"]+)"/)?.[1] ?? "";
+    // Full-size image is an i.redd.it link inside the escaped HTML content
+    const img = entry.match(/https:\/\/i\.redd\.it\/[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)/)?.[0];
+    if (!img || !postUrl) continue;
+    images.push({ imageUrl: img, postUrl, title });
   }
   return images;
 }
