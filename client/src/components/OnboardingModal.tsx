@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { getDeviceId } from "@/lib/deviceId";
 
 // ── Aesthetic config with outfit images ───────────────────────────────────────
 const AESTHETICS = [
@@ -111,19 +112,37 @@ interface OnboardingModalProps {
   onClose: () => void;
 }
 
-type Step = "shuffle" | "picker";
+type Step = "gender" | "shuffle" | "picker";
+
+const GENDER_OPTIONS = [
+  { value: "male",   label: "Menswear",   icon: "🧥", hint: "Men's fits and sizing" },
+  { value: "female", label: "Womenswear", icon: "👗", hint: "Women's fits and sizing" },
+  { value: "both",   label: "Everything", icon: "🌐", hint: "Show me all styles" },
+] as const;
 
 export default function OnboardingModal({ userId, onComplete, onClose }: OnboardingModalProps) {
-  const userGender = (() => {
-    try { return (JSON.parse(localStorage.getItem("stitch_profile") || "{}") as any).gender || "both"; } catch { return "both"; }
-  })();
+  // Gender is asked FIRST — it decides which aesthetics the shuffle and
+  // picker show (female-only aesthetics never shown to male shoppers).
+  const [gender, setGender] = useState<string | null>(null);
 
-  const visibleAesthetics = userGender === "male"
+  const visibleAesthetics = gender === "male"
     ? AESTHETICS.filter(a => !FEMALE_ONLY_AESTHETICS.has(a.label))
     : AESTHETICS;
 
   // ── Step state ────────────────────────────────────────────────────────────
-  const [step, setStep] = useState<Step>("shuffle");
+  const [step, setStep] = useState<Step>("gender");
+
+  const chooseGender = (g: string) => {
+    setGender(g);
+    // Persist locally so the rest of the app (feeds, scan) filters immediately
+    try {
+      const profile = JSON.parse(localStorage.getItem("stitch_profile") || "{}");
+      localStorage.setItem("stitch_profile", JSON.stringify({ ...profile, gender: g }));
+    } catch {
+      localStorage.setItem("stitch_profile", JSON.stringify({ gender: g }));
+    }
+    setStep("shuffle");
+  };
   const [shuffleIndex, setShuffleIndex] = useState(0);
   const [liked, setLiked] = useState<Set<string>>(new Set());   // from shuffle
   const [selected, setSelected] = useState<Set<string>>(new Set()); // for picker
@@ -183,19 +202,17 @@ export default function OnboardingModal({ userId, onComplete, onClose }: Onboard
     try {
       const res = await fetch("/api/onboarding", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-device-id": getDeviceId() },
         body: JSON.stringify({
           userId,
           aesthetics: [...selected],
-          gender: (() => {
-            try { return (JSON.parse(localStorage.getItem("stitch_profile") || "{}") as any).gender || "both"; } catch { return "both"; }
-          })(),
+          gender: gender || "both",
         }),
       });
       if (!res.ok) throw new Error("Failed to save preferences");
       onComplete();
     } catch {
-      setError("Something went wrong. Try again.");
+      setError("Couldn't save your preferences — check your connection and try again.");
       setSaving(false);
     }
   };
@@ -226,8 +243,52 @@ export default function OnboardingModal({ userId, onComplete, onClose }: Onboard
           flexDirection: "column",
         }}
       >
-        {step === "shuffle" ? (
-          // ── STEP 0: STYLE SHUFFLE ─────────────────────────────────────────
+        {step === "gender" ? (
+          // ── STEP 0: WHO DO YOU SHOP FOR? ──────────────────────────────────
+          <>
+            <div className="px-6 pt-6 pb-4">
+              <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-5 sm:hidden" />
+              <h2
+                className="text-2xl text-white text-center"
+                style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 500 }}
+              >
+                Who do you shop for?
+              </h2>
+              <p
+                className="text-center text-white/50 text-sm mt-1"
+                style={{ fontFamily: "'Jost', sans-serif", fontWeight: 300, letterSpacing: "0.06em" }}
+              >
+                We'll only show styles that fit you
+              </p>
+            </div>
+            <div className="px-5 pb-8 pt-2 flex flex-col gap-3">
+              {GENDER_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => chooseGender(opt.value)}
+                  className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-left transition-all hover:border-[#5088B8]/60 active:scale-[0.98]"
+                >
+                  <span className="text-2xl">{opt.icon}</span>
+                  <span>
+                    <span
+                      className="block text-white text-sm font-medium"
+                      style={{ fontFamily: "'Jost', sans-serif", letterSpacing: "0.04em" }}
+                    >
+                      {opt.label}
+                    </span>
+                    <span
+                      className="block text-white/40 text-xs mt-0.5"
+                      style={{ fontFamily: "'DM Sans', sans-serif" }}
+                    >
+                      {opt.hint}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : step === "shuffle" ? (
+          // ── STEP 1: STYLE SHUFFLE ─────────────────────────────────────────
           <>
             {/* Header */}
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">

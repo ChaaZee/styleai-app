@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import OnboardingModal from "../components/OnboardingModal";
 import { getOrCreateUserId, getDeviceId } from "@/lib/deviceId";
+import { formatPrice } from "@/lib/format";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface DepopItem {
@@ -29,9 +30,7 @@ function FitCard({
   const [saved, setSaved] = useState(false);
   const [imgError, setImgError] = useState(false);
 
-  const price = item.price?.priceAmount
-    ? `$${parseFloat(item.price.priceAmount).toFixed(0)}`
-    : null;
+  const price = formatPrice(item.price) || null;
 
   const depopUrl = item.url?.startsWith("https://www.depop.com/products/")
     ? item.url

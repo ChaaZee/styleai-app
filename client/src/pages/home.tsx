@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { rankByVector, getTopAesthetics } from "@/lib/styleVector";
 import OnboardingModal from "@/components/OnboardingModal";
 import { getOrCreateUserId, getDeviceId } from "@/lib/deviceId";
+import { formatPrice } from "@/lib/format";
 
 // ── Clothing SVG illustrations (same set as discover) ───────────────────────
 const Icons: Record<string, JSX.Element> = {
@@ -470,6 +471,9 @@ export default function HomePage() {
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
     setForYouOnboarded(true);
+    // The modal saves gender to localStorage — sync it into state so the main
+    // feed refetches with the new gender filter instead of waiting for a reload
+    setGenderPref(getGenderPref());
     setForYouLoading(true);
     fetch(`/api/for-you/${userId}?offset=0&limit=60`)
       .then(r => r.json())
@@ -740,7 +744,7 @@ export default function HomePage() {
                   />
                   <div className="px-2.5 pb-2.5 pt-1.5 bg-background">
                     <p className="text-[11px] font-medium text-foreground leading-tight line-clamp-2">{card.title}</p>
-                    {card.price > 0 && <p className="text-[11px] text-primary font-semibold mt-0.5">${card.price.toFixed(0)}</p>}
+                    {formatPrice(card.price) && <p className="text-[11px] text-primary font-semibold mt-0.5">{formatPrice(card.price)}</p>}
                   </div>
                 </a>
               ))}
@@ -798,7 +802,7 @@ export default function HomePage() {
                   </p>
                   <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">{item.title}</p>
                   <div className="flex items-center justify-between">
-                    {price && <p className="text-xs text-primary font-semibold">${parseFloat(price).toFixed(0)}</p>}
+                    {formatPrice(price) && <p className="text-xs text-primary font-semibold">{formatPrice(price)}</p>}
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0 ml-auto">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                       <polyline points="15 3 21 3 21 9"/>
@@ -857,7 +861,7 @@ export default function HomePage() {
                 <p className="font-label text-[9px] text-muted-foreground mb-0.5" style={{ letterSpacing: '0.14em' }}>{card.brand || item.aesthetic}</p>
                 <p className="text-xs text-foreground font-medium leading-snug mb-1 line-clamp-2">{card.title || item.label}</p>
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-primary font-semibold">${card.price?.toFixed(0)}</p>
+                  <p className="text-xs text-primary font-semibold">{formatPrice(card.price)}</p>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-muted-foreground/40 group-hover:text-primary transition-colors flex-shrink-0">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                     <polyline points="15 3 21 3 21 9"/>

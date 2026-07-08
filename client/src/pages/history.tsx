@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatPrice } from "@/lib/format";
 import { useLocation } from "wouter";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
@@ -338,7 +339,7 @@ export default function HistoryPage() {
                           <div className="flex items-center justify-between">
                             {item.price && item.price > 0 ? (
                               <span className="text-xs text-primary font-semibold" style={{ fontFamily: "'Jost', sans-serif" }}>
-                                ${item.price.toFixed(0)}
+                                {formatPrice(item.price)}
                               </span>
                             ) : <span />}
                             <div className="w-3.5 h-3.5 rounded-full bg-[#FF2300] flex items-center justify-center">

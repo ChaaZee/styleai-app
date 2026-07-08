@@ -5,6 +5,7 @@ import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { WardrobeItem } from "@shared/schema";
 import { getOrCreateUserId } from "@/lib/deviceId";
+import { formatPrice } from "@/lib/format";
 
 const CATEGORIES = ["All", "tops", "bottoms", "shoes", "outerwear", "accessories"];
 
@@ -70,8 +71,8 @@ function GapRecommendations({ userId, itemCount }: { userId: string; itemCount: 
                 )}
               </div>
               <p className="text-[8px] text-background/70 leading-tight line-clamp-2">{item.title}</p>
-              {item.price > 0 && (
-                <p className="text-[9px] font-medium text-background">${item.price.toFixed(0)}</p>
+              {formatPrice(item.price) && (
+                <p className="text-[9px] font-medium text-background">{formatPrice(item.price)}</p>
               )}
             </a>
           ))}

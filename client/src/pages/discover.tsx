@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { onLike, onUnlike, rankByVector } from "@/lib/styleVector";
 import { getUserId } from "@/lib/deviceId";
+import { formatPrice } from "@/lib/format";
 
 // ── Clothing icon map ─────────────────────────────────────────────────────────
 type IconKey = "shirt"|"pants"|"dress"|"shoes"|"bag"|"jacket"|"skirt"|"accessory";
@@ -122,8 +123,8 @@ function ShopTheLookPanel({ aesthetic, keyPieces }: { aesthetic: string; keyPiec
                 )}
                 <div className="px-1 pb-1.5 w-full">
                   <p className="text-[8px] text-muted-foreground text-center leading-tight line-clamp-1">{piece}</p>
-                  {item.price > 0 && (
-                    <p className="text-[8px] font-medium text-foreground text-center">${item.price.toFixed(0)}</p>
+                  {formatPrice(item.price) && (
+                    <p className="text-[8px] font-medium text-foreground text-center">{formatPrice(item.price)}</p>
                   )}
                 </div>
               </a>
