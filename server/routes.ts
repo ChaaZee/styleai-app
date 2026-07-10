@@ -3163,20 +3163,39 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       aesthetics.length ? aesthetics.slice(0, 3) : topDefaults
     );
     try {
-      // Pull more per aesthetic when gender filtering to compensate for filtered items
-      const perAesthetic = gender === "both" ? 50 : 100;
+      // aesthetics[0] is the user's MAIN style, [1] and [2] are sub styles.
+      // Main fills ~half the feed, subs share the rest, interleaved 2:1:1 so
+      // styles mix throughout instead of appearing as three blocks. Pull more
+      // per aesthetic when gender filtering to compensate for filtered items.
+      const mainCount = gender === "both" ? 80 : 150;
+      const subCount = gender === "both" ? 40 : 80;
       const results = await Promise.all(
-        targetAesthetics.map(a => getDepopCacheByAesthetic(a, perAesthetic))
+        targetAesthetics.map((a, i) => getDepopCacheByAesthetic(a, i === 0 ? mainCount : subCount))
       );
-      // Cross-aesthetic dedup + gender filter
+      // Cross-aesthetic dedup + gender filter per pool
       const seenUrls = new Set<string>();
-      const listings = results.flat().filter((l: any) => {
+      const pools = results.map(pool => pool.filter((l: any) => {
         const key = l.url || l.product_link || (l.image ? l.image.split('?')[0] : '');
         if (!key || seenUrls.has(key)) return false;
         if (!feedGenderOk(l, gender)) return false;
         seenUrls.add(key);
         return true;
-      }).slice(0, 150); // cap at 150
+      }));
+      // Weighted interleave: main, main, sub1, sub2, repeat — cap at 150
+      const pattern = pools.length >= 3 ? [0, 0, 1, 2] : pools.length === 2 ? [0, 0, 1] : [0];
+      const cursors = pools.map(() => 0);
+      const listings: any[] = [];
+      while (listings.length < 150) {
+        let added = false;
+        for (const p of pattern) {
+          if (p < pools.length && cursors[p] < pools[p].length) {
+            listings.push(pools[p][cursors[p]++]);
+            added = true;
+            if (listings.length >= 150) break;
+          }
+        }
+        if (!added) break;
+      }
       // If nothing cached yet, fire background seed for all default queries
       if (!listings.length) {
         // Run in batches of 8 to avoid overwhelming Apify free tier
@@ -3319,8 +3338,40 @@ export async function registerRoutes(httpServer: Server, app: Express) {
           if (!listings.length) {
             listings = await getDepopCacheByAesthetic("Minimalist", 24).catch(() => []);
           }
-          listings = listings.filter((l: any) => feedGenderOk(l, qGender)).slice(0, 10);
-          return { piece: query, listings };
+          listings = listings.filter((l: any) => feedGenderOk(l, qGender));
+          // Thin group (exact-match cache rows can shadow better content, and
+          // gender filtering shrinks pools) — top up from the aesthetic pool
+          if (listings.length < 4) {
+            const extra = (await getDepopCacheByAesthetic(aesthetic, 30).catch(() => []))
+              .filter((l: any) => feedGenderOk(l, qGender));
+            const seenKeys = new Set(listings.map((l: any) => l.url || l.image));
+            for (const l of extra) {
+              const k = l.url || l.image;
+              if (!k || seenKeys.has(k)) continue;
+              seenKeys.add(k);
+              listings.push(l);
+              if (listings.length >= 12) break;
+            }
+          }
+          // Interleave across stores so post-analysis recs aren't all-Depop
+          const bySource: Record<string, any[]> = {};
+          for (const l of listings) (bySource[l._source || "depop"] ??= []).push(l);
+          const srcKeys = Object.keys(bySource);
+          const mixed: any[] = [];
+          let si = 0;
+          while (mixed.length < 10) {
+            let added = false;
+            for (const k of srcKeys) {
+              if (bySource[k].length > si) {
+                mixed.push(bySource[k][si]);
+                added = true;
+                if (mixed.length >= 10) break;
+              }
+            }
+            if (!added) break;
+            si++;
+          }
+          return { piece: query, listings: mixed };
         })
       );
 

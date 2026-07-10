@@ -732,28 +732,63 @@ export async function getDepopCacheByType(aesthetic: string, garmentType: string
 // have to pull 500 rows just to pick 50. The final Fisher–Yates shuffle is
 // in JS to mix the order across cache rows.
 export async function getDepopCacheByAesthetic(aesthetic: string, limit = 50): Promise<any[]> {
-  // Use RANDOM() so we sample across all 500+ rows, not just the newest ones
+  // Depop items live in hundreds of small rows while ASOS/Pacsun/Shopify items
+  // live in a few giant rows (e.g. 'asos mens hoodies' = 1,348 listings in one
+  // row) — pure random row sampling almost never picks the big rows, producing
+  // an all-Depop feed. Sample depop and non-depop rows separately, then
+  // interleave item-by-item across sources so every store gets shelf space.
   const rowLimit = Math.ceil(limit / 4) + 4;
   const rows = await client`
-    SELECT listings FROM depop_cache
-    WHERE aesthetic = ${aesthetic}
-      AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
-    ORDER BY RANDOM()
-    LIMIT ${rowLimit}
+    (SELECT listings FROM depop_cache
+     WHERE aesthetic = ${aesthetic}
+       AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+       AND COALESCE(listings->0->>'_source', 'depop') = 'depop'
+     ORDER BY RANDOM()
+     LIMIT ${rowLimit})
+    UNION ALL
+    (SELECT listings FROM depop_cache
+     WHERE aesthetic = ${aesthetic}
+       AND (permanent = TRUE OR created_at > NOW() - INTERVAL '24 hours')
+       AND COALESCE(listings->0->>'_source', 'depop') <> 'depop'
+     ORDER BY RANDOM()
+     LIMIT 4)
   `;
-  // Flatten, dedup by URL (same item can appear in multiple cache rows), shuffle, return limit
+  // Flatten + dedupe by URL, bucket by item source, shuffle within each bucket
   const seen = new Set<string>();
-  const all: any[] = rows.flatMap((r: any) => r.listings as any[]).filter((l: any) => {
-    const key = l.url || l.product_link || (l.image ? l.image.split('?')[0] : '');
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  for (let i = all.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [all[i], all[j]] = [all[j], all[i]];
+  const buckets: Record<string, any[]> = {};
+  for (const r of rows) {
+    const listings = Array.isArray(r.listings) ? r.listings : JSON.parse(r.listings as any);
+    for (const l of listings) {
+      const key = l.url || l.product_link || (l.image ? l.image.split('?')[0] : '');
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      const src = l._source || "depop";
+      (buckets[src] ??= []).push(l);
+    }
   }
-  return all.slice(0, limit);
+  for (const arr of Object.values(buckets)) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+  // Round-robin across sources for store variety
+  const keys = Object.keys(buckets);
+  const out: any[] = [];
+  let idx = 0;
+  while (out.length < limit) {
+    let added = false;
+    for (const k of keys) {
+      if (buckets[k].length > idx) {
+        out.push(buckets[k][idx]);
+        added = true;
+        if (out.length >= limit) break;
+      }
+    }
+    if (!added) break;
+    idx++;
+  }
+  return out;
 }
 
 // ─────────────────────────────────────────────
@@ -1402,6 +1437,38 @@ export async function getForYouRecommendations(
         const source: string = item._source || "depop";
         if (!buckets[source]) buckets[source] = [];
         buckets[source].push({ ...item, _aesthetic: row.aesthetic });
+      }
+    }
+  }
+
+  // Guarantee store variety: vector proximity favours the hundreds of small
+  // Depop rows, so the few giant ASOS/Pacsun/Shopify rows rarely make the
+  // candidate set. If no non-Depop source surfaced, pull the nearest
+  // non-Depop rows explicitly so the round-robin below has stores to mix.
+  const hasNonDepop = Object.keys(buckets).some(s => s !== "depop");
+  if (!hasNonDepop && queryVectors.length) {
+    const vecStr = `[${queryVectors[0].join(",")}]`;
+    const extraRows = await client<{ listings: any[]; aesthetic: string }[]>`
+      SELECT listings, aesthetic
+      FROM depop_cache
+      WHERE embedding IS NOT NULL
+        AND permanent = TRUE
+        AND COALESCE(listings->0->>'_source', 'depop') <> 'depop'
+        ${genderQueryFilter}
+      ORDER BY embedding <=> ${vecStr}::vector
+      LIMIT 5
+    `.catch(() => [] as any);
+    for (const row of extraRows) {
+      if (gender === "male" && FEMALE_ONLY_AESTHETICS.has(row.aesthetic)) continue;
+      const listings = Array.isArray(row.listings) ? row.listings : JSON.parse(row.listings as any);
+      for (const item of listings) {
+        const key = item.url || item.id;
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        if (!genderPassesFilter(item, gender)) continue;
+        if (isJunkListing(item)) continue;
+        const source: string = item._source || "depop";
+        (buckets[source] ??= []).push({ ...item, _aesthetic: row.aesthetic });
       }
     }
   }
