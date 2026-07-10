@@ -60,9 +60,8 @@ without paying full retail. Think Shazam but for clothes.
 
 ### Product Rules
 - No Amazon or eBay product cards — only Depop, ASOS, Pacsun, Shopify brands for now
-- No sponsored cards on the home page (Sovrn/Nexbie removed July 2026) — the
-  Sovrn link lives in the menu + How It Works; Nexbie only in analysis results
-- When footwear is detected in an analysis, inject Nexbie shoe cards into results
+- No sponsored product cards anywhere (Sovrn/Nexbie removed from home page and
+  analysis results, July 2026) — the Sovrn link lives only in the menu + How It Works
 - Home feed mixes the user's MAIN style (~50%) with 2 sub styles (~25% each),
   interleaved across stores (depop/asos/pacsun/shopify) and shuffled per refresh
 - When displaying Depop items, always use the real title — never the slug
@@ -258,7 +257,6 @@ Recent likes matter more than old ones. Clusters are recomputed every 5 interact
 - Build queries from detected garments + aesthetic
 - Pull matching rows from `depop_cache` using semantic similarity (embedding `<=>` operator)
 - Filter by gender, apply source diversity (round-robin across stores)
-- Inject Nexbie shoe cards into results when footwear is detected
 
 ---
 
